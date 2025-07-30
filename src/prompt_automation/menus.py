@@ -10,7 +10,7 @@ from . import logger
 from .renderer import fill_placeholders, load_template
 from .variables import get_variables
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "styles"
+PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
 
 
 def _run_picker(items: List[str], title: str) -> Optional[str]:

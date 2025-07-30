@@ -2,3 +2,9 @@ build/
 scripts/venv/
 *.egg-info
 .DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage

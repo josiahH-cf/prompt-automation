@@ -30,4 +30,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 prompt_automation = ["resources/*", "hotkey/*"]
-prompts = ["styles/**/*.json"]
