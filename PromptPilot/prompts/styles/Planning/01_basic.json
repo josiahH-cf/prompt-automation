@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "title": "Plan tasks",
+  "style": "Planning",
+  "role": "You are a helpful planner.",
+  "template": [
+    "Plan for: {{TOPIC}}"
+  ],
+  "placeholders": [
+    { "name": "TOPIC", "label": "Topic" }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "title": "Debug issue",
+  "style": "Troubleshooting",
+  "role": "You help fix problems.",
+  "template": [
+    "Problem description: {{DESC}}"
+  ],
+  "placeholders": [
+    { "name": "DESC", "label": "Describe the problem" }
+  ]
+}

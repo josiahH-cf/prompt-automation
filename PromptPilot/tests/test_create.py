@@ -1,0 +1,12 @@
+import json
+from promptpilot import menus
+
+def test_create_new_template(tmp_path, monkeypatch):
+    menus.PROMPTS_DIR = tmp_path
+    inputs = iter(["Test", "1", "Title", "Line1", "."])
+    monkeypatch.setattr("builtins.input", lambda *a: next(inputs))
+    menus.create_new_template()
+    files = list(tmp_path.glob("Test/*.json"))
+    assert files
+    data = json.loads(files[0].read_text())
+    assert data["id"] == 1
