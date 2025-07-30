@@ -1,7 +1,7 @@
 import sys
 
 sys.modules.setdefault("pyperclip", type("x", (), {"copy": lambda x: None}))
-from prompt_automation import cli
+from prompt_automation import cli  # noqa: E402
 
 
 def test_troubleshoot_flag(capsys):
