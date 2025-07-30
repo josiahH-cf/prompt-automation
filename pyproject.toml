@@ -1,12 +1,12 @@
 [project]
-name = "promptpilot"
+name = "prompt-automation"
 version = "0.2.0"
 description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
-authors = [{name="PromptPilot"}]
+authors = [{name="prompt-automation"}]
 
 [project.scripts]
-promptpilot = "promptpilot.cli:main"
+prompt-automation = "prompt_automation.cli:main"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "ruff"]
@@ -15,7 +15,7 @@ test = ["pytest", "pytest-cov", "ruff"]
 line-length = 88
 
 [tool.pytest.ini_options]
-addopts = "--cov=src --cov-report=term"
+addopts = ""
 
 [build-system]
 requires = ["setuptools", "wheel"]

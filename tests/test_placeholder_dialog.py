@@ -1,4 +1,4 @@
-from promptpilot import variables
+from prompt_automation import variables
 
 
 def test_cli_fallback(monkeypatch):
