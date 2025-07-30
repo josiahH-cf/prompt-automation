@@ -1,71 +1,105 @@
 # prompt-automation
 
-**prompt-automation** is a keyboard-driven launcher for your favorite AI prompt templates.
+**prompt-automation** is a keyboard driven launcher for your favorite AI prompts. Press a hotkey, pick a template and the text is pasted wherever your cursor lives.
 
-## 1. Install prerequisites
+---
 
-### Windows 11
-1. Install [Git](https://git-scm.com/download/win).
-2. Open PowerShell as Administrator and run:
-   ```powershell
-   winget install -e --id Python.Python.3.11
-   winget install -e --id Microsoft.VisualStudioCode
-   winget install -e --id Git.Git
-   ```
+## Getting the Code
 
-### macOS 14
-1. Install [Homebrew](https://brew.sh) if missing.
-2. Run:
-   ```bash
-   brew install git python@3.11 --cask visual-studio-code
-   ```
-
-## 2. Clone this repository
+Clone the repository and change into the project directory:
 
 ```bash
 git clone https://github.com/<user>/prompt-automation.git
 cd prompt-automation
 ```
 
-## 3. Run the installer
+## OS Specific Installation
 
-### macOS/Linux
-```bash
-curl -sSL https://example.com/install.sh | bash
-```
-
-### Windows PowerShell
+### Windows 11
+Run the PowerShell installer:
 ```powershell
-iwr -useb https://example.com/install.ps1 | iex
+scripts\install.ps1
 ```
+The script installs Python, pipx, fzf, espanso and registers the **Ctrl+Shift+J** hotkey using AutoHotkey.
 
-After installation, restart your terminal or log out/in if prompted.
-Detailed hotkey setup instructions for each platform are available in
-[docs/HOTKEYS.md](docs/HOTKEYS.md).
-
-## 4. Try the hotkey
-
-Press **Ctrl+Shift+J** and a style picker will appear. Choose a template and the text is pasted automatically.
-
-```
-[Ctrl+Shift+J] -> [Style Picker] -> [Fill Placeholders] -> [Pasted Output]
-```
-
-## 5. Add a new prompt
-
-Run the launcher and select **Option 99**. Provide style, ID, title, role, template lines and placeholders when prompted. The new JSON template is saved under `prompts/styles/<Style>/` and is available immediately.
-
-## Troubleshooting
-
-- **Behind a firewall?** Download the repo and run the installer scripts locally.
-- **Hotkey not working?** Re-run `prompt-automation` from the terminal to reset the hotkey integration.
-- **Need more help?** Run `prompt-automation --troubleshoot` and check `~/.prompt-automation/logs` for details.
-
-## Uninstall
-
+### macOS 14
+Run the shell installer:
 ```bash
-pipx uninstall prompt-automation
-rm -rf ~/.prompt-automation
+bash scripts/install.sh
+```
+Homebrew is used to fetch dependencies. A small AppleScript registers the hotkey on login.
+
+### Linux
+Run the shell installer as above. It expects `apt` or `brew` and uses Espanso for the hotkey.
+
+### WSL2
+Run the Linux installer inside your distribution. Clipboard integration requires `clip.exe` in your Windows path.
+
+After installation restart your terminal session so `pipx` is on your `PATH`.
+
+## Launching and Hotkeys
+
+Press **Ctrl+Shift+J** to open the style picker. Hotkey troubleshooting and manual setup steps for each platform are documented in [docs/HOTKEYS.md](docs/HOTKEYS.md).
+
+## Using prompt-automation
+
+1. **Pick Style** – Choose a style category.
+2. **Pick Template** – Select the prompt template.
+3. **Fill Placeholders** – Enter any required values.
+4. **Paste** – The rendered text is copied to the clipboard and pasted for you.
+
+```
+[Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]
+```
+
+Templates live under `prompts/styles/`. Selecting option `99` inside the style picker lets you create a new template interactively.
+
+## Managing Prompt Templates
+
+Template files are JSON documents stored in subfolders of `prompts/styles/`.
+Each file must contain:
+
+```json
+{
+  "id": 1,
+  "title": "My Template",
+  "style": "Utility",
+  "role": "assistant",
+  "template": ["Hello {{name}}"],
+  "placeholders": [{"name": "name", "label": "Name"}]
+}
+```
+
+The filename should start with a two digit ID: `01_my_template.json`.
+To edit an existing template simply modify the JSON file and rerun the launcher.
+
+## Usage Log
+
+Every time text is pasted an entry is recorded in `~/.prompt-automation/usage.db`.
+Delete this file to reset statistics.
+
+## Advanced Configuration
+
+Several environment variables allow custom paths:
+
+- `PROMPT_AUTOMATION_PROMPTS` – directory containing the `styles/` folders.
+- `PROMPT_AUTOMATION_DB` – path to the usage database.
+
+You can also modify the installed hotkey by editing the platform specific file in `src/prompt_automation/hotkey/` and rerunning the installer.
+
+## Directory Overview
+
+```
+project/
+├── docs/               # Additional documentation
+├── prompts/
+│   └── styles/         # Prompt JSON files
+├── scripts/            # Install helpers
+├── src/
+│   └── prompt_automation/
+│       ├── hotkey/     # Platform hotkey scripts
+│       └── ...         # Application modules
+└── tests/              # Test suite
 ```
 
 Enjoy!

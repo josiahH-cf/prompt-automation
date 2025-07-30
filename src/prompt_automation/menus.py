@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -10,7 +11,8 @@ from . import logger
 from .renderer import fill_placeholders, load_template
 from .variables import get_variables
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
+DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
+PROMPTS_DIR = Path(os.environ.get("PROMPT_AUTOMATION_PROMPTS", DEFAULT_PROMPTS_DIR))
 
 
 def _run_picker(items: List[str], title: str) -> Optional[str]:
