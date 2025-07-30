@@ -1,5 +1,4 @@
 """Clipboard helper using pyperclip and keyboard."""
-import os
 import platform
 import subprocess
 

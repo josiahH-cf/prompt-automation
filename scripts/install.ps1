@@ -1,22 +1,59 @@
-# Install Python 3.11, pipx, fzf, espanso and prompt-automation
-Write-Host "Step 1/6: Checking Python 3.11 ..."
+# PowerShell install script for prompt-automation
+param()
+
+function Info($msg) { Write-Host $msg -ForegroundColor Green }
+function Fail($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
+
+if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
+    Fail "This installer must be run on Windows."
+}
+
+# Ensure Python
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    winget install -e --id Python.Python.3.11
+    Info "Installing Python3 via winget..."
+    winget install -e --id Python.Python.3 || Fail "Failed to install Python"
 }
-Write-Host "Step 2/6: Installing pipx ..."
+
+# Ensure pipx
 if (-not (Get-Command pipx -ErrorAction SilentlyContinue)) {
-    python -m pip install --user pipx
-    pipx ensurepath
+    Info "Installing pipx..."
+    python -m pip install --user pipx || Fail "pip install pipx failed"
+    python -m pipx ensurepath
+    $env:Path += ";$([Python]::CreateEngine().GetSysModule().GetAttr('prefix').ToString())\Scripts"
 }
-Write-Host "Step 3/6: Installing fzf ..."
+
+# Install fzf
 if (-not (Get-Command fzf -ErrorAction SilentlyContinue)) {
-    winget install -e --id Git.Fzf
+    Info "Installing fzf..."
+    winget install -e --id Git.Fzf || Fail "Failed to install fzf"
 }
-Write-Host "Step 4/6: Installing espanso ..."
+
+# Install espanso
 if (-not (Get-Command espanso -ErrorAction SilentlyContinue)) {
-    winget install -e --id Espanso.Espanso
+    Info "Installing espanso..."
+    winget install -e --id Espanso.Espanso || Fail "Failed to install espanso"
 }
-Write-Host "Step 5/6: Installing prompt-automation ..."
-pipx install --force prompt-automation
-Write-Host "Step 6/6: Opening README ..."
-Start-Process README.md
+
+# Install AutoHotkey v2
+if (-not (Get-Command AutoHotkey -ErrorAction SilentlyContinue)) {
+    Info "Installing AutoHotkey..."
+    winget install -e --id AutoHotkey.AutoHotkey || Fail "Failed to install AutoHotkey"
+}
+
+# Copy AHK script to Startup
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ahkSource = Join-Path $scriptDir '..\src\prompt_automation\hotkey\windows.ahk'
+$ahkSource = Resolve-Path $ahkSource
+$startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\prompt-automation.ahk'
+try {
+    Copy-Item -Path $ahkSource -Destination $startup -Force
+    Info "Registered prompt-automation hotkey script."
+} catch {
+    Write-Warning "Failed to register AutoHotkey script: $_"
+}
+
+# Install prompt-automation
+Info "Installing prompt-automation via pipx..."
+pipx install --force prompt-automation || Fail "Failed to install prompt-automation"
+
+Info "Installation complete. You may need to log out and back in for hotkeys to activate."
