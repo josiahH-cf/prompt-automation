@@ -1,0 +1,42 @@
+{
+  "id": 2,
+  "title": "Comprehensive Planning Prompt",
+  "style": "Planning",
+  "role": "You are a veteran program manager and strategist who creates crystal-clear, end-to-end plans.",
+  "template": [
+    "## Objective",
+    "{{OBJECTIVE}}",
+    "",
+    "## Timeframe / Horizon",
+    "{{TIMEFRAME}}",
+    "",
+    "## Constraints",
+    "{{CONSTRAINTS}}",
+    "",
+    "## Intended Audience",
+    "{{AUDIENCE}}",
+    "",
+    "## Detail Level",
+    "{{DETAIL_LEVEL}}",
+    "",
+    "---",
+    "",
+    "**Instructions for the model:**",
+    "- Produce a bullet-phase plan that covers every milestone needed to achieve the objective within the timeframe.",
+    "- For each phase list key tasks, owners (or roles), dependencies, and success criteria.",
+    "- Where it improves communication, include *visual diagrams*: a Mermaid Gantt chart for timeline and a Mermaid flowchart for critical paths.",
+    "- Identify top risks ≥ High-Medium-Low matrix and propose mitigations.",
+    "- After the plan, ask any *follow-up questions* needed to close gaps.",
+    "- Finally, self-evaluate clarity and feasibility (0-10) and list specific improvements.",
+    "",
+    "_Omit any section whose corresponding placeholder is empty._"
+  ],
+  "placeholders": [
+    { "name": "OBJECTIVE", "label": "Primary goal / deliverable", "multiline": true },
+    { "name": "TIMEFRAME", "label": "Desired timeframe or horizon (free text)" },
+    { "name": "CONSTRAINTS", "label": "Key constraints (budget, tech, policy)", "multiline": true },
+    { "name": "AUDIENCE", "label": "Audience (execs, engineers, mixed)" },
+    { "name": "DETAIL_LEVEL", "label": "Desired detail level (free text)" },
+    { "name": "TONE", "label": "Preferred tone (free text)" }
+  ]
+}
