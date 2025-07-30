@@ -1,3 +1,5 @@
+import sys
+sys.modules.setdefault("pyperclip", type("x", (), {"copy": lambda *a: None}))
 from prompt_automation import cli
 
 def test_list_flag(capsys):

@@ -6,7 +6,7 @@ import logging
 import os
 import platform
 import shutil
-import subprocess
+from .utils import safe_run
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,7 +36,7 @@ def _check_cmd(name: str) -> bool:
 
 def _run_cmd(cmd: list[str]) -> bool:
     try:
-        res = subprocess.run(cmd, capture_output=True)
+        res = safe_run(cmd, capture_output=True)
         return res.returncode == 0
     except Exception:
         return False
@@ -101,6 +101,12 @@ def main(argv: list[str] | None = None) -> None:
     if args.prompt_dir:
         os.environ["PROMPT_AUTOMATION_PROMPTS"] = str(args.prompt_dir)
         _log.info("using custom prompt directory %s", args.prompt_dir)
+
+    try:
+        menus.ensure_unique_ids(menus.PROMPTS_DIR)
+    except ValueError as e:
+        print(f"[prompt-automation] {e}")
+        return
 
     if args.reset_log:
         logger.clear_usage_log()

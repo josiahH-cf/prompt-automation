@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-import subprocess
+from .utils import safe_run
 import tempfile
 from pathlib import Path
 from typing import Dict, List
@@ -19,27 +19,29 @@ def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | No
     """Try platform GUI for input; return ``None`` on failure."""
     sys = platform.system()
     try:
+        safe_label = label.replace('"', '\"')
         if opts:
+            clean_opts = [o.replace('"', '\"') for o in opts]
             if sys == "Linux" and shutil.which("zenity"):
-                cmd = ["zenity", "--list", "--column", label, *opts]
+                cmd = ["zenity", "--list", "--column", safe_label, *clean_opts]
             elif sys == "Darwin" and shutil.which("osascript"):
-                opts_s = ",".join(opts)
-                cmd = ["osascript", "-e", f'choose from list {{{opts_s}}} with prompt \"{label}\"']
+                opts_s = ",".join(clean_opts)
+                cmd = ["osascript", "-e", f'choose from list {{{opts_s}}} with prompt "{safe_label}"']
             elif sys == "Windows":
-                arr = ";".join(opts)
-                cmd = ["powershell", "-Command", f'$a="{arr}".Split(";");$a|Out-GridView -OutputMode Single -Title \"{label}\"']
+                arr = ";".join(clean_opts)
+                cmd = ["powershell", "-Command", f'$a="{arr}".Split(";");$a|Out-GridView -OutputMode Single -Title "{safe_label}"']
             else:
                 return None
         else:
             if sys == "Linux" and shutil.which("zenity"):
-                cmd = ["zenity", "--entry", "--text", label]
+                cmd = ["zenity", "--entry", "--text", safe_label]
             elif sys == "Darwin" and shutil.which("osascript"):
-                cmd = ["osascript", "-e", f'display dialog \"{label}\" default answer "']
+                cmd = ["osascript", "-e", f'display dialog "{safe_label}" default answer "']
             elif sys == "Windows":
-                cmd = ["powershell", "-Command", f'Read-Host \"{label}\"']
+                cmd = ["powershell", "-Command", f'Read-Host "{safe_label}"']
             else:
                 return None
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = safe_run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
             return res.stdout.strip()
     except Exception as e:  # pragma: no cover - GUI may be missing
@@ -52,8 +54,10 @@ def _editor_prompt() -> str | None:
     try:
         fd, path = tempfile.mkstemp()
         os.close(fd)
-        editor = os.environ.get("EDITOR", "notepad" if platform.system() == "Windows" else "nano")
-        subprocess.run([editor, path])
+        editor = os.environ.get(
+            "EDITOR", "notepad" if platform.system() == "Windows" else "nano"
+        )
+        safe_run([editor, path])
         return Path(path).read_text().strip()
     except Exception as e:  # pragma: no cover - depends on editor
         _log.error("editor prompt failed: %s", e)
