@@ -35,10 +35,13 @@ if (-not (Get-Command espanso -ErrorAction SilentlyContinue)) {
 }
 
 # Install AutoHotkey v2
-if (-not (Get-Command AutoHotkey -ErrorAction SilentlyContinue)) {
+$ahk = Get-Command AutoHotkey -ErrorAction SilentlyContinue
+if (-not $ahk) {
     Info "Installing AutoHotkey..."
     winget install -e --id AutoHotkey.AutoHotkey || Fail "Failed to install AutoHotkey"
+    $ahk = Get-Command AutoHotkey -ErrorAction SilentlyContinue
 }
+if (-not $ahk) { Fail "AutoHotkey not found in PATH after installation" }
 
 # Copy AHK script to Startup
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -47,7 +50,11 @@ $ahkSource = Resolve-Path $ahkSource
 $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\prompt-automation.ahk'
 try {
     Copy-Item -Path $ahkSource -Destination $startup -Force
-    Info "Registered prompt-automation hotkey script."
+    if (Test-Path $startup) {
+        Info "Registered prompt-automation hotkey script at $startup."
+    } else {
+        Fail "Failed to register AutoHotkey script"
+    }
 } catch {
     Write-Warning "Failed to register AutoHotkey script: $_"
 }

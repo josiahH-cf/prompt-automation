@@ -61,6 +61,21 @@ else
     info "espanso already installed"
 fi
 
+# Register global hotkey
+HOTKEY_SRC="$(cd "$(dirname "$0")/.." && pwd)/src/prompt_automation/hotkey"
+if [ "$PLATFORM" = "Linux" ] || [ "$PLATFORM" = "WSL2" ]; then
+    ESPANSO_MATCH_DIR="$HOME/.config/espanso/match"
+    mkdir -p "$ESPANSO_MATCH_DIR"
+    cp "$HOTKEY_SRC/linux.yaml" "$ESPANSO_MATCH_DIR/prompt-automation.yml"
+    info "Espanso hotkey added. Restarting espanso..."
+    espanso restart || true
+elif [ "$PLATFORM" = "macOS" ]; then
+    WORKFLOW_DIR="$HOME/Library/Application Scripts/prompt-automation"
+    mkdir -p "$WORKFLOW_DIR"
+    cp "$HOTKEY_SRC/macos.applescript" "$WORKFLOW_DIR/"
+    osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$WORKFLOW_DIR'/macos.applescript", hidden:false}' || true
+fi
+
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
 pipx install --force prompt-automation || { err "Failed to install prompt-automation"; exit 1; }
