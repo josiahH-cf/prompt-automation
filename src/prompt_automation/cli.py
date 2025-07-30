@@ -99,8 +99,9 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.prompt_dir:
-        os.environ["PROMPT_AUTOMATION_PROMPTS"] = str(args.prompt_dir)
-        _log.info("using custom prompt directory %s", args.prompt_dir)
+        path = args.prompt_dir.expanduser().resolve()
+        os.environ["PROMPT_AUTOMATION_PROMPTS"] = str(path)
+        _log.info("using custom prompt directory %s", path)
 
     try:
         menus.ensure_unique_ids(menus.PROMPTS_DIR)
@@ -144,5 +145,9 @@ def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # pragma: no cover - entry
+        _log.exception("unhandled error")
+        print(f"[prompt-automation] Error: {e}. See {LOG_FILE} for details.")
 
