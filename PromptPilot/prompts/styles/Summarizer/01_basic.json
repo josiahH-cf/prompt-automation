@@ -1,0 +1,19 @@
+{
+  "id": 1,
+  "title": "Concise summary",
+  "style": "Summarizer",
+  "role": "You are an expert technical summarizer.",
+  "template": [
+    "## Audience: {{AUDIENCE}}",
+    "## Tone: {{TONE}}",
+    "",
+    "{{CONTENT}}",
+    "",
+    "After writing, list any missing key points in one line."
+  ],
+  "placeholders": [
+    { "name": "AUDIENCE", "label": "Target audience", "options": ["Exec", "Dev", "Student"] },
+    { "name": "TONE", "label": "Tone", "options": ["Formal", "Friendly", "Snarky"] },
+    { "name": "CONTENT", "label": "Text to summarize" }
+  ]
+}
