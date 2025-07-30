@@ -1,0 +1,7 @@
+from prompt_automation import cli
+
+def test_list_flag(capsys):
+    cli.main(["--list"])
+    out = capsys.readouterr().out
+    assert "Utility" in out
+

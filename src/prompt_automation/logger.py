@@ -55,3 +55,10 @@ def rotate_db() -> None:
             conn.commit()
             conn.execute("VACUUM")
 
+
+def clear_usage_log() -> None:
+    """Remove the usage database file."""
+    if DB_PATH.exists():
+        DB_PATH.unlink()
+
+

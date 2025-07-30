@@ -8,4 +8,5 @@ def test_troubleshoot_flag(capsys):
     cli.main(["--troubleshoot"])
     out = capsys.readouterr().out
     assert "Troubleshooting" in out
+    assert "usage.db" in out
 

@@ -47,6 +47,7 @@ Press **Ctrl+Shift+J** to open the style picker. Hotkey troubleshooting and manu
 2. **Pick Template** – Select the prompt template.
 3. **Fill Placeholders** – Enter any required values.
 4. **Paste** – The rendered text is copied to the clipboard and pasted for you.
+   Use `prompt-automation --list` to see available templates.
 
 ```
 [Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]
@@ -76,7 +77,7 @@ To edit an existing template simply modify the JSON file and rerun the launcher.
 ## Usage Log
 
 Every time text is pasted an entry is recorded in `~/.prompt-automation/usage.db`.
-Delete this file to reset statistics.
+Use `prompt-automation --reset-log` to clear this file and `--troubleshoot` to show the paths in use.
 
 ## Advanced Configuration
 
@@ -84,6 +85,7 @@ Several environment variables allow custom paths:
 
 - `PROMPT_AUTOMATION_PROMPTS` – directory containing the `styles/` folders.
 - `PROMPT_AUTOMATION_DB` – path to the usage database.
+These can also be provided via the CLI with `--prompt-dir`.
 
 You can also modify the installed hotkey by editing the platform specific file in `src/prompt_automation/hotkey/` and rerunning the installer.
 
