@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from . import logger, menus, paste
 
@@ -91,11 +92,35 @@ def check_dependencies() -> bool:
 def main(argv: list[str] | None = None) -> None:
     """Program entry point."""
     parser = argparse.ArgumentParser(prog="prompt-automation")
-    parser.add_argument("--troubleshoot", action="store_true", help="Show troubleshooting help")
+    parser.add_argument("--troubleshoot", action="store_true", help="Show troubleshooting help and paths")
+    parser.add_argument("--prompt-dir", type=Path, help="Directory containing prompt templates")
+    parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
+    parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
     args = parser.parse_args(argv)
 
+    if args.prompt_dir:
+        os.environ["PROMPT_AUTOMATION_PROMPTS"] = str(args.prompt_dir)
+        _log.info("using custom prompt directory %s", args.prompt_dir)
+
+    if args.reset_log:
+        logger.clear_usage_log()
+        print("[prompt-automation] usage log cleared")
+        return
+
+    if args.list:
+        for style in menus.list_styles():
+            print(style)
+            for tmpl_path in menus.list_prompts(style):
+                print("  ", tmpl_path.name)
+        return
+
     if args.troubleshoot:
-        print("Troubleshooting tips:\n- Ensure dependencies are installed.\n- Logs stored at", LOG_DIR)
+        print(
+            "Troubleshooting tips:\n- Ensure dependencies are installed.\n- Logs stored at",
+            LOG_DIR,
+            "\n- Usage DB:",
+            logger.DB_PATH,
+        )
         return
 
     _log.info("running on %s", platform.platform())
@@ -103,7 +128,7 @@ def main(argv: list[str] | None = None) -> None:
         return
     banner = Path(__file__).with_name("resources").joinpath("banner.txt")
     print(banner.read_text())
-    tmpl = menus.pick_style()
+    tmpl: dict[str, Any] | None = menus.pick_style()
     if not tmpl:
         return
     text = menus.render_template(tmpl)

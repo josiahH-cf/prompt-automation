@@ -13,7 +13,7 @@ dependencies = [
 prompt-automation = "prompt-automation.cli:main"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "ruff"]
+test = ["pytest", "pytest-cov", "ruff", "mypy"]
 
 [tool.ruff]
 line-length = 88
@@ -22,7 +22,7 @@ line-length = 88
 addopts = ""
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

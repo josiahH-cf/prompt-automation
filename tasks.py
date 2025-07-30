@@ -3,6 +3,7 @@ from invoke import task
 @task
 def lint(c):
     c.run("ruff src tests")
+    c.run("mypy src")
 
 @task
 def test(c):
