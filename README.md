@@ -40,6 +40,8 @@ iwr -useb https://example.com/install.ps1 | iex
 ```
 
 After installation, restart your terminal or log out/in if prompted.
+Detailed hotkey setup instructions for each platform are available in
+[docs/HOTKEYS.md](docs/HOTKEYS.md).
 
 ## 4. Try the hotkey
 
