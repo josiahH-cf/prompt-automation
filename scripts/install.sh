@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+LOG_DIR="$HOME/.prompt-automation/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/install.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+trap 'err "Error on line $LINENO. See $LOG_FILE"' ERR
+
 info(){ echo -e "\033[1;32m$1\033[0m"; }
 err(){ echo -e "\033[1;31m$1\033[0m" >&2; }
 
@@ -81,3 +87,4 @@ info "Installing prompt-automation..."
 pipx install --force prompt-automation || { err "Failed to install prompt-automation"; exit 1; }
 
 info "Installation complete. You may need to restart your shell for PATH changes to take effect."
+info "Installation log saved to $LOG_FILE"

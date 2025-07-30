@@ -9,6 +9,11 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List
 
+from .errorlog import get_logger
+
+
+_log = get_logger(__name__)
+
 
 def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | None:
     """Try platform GUI for input; return ``None`` on failure."""
@@ -37,8 +42,8 @@ def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | No
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
             return res.stdout.strip()
-    except Exception:
-        pass
+    except Exception as e:  # pragma: no cover - GUI may be missing
+        _log.error("GUI prompt failed: %s", e)
     return None
 
 
@@ -50,7 +55,8 @@ def _editor_prompt() -> str | None:
         editor = os.environ.get("EDITOR", "notepad" if platform.system() == "Windows" else "nano")
         subprocess.run([editor, path])
         return Path(path).read_text().strip()
-    except Exception:
+    except Exception as e:  # pragma: no cover - depends on editor
+        _log.error("editor prompt failed: %s", e)
         return None
 
 
@@ -65,6 +71,7 @@ def get_variables(placeholders: List[Dict]) -> Dict[str, str]:
         if val is None:
             val = _editor_prompt()
         if val is None:
+            _log.info("CLI fallback for %s", label)
             if opts:
                 print(f"{label} options: {', '.join(opts)}")
                 val = input(f"{label}: ") or opts[0]
@@ -86,3 +93,4 @@ def get_variables(placeholders: List[Dict]) -> Dict[str, str]:
                 val = "0"
         values[ph["name"]] = val
     return values
+
