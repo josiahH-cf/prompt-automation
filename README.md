@@ -1,64 +1,42 @@
 # prompt-automation
 
-**prompt-automation** is a keyboard driven launcher for your favorite AI prompts. Press a hotkey, pick a template and the text is pasted wherever your cursor lives.
+**prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and instantly paste the result into the active application.
 
 ---
 
-## Getting the Code
+## Getting Started
 
-Clone the repository and change into the project directory:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/<user>/prompt-automation.git
+   cd prompt-automation
+   ```
+2. **Run the installer** for your platform. The script installs all dependencies (Python, pipx, fzf and espanso) and registers the global hotkey.
+   - **Windows**
+     ```powershell
+     scripts\install.ps1
+     ```
+   - **macOS / Linux / WSL2**
+     ```bash
+     bash scripts/install.sh
+     ```
 
-```bash
-git clone https://github.com/<user>/prompt-automation.git
-cd prompt-automation
-```
+After installation restart your terminal so `pipx` is on your `PATH`.
 
-## OS Specific Installation
+## Usage
 
-### Windows 11
-Run the PowerShell installer:
-```powershell
-scripts\install.ps1
-```
-The script installs Python, pipx, fzf, espanso and registers the **Ctrl+Shift+J** hotkey using AutoHotkey.
-
-### macOS 14
-Run the shell installer:
-```bash
-bash scripts/install.sh
-```
-Homebrew is used to fetch dependencies. A small AppleScript registers the hotkey on login.
-
-### Linux
-Run the shell installer as above. It expects `apt` or `brew` and uses Espanso for the hotkey.
-
-### WSL2
-Run the Linux installer inside your distribution. Clipboard integration requires `clip.exe` in your Windows path.
-
-After installation restart your terminal session so `pipx` is on your `PATH`.
-
-## Launching and Hotkeys
-
-Press **Ctrl+Shift+J** to open the style picker. Hotkey troubleshooting and manual setup steps for each platform are documented in [docs/HOTKEYS.md](docs/HOTKEYS.md).
-
-## Using prompt-automation
-
-1. **Pick Style** – Choose a style category.
-2. **Pick Template** – Select the prompt template.
-3. **Fill Placeholders** – Enter any required values.
-4. **Paste** – The rendered text is copied to the clipboard and pasted for you.
-   Use `prompt-automation --list` to see available templates.
+Press **Ctrl+Shift+J** to open the style picker. Select a style, choose a template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
 
 ```
 [Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]
 ```
 
-Templates live under `prompts/styles/`. Selecting option `99` inside the style picker lets you create a new template interactively.
+Templates live under `prompts/styles/`. Choosing option `99` in the style picker lets you create a new template interactively.
 
-## Managing Prompt Templates
+## Managing Templates
 
-Template files are JSON documents stored in subfolders of `prompts/styles/`.
-Each file must contain:
+Template files are plain JSON documents in `prompts/styles/<Style>/`.
+A minimal example:
 
 ```json
 {
@@ -71,23 +49,17 @@ Each file must contain:
 }
 ```
 
-The filename should start with a two digit ID: `01_my_template.json`.
-To edit an existing template simply modify the JSON file and rerun the launcher.
+## Troubleshooting
 
-## Usage Log
+- Run `prompt-automation --troubleshoot` to print log and database locations.
+- Use `prompt-automation --list` to list available templates.
+- If the hotkey does not work see [docs/HOTKEYS.md](docs/HOTKEYS.md) for manual setup instructions.
 
-Every time text is pasted an entry is recorded in `~/.prompt-automation/usage.db`.
-Use `prompt-automation --reset-log` to clear this file and `--troubleshoot` to show the paths in use.
+## FAQ
 
-## Advanced Configuration
+**Where is usage stored?** In `~/.prompt-automation/usage.db`. Clear it with `--reset-log`.
 
-Several environment variables allow custom paths:
-
-- `PROMPT_AUTOMATION_PROMPTS` – directory containing the `styles/` folders.
-- `PROMPT_AUTOMATION_DB` – path to the usage database.
-These can also be provided via the CLI with `--prompt-dir`.
-
-You can also modify the installed hotkey by editing the platform specific file in `src/prompt_automation/hotkey/` and rerunning the installer.
+**How do I use my own templates?** Set the `PROMPT_AUTOMATION_PROMPTS` environment variable or pass `--prompt-dir` when launching.
 
 ## Directory Overview
 
