@@ -1,0 +1,2 @@
+[console_scripts]
+promptpilot = promptpilot.cli:main

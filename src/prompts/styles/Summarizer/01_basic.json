@@ -1,0 +1,10 @@
+{
+  "id": 4,
+  "title": "Basic Summary",
+  "style": "Summarizer",
+  "role": "assistant",
+  "template": ["Summarize the following text:\n{{text}}"],
+  "placeholders": [
+    {"name": "text", "label": "Input text", "multiline": true}
+  ]
+}

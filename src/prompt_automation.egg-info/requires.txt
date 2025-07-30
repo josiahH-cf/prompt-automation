@@ -1,0 +1,9 @@
+pyperclip
+
+[:platform_system == "Windows"]
+keyboard
+
+[test]
+pytest
+pytest-cov
+ruff

@@ -1,0 +1,2 @@
+[console_scripts]
+prompt-automation = prompt_automation.cli:main
