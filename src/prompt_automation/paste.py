@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import platform
 import shutil
-import subprocess
+from .utils import safe_run
 
 import pyperclip
 
@@ -22,20 +22,20 @@ def _copy_system(text: str, os_name: str) -> bool:
     """Attempt system clipboard utilities."""
     try:
         if _is_wsl():
-            subprocess.run(["clip.exe"], input=text.encode(), check=True)
+            safe_run(["clip.exe"], input=text.encode(), check=True)
             return True
         if os_name == "Linux":
             if shutil.which("xclip"):
-                subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
+                safe_run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
                 return True
             if shutil.which("wl-copy"):
-                subprocess.run(["wl-copy"], input=text.encode(), check=True)
+                safe_run(["wl-copy"], input=text.encode(), check=True)
                 return True
         elif os_name == "Darwin":
-            subprocess.run(["pbcopy"], input=text.encode(), check=True)
+            safe_run(["pbcopy"], input=text.encode(), check=True)
             return True
         elif os_name == "Windows":
-            subprocess.run("clip", input=text.encode(), shell=True, check=True)
+            safe_run(["clip"], input=text.encode(), check=True)
             return True
     except Exception as e:  # pragma: no cover - platform specific
         _log.error("system copy failed: %s", e)
@@ -64,14 +64,14 @@ def paste_text(text: str) -> None:
 
             keyboard.send("ctrl+v")
         elif os_name == "Darwin":
-            subprocess.run(
+            safe_run(
                 ["osascript", "-e", 'tell app "System Events" to keystroke "v" using command down'],
                 check=False,
             )
         elif os_name == "Linux" and shutil.which("xdotool"):
-            subprocess.run(["xdotool", "key", "ctrl+v"], check=False)
+            safe_run(["xdotool", "key", "ctrl+v"], check=False)
         elif _is_wsl():
-            subprocess.run(
+            safe_run(
                 [
                     "powershell.exe",
                     "-Command",

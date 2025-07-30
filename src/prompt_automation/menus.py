@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-import subprocess
+from .utils import safe_run
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -18,9 +18,9 @@ PROMPTS_DIR = Path(os.environ.get("PROMPT_AUTOMATION_PROMPTS", DEFAULT_PROMPTS_D
 def _run_picker(items: List[str], title: str) -> Optional[str]:
     """Return selected item using ``fzf`` or simple input."""
     try:
-        res = subprocess.run(
+        res = safe_run(
             ["fzf", "--prompt", f"{title}> "],
-            input="\n".join(items),
+            input="\n".join(it.replace("\n", " ") for it in items),
             text=True,
             capture_output=True,
         )
@@ -85,6 +85,17 @@ def _slug(text: str) -> str:
     return "".join(c.lower() if c.isalnum() else "-" for c in text).strip("-")
 
 
+def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
+    """Raise ``ValueError`` if duplicate template IDs are found."""
+    seen: Dict[int, Path] = {}
+    for path in base.rglob("*.json"):
+        data = json.loads(path.read_text())
+        pid = data["id"]
+        if pid in seen:
+            raise ValueError(f"Duplicate id {pid} in {path} and {seen[pid]}")
+        seen[pid] = path
+
+
 def create_new_template() -> None:
     style = input("Style: ") or "Misc"
     dir_path = PROMPTS_DIR / style
@@ -118,4 +129,5 @@ def create_new_template() -> None:
     fname = f"{int(pid):02d}_{_slug(title)}.json"
     (dir_path / fname).write_text(json.dumps(data, indent=2))
     print(f"Created {fname}")
+
 
