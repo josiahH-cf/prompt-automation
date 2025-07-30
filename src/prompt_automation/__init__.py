@@ -7,4 +7,6 @@ __all__ = [
     "renderer",
     "paste",
     "logger",
+    "errorlog",
 ]
+

@@ -59,6 +59,7 @@ Run the launcher and select **Option 99**. Provide style, ID, title, role, templ
 
 - **Behind a firewall?** Download the repo and run the installer scripts locally.
 - **Hotkey not working?** Re-run `prompt-automation` from the terminal to reset the hotkey integration.
+- **Need more help?** Run `prompt-automation --troubleshoot` and check `~/.prompt-automation/logs` for details.
 
 ## Uninstall
 

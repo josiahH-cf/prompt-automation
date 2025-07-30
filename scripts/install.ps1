@@ -4,6 +4,12 @@ param()
 function Info($msg) { Write-Host $msg -ForegroundColor Green }
 function Fail($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
 
+$LogDir = Join-Path $env:USERPROFILE '.prompt-automation\logs'
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+$LogFile = Join-Path $LogDir 'install.log'
+Start-Transcript -Path $LogFile -Append | Out-Null
+trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $LogFile" }
+
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
     Fail "This installer must be run on Windows."
 }
@@ -64,3 +70,5 @@ Info "Installing prompt-automation via pipx..."
 pipx install --force prompt-automation || Fail "Failed to install prompt-automation"
 
 Info "Installation complete. You may need to log out and back in for hotkeys to activate."
+Stop-Transcript | Out-Null
+Info "Installation log saved to $LogFile"

@@ -1,6 +1,7 @@
 """Command line entrypoint with dependency checks."""
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import platform
@@ -87,7 +88,16 @@ def check_dependencies() -> bool:
     return True
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    """Program entry point."""
+    parser = argparse.ArgumentParser(prog="prompt-automation")
+    parser.add_argument("--troubleshoot", action="store_true", help="Show troubleshooting help")
+    args = parser.parse_args(argv)
+
+    if args.troubleshoot:
+        print("Troubleshooting tips:\n- Ensure dependencies are installed.\n- Logs stored at", LOG_DIR)
+        return
+
     _log.info("running on %s", platform.platform())
     if not check_dependencies():
         return
@@ -104,3 +114,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
