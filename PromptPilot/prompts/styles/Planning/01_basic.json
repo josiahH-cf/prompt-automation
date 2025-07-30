@@ -1,12 +1,11 @@
 {
   "id": 1,
-  "title": "Plan tasks",
+  "title": "Basic Plan",
   "style": "Planning",
-  "role": "You are a helpful planner.",
-  "template": [
-    "Plan for: {{TOPIC}}"
-  ],
+  "role": "assistant",
+  "template": ["Create a plan for {{task}} with {{steps}} steps."],
   "placeholders": [
-    { "name": "TOPIC", "label": "Topic" }
+    {"name": "task", "label": "Task"},
+    {"name": "steps", "label": "Number of steps", "type": "number"}
   ]
 }

@@ -1,16 +1,21 @@
-from . import menus
-from .logger import log_usage
+"""Command line entrypoint."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from . import logger, menus, paste
+
 
 def main() -> None:
-    template = menus.pick_style()
-    if template is None:
+    banner = Path(__file__).with_name("resources").joinpath("banner.txt")
+    print(banner.read_text())
+    tmpl = menus.pick_style()
+    if not tmpl:
         return
-    text = menus.render_template(template)
+    text = menus.render_template(tmpl)
     if text:
-        from .paste import paste_text
-
-        paste_text(text)
-        log_usage(template)
+        paste.paste_text(text)
+        logger.log_usage(tmpl, len(text))
 
 
 if __name__ == "__main__":

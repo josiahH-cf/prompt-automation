@@ -1,0 +1,4 @@
+matches:
+  - trigger: "<ctrl>+<shift>+j"
+    run: "promptpilot"
+    propagate: false

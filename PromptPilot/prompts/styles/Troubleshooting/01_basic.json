@@ -1,12 +1,11 @@
 {
   "id": 1,
-  "title": "Debug issue",
+  "title": "Troubleshoot Issue",
   "style": "Troubleshooting",
-  "role": "You help fix problems.",
-  "template": [
-    "Problem description: {{DESC}}"
-  ],
+  "role": "assistant",
+  "template": ["Help troubleshoot: {{issue}}"],
   "placeholders": [
-    { "name": "DESC", "label": "Describe the problem" }
+    {"name": "issue", "label": "Issue description"},
+    {"name": "severity", "label": "Severity", "options": ["low", "medium", "high"]}
   ]
 }
