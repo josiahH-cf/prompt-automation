@@ -1,1 +1,10 @@
-__all__ = ["cli", "menus", "variables", "renderer", "paste", "logger"]
+"""PromptPilot package."""
+
+__all__ = [
+    "cli",
+    "menus",
+    "variables",
+    "renderer",
+    "paste",
+    "logger",
+]

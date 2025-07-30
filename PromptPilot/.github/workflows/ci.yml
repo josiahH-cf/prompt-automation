@@ -1,19 +1,16 @@
 name: CI
-
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11"]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip install ruff pytest invoke
-      - run: invoke lint
-      - run: invoke test
-      - run: invoke build
+          python-version: '3.11'
+      - run: pip install pipx
+      - run: pipx install poetry
+      - run: pip install -e .[test]
+      - run: ruff src tests
+      - run: pytest --cov=src --cov-fail-under=80

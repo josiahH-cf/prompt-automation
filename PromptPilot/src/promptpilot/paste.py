@@ -1,22 +1,25 @@
+"""Clipboard helper using pyperclip and keyboard."""
 import os
 import platform
+import subprocess
 
 import pyperclip
 
 
 def paste_text(text: str) -> None:
+    """Copy ``text`` to clipboard and simulate paste."""
     pyperclip.copy(text)
     os_name = platform.system()
-    if os_name == "Windows":
-        try:
+    try:
+        if os_name == "Windows":
             import keyboard
-
             keyboard.send("ctrl+v")
-        except Exception:
-            pass
-    elif os_name == "Darwin":
-        os.system(
-            'osascript -e "tell application \"System Events\" to keystroke \"v\" using command down"'
-        )
-    else:
-        os.system("xdotool key ctrl+v")
+        elif os_name == "Darwin":
+            subprocess.run(
+                ["osascript", "-e", 'tell app "System Events" to keystroke "v" using command down'],
+                check=False,
+            )
+        else:
+            subprocess.run(["xdotool", "key", "ctrl+v"], check=False)
+    except Exception:
+        pass

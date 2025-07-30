@@ -6,7 +6,7 @@ def lint(c):
 
 @task
 def test(c):
-    c.run("pytest")
+    c.run("pytest --cov=src --cov-report=term")
 
 @task
 def build(c):

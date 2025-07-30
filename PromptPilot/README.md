@@ -1,34 +1,40 @@
 # PromptPilot
 
-PromptPilot is a keyboard-only smart prompt launcher for Windows, macOS, and Linux. It lets you pick prompt templates via a quick menu and automatically pastes the rendered prompt at your cursor location.
+Keyboard-only launcher for your favorite LLM prompts. Invoke with **Ctrl+Shift+J** and paste the rendered text anywhere.
 
 ## Quick start
 
-```powershell
-# Windows
-iwr https://example.com/install.ps1 | iex
-```
-
 ```bash
-# macOS/Linux
-bash <(curl -fsSL https://example.com/install.sh)
+# Linux/macOS
+curl -sSL https://example.com/install.sh | bash
+# Windows (PowerShell)
+iwr -useb https://example.com/install.ps1 | iex
 ```
 
 ## Prerequisites
-- Python 3.11+
-- pipx
-- fzf
-- espanso
+
+Python 3.11, pipx, fzf and espanso are installed by the one-liner above. See `scripts/install.*` if you prefer manual steps.
 
 ## Usage
-The installer registers an Espanso snippet `;pp` which launches the menu. Choose a style, then a prompt, fill in any variables, and the text is pasted for you.
 
-### Adding a new prompt (Option 99)
-Selecting option 99 lets you create a new template interactively. The JSON file is saved under `prompts/styles/<Style>/` and becomes available immediately.
+Run `promptpilot` once to configure the hotkey. Use **Ctrl+Shift+J** in any application to open the style picker. Fill in placeholder values and the text will be pasted automatically.
 
-### Logging
-Every run stores a timestamp, prompt ID, and estimated token count in `~/.promptpilot/usage.db`.
+## Creating a new prompt
+
+Choose option 99 from the style picker. Supply a style name, two digit ID, title, role and body. The new template is saved under `prompts/styles/<Style>` and immediately available.
+
+## Logging
+
+Usage is recorded to `~/.promptpilot/usage.db`. When the file grows beyond 5MB it is archived and vacuumed.
+
+## Firewall / offline install
+
+If the one-liners fail, download release assets from this repository and run `install.sh` or `install.ps1` locally.
 
 ## Uninstall
-Remove the espanso snippet and delete the pipx package `promptpilot`.
 
+Remove the `promptpilot` package with `pipx uninstall promptpilot` and delete the `~/.promptpilot` directory.
+
+## Contributing
+
+Pull requests are welcome. See the MIT License for terms.

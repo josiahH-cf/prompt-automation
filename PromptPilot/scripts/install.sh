@@ -1,16 +1,18 @@
-#!/bin/sh
+#!/bin/bash
 set -e
-OS=$(uname)
-if [ "$OS" = "Darwin" ]; then
-    brew install python@3.11 pipx fzf espanso || true
-else
-    sudo apt-get update && sudo apt-get install -y python3-pip pipx fzf espanso || true
+# Install Python 3.11, pipx, fzf and espanso, then PromptPilot
+if ! command -v python3.11 >/dev/null; then
+  echo "Python 3.11 required"
+  exit 1
 fi
-pipx install --force --pip-args "--upgrade pip" "$(dirname "$0")/.."
-mkdir -p ~/.config/espanso/match
-cat > ~/.config/espanso/match/promptpilot.yml <<'YML'
-matches:
-  - trigger: ';pp'
-    run: promptpilot
-YML
-printf 'Installed PromptPilot. Trigger with ;pp\n'
+if ! command -v pipx >/dev/null; then
+  python3.11 -m pip install --user pipx
+  python3.11 -m pipx ensurepath
+fi
+if ! command -v fzf >/dev/null; then
+  echo "Install fzf from https://github.com/junegunn/fzf/releases"
+fi
+if ! command -v espanso >/dev/null; then
+  echo "Install espanso from https://github.com/espanso/espanso/releases"
+fi
+pipx install --force promptpilot

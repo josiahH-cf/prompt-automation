@@ -1,6 +1,6 @@
 [project]
 name = "promptpilot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
 authors = [{name="PromptPilot"}]
@@ -8,8 +8,14 @@ authors = [{name="PromptPilot"}]
 [project.scripts]
 promptpilot = "promptpilot.cli:main"
 
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov", "ruff"]
+
 [tool.ruff]
 line-length = 88
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=term"
 
 [build-system]
 requires = ["setuptools", "wheel"]
