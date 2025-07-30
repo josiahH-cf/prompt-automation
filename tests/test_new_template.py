@@ -1,5 +1,5 @@
 import json
-from promptpilot import menus
+from prompt_automation import menus
 
 
 def test_create_new_template(tmp_path, monkeypatch):

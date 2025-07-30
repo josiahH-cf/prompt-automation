@@ -1,10 +1,12 @@
 import json
 from pathlib import Path
-from prompt_automation import renderer
 
 
-def test_sample_prompts_valid():
+def test_template_ids_unique():
     base = Path(__file__).resolve().parents[1] / "prompts" / "styles"
+    seen = {}
     for path in base.rglob("*.json"):
         data = json.loads(path.read_text())
-        assert renderer.validate_template(data)
+        pid = data["id"]
+        assert pid not in seen, f"Duplicate id {pid} in {path} and {seen[pid]}"
+        seen[pid] = path

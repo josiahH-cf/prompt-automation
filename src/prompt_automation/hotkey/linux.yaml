@@ -1,4 +1,4 @@
 matches:
   - trigger: "<ctrl>+<shift>+j"
-    run: "promptpilot"
+    run: "prompt-automation"
     propagate: false

@@ -1,3 +1,0 @@
-^+j::
-Run, promptpilot
-return

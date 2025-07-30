@@ -1,0 +1,25 @@
+{
+  "id": 0,
+  "title": "Workspace Copilot",
+  "style": "Utility",
+  "role": "You are GitHub Copilot Chat assisting with prompt design.",
+  "template": [
+    "Read this repository and ask clarifying questions about {{STYLE}}, {{PROVISIONAL_ID}}, {{TITLE}} and {{ROLE_DESCRIPTION}}.",
+    "Provide a final JSON that matches the schema in prompts/styles/<Style>/<ID>_<slug>.json.",
+    "Respond only with the completed JSON below:",
+    "{",
+    "  \"id\": {{PROVISIONAL_ID}},",
+    "  \"title\": \"{{TITLE}}\",",
+    "  \"style\": \"{{STYLE}}\",",
+    "  \"role\": \"{{ROLE_DESCRIPTION}}\",",
+    "  \"template\": [],",
+    "  \"placeholders\": []",
+    "}"
+  ],
+  "placeholders": [
+    {"name": "STYLE", "label": "Style"},
+    {"name": "PROVISIONAL_ID", "label": "Provisional ID"},
+    {"name": "TITLE", "label": "Title"},
+    {"name": "ROLE_DESCRIPTION", "label": "Role description", "multiline": true}
+  ]
+}

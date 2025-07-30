@@ -1,40 +1,68 @@
-# PromptPilot
+# prompt-automation
 
-Keyboard-only launcher for your favorite LLM prompts. Invoke with **Ctrl+Shift+J** and paste the rendered text anywhere.
+**prompt-automation** is a keyboard-driven launcher for your favorite AI prompt templates.
 
-## Quick start
+## 1. Install prerequisites
+
+### Windows 11
+1. Install [Git](https://git-scm.com/download/win).
+2. Open PowerShell as Administrator and run:
+   ```powershell
+   winget install -e --id Python.Python.3.11
+   winget install -e --id Microsoft.VisualStudioCode
+   winget install -e --id Git.Git
+   ```
+
+### macOS 14
+1. Install [Homebrew](https://brew.sh) if missing.
+2. Run:
+   ```bash
+   brew install git python@3.11 --cask visual-studio-code
+   ```
+
+## 2. Clone this repository
 
 ```bash
-# Linux/macOS
+git clone https://github.com/<user>/prompt-automation.git
+cd prompt-automation
+```
+
+## 3. Run the installer
+
+### macOS/Linux
+```bash
 curl -sSL https://example.com/install.sh | bash
-# Windows (PowerShell)
+```
+
+### Windows PowerShell
+```powershell
 iwr -useb https://example.com/install.ps1 | iex
 ```
 
-## Prerequisites
+After installation, restart your terminal or log out/in if prompted.
 
-Python 3.11, pipx, fzf and espanso are installed by the one-liner above. See `scripts/install.*` if you prefer manual steps.
+## 4. Try the hotkey
 
-## Usage
+Press **Ctrl+Shift+J** and a style picker will appear. Choose a template and the text is pasted automatically.
 
-Run `promptpilot` once to configure the hotkey. Use **Ctrl+Shift+J** in any application to open the style picker. Fill in placeholder values and the text will be pasted automatically.
+```
+[Ctrl+Shift+J] -> [Style Picker] -> [Fill Placeholders] -> [Pasted Output]
+```
 
-## Creating a new prompt
+## 5. Add a new prompt
 
-Choose option 99 from the style picker. Supply a style name, two digit ID, title, role and body. The new template is saved under `prompts/styles/<Style>` and immediately available.
+Run the launcher and select **Option 99**. Provide style, ID, title, role, template lines and placeholders when prompted. The new JSON template is saved under `prompts/styles/<Style>/` and is available immediately.
 
-## Logging
+## Troubleshooting
 
-Usage is recorded to `~/.promptpilot/usage.db`. When the file grows beyond 5MB it is archived and vacuumed.
-
-## Firewall / offline install
-
-If the one-liners fail, download release assets from this repository and run `install.sh` or `install.ps1` locally.
+- **Behind a firewall?** Download the repo and run the installer scripts locally.
+- **Hotkey not working?** Re-run `prompt-automation` from the terminal to reset the hotkey integration.
 
 ## Uninstall
 
-Remove the `promptpilot` package with `pipx uninstall promptpilot` and delete the `~/.promptpilot` directory.
+```bash
+pipx uninstall prompt-automation
+rm -rf ~/.prompt-automation
+```
 
-## Contributing
-
-Pull requests are welcome. See the MIT License for terms.
+Enjoy!

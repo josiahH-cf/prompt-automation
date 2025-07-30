@@ -1,4 +1,4 @@
-from promptpilot import logger
+from prompt_automation import logger
 from pathlib import Path
 import sqlite3
 

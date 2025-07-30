@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Tuple
 
-DB_PATH = Path.home() / ".promptpilot" / "usage.db"
+DB_PATH = Path.home() / ".prompt-automation" / "usage.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
 
@@ -45,7 +45,7 @@ def rotate_db() -> None:
     if DB_PATH.exists() and DB_PATH.stat().st_size > 5 * 1024 * 1024:
         bak = DB_PATH.with_name(f"usage_{datetime.now():%Y%m%d}.db")
         DB_PATH.replace(bak)
-        print("[promptpilot] usage.db rotated")
+        print("[prompt-automation] usage.db rotated")
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS logs (ts TEXT, prompt_id TEXT, style TEXT, length INTEGER, tokens INTEGER)"

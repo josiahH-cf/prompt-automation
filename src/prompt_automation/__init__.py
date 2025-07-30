@@ -1,4 +1,4 @@
-"""PromptPilot package."""
+"""prompt-automation package."""
 
 __all__ = [
     "cli",

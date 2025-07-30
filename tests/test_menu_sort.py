@@ -1,4 +1,4 @@
-from promptpilot import menus
+from prompt_automation import menus
 
 
 def test_freq_sorted():
