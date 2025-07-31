@@ -84,7 +84,20 @@ fi
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
-pipx install --force prompt-automation || { err "Failed to install prompt-automation"; exit 1; }
+
+# Get the project root directory (parent of scripts directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+info "Project root directory: $PROJECT_ROOT"
+
+# Verify pyproject.toml exists
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    err "pyproject.toml not found at $PROJECT_ROOT/pyproject.toml. Make sure you're running this script from the correct location."
+    exit 1
+fi
+info "Found pyproject.toml at: $PROJECT_ROOT/pyproject.toml"
+
+pipx install --force "$PROJECT_ROOT" || { err "Failed to install prompt-automation from local source"; exit 1; }
 
 info "Installation complete. You may need to restart your shell for PATH changes to take effect."
 info "Installation log saved to $LOG_FILE"

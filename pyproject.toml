@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-prompt-automation = "prompt-automation.cli:main"
+prompt-automation = "prompt_automation.cli:main"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "ruff", "mypy"]
@@ -29,4 +29,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-prompt-automation = ["resources/*", "hotkey/*"]
+prompt_automation = ["resources/*", "hotkey/*"]
