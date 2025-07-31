@@ -892,8 +892,7 @@ Debug "- AutoHotkey: $(if (Get-Command AutoHotkey -ErrorAction SilentlyContinue)
 Debug "- prompt-automation: $(if (Get-Command prompt-automation -ErrorAction SilentlyContinue) { 'Found' } else { 'Not found' })"
 
 Stop-Transcript | Out-Null
-Info "Installation log saved to $LogFile"{
-    Info "You can view the log for detailed information about the installation process."
-    Info "If you encounter any issues, please refer to the log for troubleshooting."
-    Info "Thank you for using prompt-automation!"
-}
+Info "Installation log saved to $LogFile"
+Info "You can view the log for detailed information about the installation process."
+Info "If you encounter any issues, please refer to the log for troubleshooting."
+Info "Thank you for using prompt-automation!"
