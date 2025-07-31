@@ -2,9 +2,9 @@ import json
 import sys
 sys.modules.setdefault("pyperclip", type("x", (), {"copy": lambda *a: None}))
 
-import pytest
-from prompt_automation import menus, logger, variables, cli
-from prompt_automation.utils import safe_run
+import pytest  # noqa: E402
+from prompt_automation import menus, logger, variables, cli  # noqa: E402
+from prompt_automation.utils import safe_run  # noqa: E402
 
 
 def test_safe_run_sanitizes(monkeypatch):
