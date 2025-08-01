@@ -2,14 +2,25 @@
 
 set -euo pipefail
 
+info(){ echo -e "\033[1;32m$1\033[0m"; }
+err(){ echo -e "\033[1;31m$1\033[0m" >&2; }
+retry(){
+    local cmd="$1"; local attempts=0; local max=2
+    until eval "$cmd"; do
+        attempts=$((attempts+1))
+        if [ $attempts -ge $max ]; then
+            return 1
+        fi
+        sleep 2
+        info "Retrying: $cmd"
+    done
+}
+
 LOG_DIR="$HOME/.prompt-automation/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/install.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 trap 'err "Error on line $LINENO. See $LOG_FILE"' ERR
-
-info(){ echo -e "\033[1;32m$1\033[0m"; }
-err(){ echo -e "\033[1;31m$1\033[0m" >&2; }
 
 # Detect platform
 PLATFORM="$(uname -s)"
@@ -32,6 +43,12 @@ else
     if command -v apt-get >/dev/null; then
         sudo apt-get update -y
         PM_INSTALL="sudo apt-get install -y"
+    elif command -v dnf >/dev/null; then
+        PM_INSTALL="sudo dnf install -y"
+    elif command -v yum >/dev/null; then
+        PM_INSTALL="sudo yum install -y"
+    elif command -v pacman >/dev/null; then
+        PM_INSTALL="sudo pacman -Sy --noconfirm"
     else
         err "Supported package manager not found. Install dependencies manually."; exit 1
     fi
@@ -40,21 +57,21 @@ fi
 # Ensure python3
 if ! command -v python3 >/dev/null; then
     info "Installing Python3..."
-    $PM_INSTALL python3 || { err "Failed to install Python3"; exit 1; }
+    retry "$PM_INSTALL python3" || { err "Failed to install Python3"; exit 1; }
 fi
 
 # Ensure pipx
 if ! command -v pipx >/dev/null; then
     info "Installing pipx..."
-    python3 -m pip install --user pipx || { err "pip install pipx failed"; exit 1; }
-    python3 -m pipx ensurepath || { err "pipx ensurepath failed"; exit 1; }
+    retry "python3 -m pip install --user pipx" || { err "pip install pipx failed"; exit 1; }
+    retry "python3 -m pipx ensurepath" || { err "pipx ensurepath failed"; exit 1; }
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
 fi
 
 # Install fzf
 if ! command -v fzf >/dev/null; then
     info "Installing fzf..."
-    $PM_INSTALL fzf || { err "Failed to install fzf"; exit 1; }
+    retry "$PM_INSTALL fzf" || { err "Failed to install fzf"; exit 1; }
 else
     info "fzf already installed"
 fi
@@ -62,7 +79,7 @@ fi
 # Install espanso
 if ! command -v espanso >/dev/null; then
     info "Installing espanso..."
-    $PM_INSTALL espanso || { err "Failed to install espanso"; exit 1; }
+    retry "$PM_INSTALL espanso" || { err "Failed to install espanso"; exit 1; }
 else
     info "espanso already installed"
 fi
@@ -84,20 +101,30 @@ fi
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
-
-# Get the project root directory (parent of scripts directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 info "Project root directory: $PROJECT_ROOT"
 
-# Verify pyproject.toml exists
 if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
-    err "pyproject.toml not found at $PROJECT_ROOT/pyproject.toml. Make sure you're running this script from the correct location."
-    exit 1
+    err "pyproject.toml not found at $PROJECT_ROOT/pyproject.toml. Make sure you're running this script from the correct location."; exit 1
 fi
 info "Found pyproject.toml at: $PROJECT_ROOT/pyproject.toml"
 
-pipx install --force "$PROJECT_ROOT" || { err "Failed to install prompt-automation from local source"; exit 1; }
+retry "pipx install --force \"$PROJECT_ROOT\"" || { err "Failed to install prompt-automation from local source"; exit 1; }
+
+# Summary verification
+info "\n=== Installation Summary ==="
+for cmd in python3 pipx fzf espanso prompt-automation; do
+    if command -v "$cmd" >/dev/null; then
+        info "- $cmd: installed"
+    else
+        err "- $cmd: missing"
+    fi
+done
+
+if [ "$PLATFORM" = "WSL2" ]; then
+    info "WSL2 detected. For Windows hotkey integration run: powershell.exe -Command \"(Get-Location).Path; .\\scripts\\install.ps1\""
+fi
 
 info "Installation complete. You may need to restart your shell for PATH changes to take effect."
 info "Installation log saved to $LOG_FILE"

@@ -9,6 +9,12 @@ This script installs prompt-automation from PyPI or Git instead of local WSL fil
 
 if (-not (Test-ExecutionPolicy)) { Fail "Cannot proceed due to execution policy restrictions." }
 
+$LogDir = Join-Path $env:USERPROFILE '.prompt-automation\logs'
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+$LogFile = Join-Path $LogDir 'install-wsl.log'
+Start-Transcript -Path $LogFile -Append | Out-Null
+trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $LogFile" }
+
 Info "Starting prompt-automation installation (WSL-compatible method)..."
 
 # Install dependencies first (Python, pipx, etc.)
@@ -160,3 +166,6 @@ setup(
 }
 
 Info "Installation process completed."
+
+Stop-Transcript | Out-Null
+Info "Log saved to $LogFile"

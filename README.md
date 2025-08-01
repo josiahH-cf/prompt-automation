@@ -57,7 +57,7 @@ A minimal example:
 
 ## FAQ
 
-**Where is usage stored?** In `~/.prompt-automation/usage.db`. Clear it with `--reset-log`.
+**Where is usage stored?** In `$HOME/.prompt-automation/usage.db`. Clear it with `--reset-log`.
 
 **How do I use my own templates?** Set the `PROMPT_AUTOMATION_PROMPTS` environment variable or pass `--prompt-dir` when launching.
 
@@ -72,6 +72,32 @@ A minimal example:
 - Use the provided PowerShell installation scripts from Windows
 - Prompts directory is accessible from both environments
 - Use `--troubleshoot` flag to see path resolution details
+
+## WSL (Windows Subsystem for Linux) Troubleshooting
+
+If you're running into issues with prompt-automation in WSL, it's likely
+because the tool is trying to run from the WSL environment instead of native
+Windows.
+
+**Solution**: Install prompt-automation in your native Windows environment:
+
+1. **Open PowerShell as Administrator in Windows** (not in WSL)
+2. **Navigate to a temporary directory**:
+   ```powershell
+   cd C:\temp
+   mkdir prompt-automation
+   cd prompt-automation
+   Copy-Item -Path "\\wsl.localhost\Ubuntu\home\$env:USERNAME\path\to\prompt-automation\*" -Destination . -Recurse -Force
+   .\scripts\install.ps1
+   ```
+
+**Alternative**: Run the installation directly from your WSL environment but
+ensure Windows integration:
+
+```bash
+# In WSL, but installs to Windows
+powershell.exe -Command "cd 'C:\\temp\\prompt-automation'; Copy-Item -Path '\\wsl.localhost\\Ubuntu\\home\\$(whoami)\\path\\to\\prompt-automation\\*' -Destination . -Recurse -Force; .\\scripts\\install.ps1"
+```
 
 **Missing Prompts Directory:** If you see "prompts directory not found":
 - Reinstall with `pipx install --force dist/prompt_automation-0.2.1-py3-none-any.whl`

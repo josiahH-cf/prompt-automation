@@ -28,7 +28,7 @@ $pipxCmd = Get-Command pipx -ErrorAction SilentlyContinue
 if ($pipxCmd) { $global:pipxCommand = 'pipx' } else { $global:pipxCommand = 'python -m pipx' }
 
 # Get project root
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$scriptDir = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptDir
 
 # Handle WSL path issues

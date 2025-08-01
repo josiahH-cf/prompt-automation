@@ -25,8 +25,8 @@ The default key combination is **Ctrl+Shift+J**.
 
 ## Linux / WSL2
 1. Ensure [Espanso](https://espanso.org) is installed.
-2. Copy `src/prompt_automation/hotkey/linux.yaml` to `~/.config/espanso/match/prompt-automation.yml` and run `espanso restart`.
-3. If Espanso is unavailable, create `~/.config/autostart/prompt-automation.desktop`:
+2. Copy `src/prompt_automation/hotkey/linux.yaml` to `$HOME/.config/espanso/match/prompt-automation.yml` and run `espanso restart`.
+3. If Espanso is unavailable, create `$HOME/.config/autostart/prompt-automation.desktop`:
    ```ini
    [Desktop Entry]
    Type=Application
@@ -37,5 +37,11 @@ The default key combination is **Ctrl+Shift+J**.
    Name=prompt-automation
    ```
 4. Remove or edit that file to unregister or change the hotkey.
+
+### WSL Notes
+
+When using WSL, the hotkey runs inside Linux only. To trigger the Windows
+application, install from Windows using `scripts\install.ps1` and copy the
+repository with `\wsl.localhost` paths as described in the README.
 
 After installation, press **Ctrl+Shift+J** to activate the launcher. If the hotkey fails, rerun the installer or consult your platform's hotkey settings.
