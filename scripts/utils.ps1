@@ -81,13 +81,31 @@ function Install-WingetPackage {
         try {
             winget install -e --id $PackageId --accept-source-agreements --accept-package-agreements
             if ($LASTEXITCODE -eq 0) {
-                Info "✓ $PackageName installed successfully"
+                Info "[OK] $PackageName installed successfully"
                 Debug "$PackageName installation completed successfully"
                 return $true
             } else {
                 Debug "winget $PackageName exit code: $LASTEXITCODE"
                 if ($PackageName -eq "AutoHotkey" -and $LASTEXITCODE -ne 0) {
-                    Write-Warning "AutoHotkey installation returned exit code $LASTEXITCODE"
+                    # Check for specific AutoHotkey error codes
+                    if ($LASTEXITCODE -eq -1978335189) {
+                        Write-Warning "AutoHotkey installation returned exit code $LASTEXITCODE (0x8A15010B)"
+                        Write-Warning "This typically means the package is already installed or requires elevated permissions."
+                        # Check if AutoHotkey is actually installed
+                        $ahkPaths = @(
+                            "${env:ProgramFiles}\AutoHotkey\AutoHotkey.exe",
+                            "${env:ProgramFiles(x86)}\AutoHotkey\AutoHotkey.exe",
+                            "${env:LOCALAPPDATA}\Programs\AutoHotkey\AutoHotkey.exe"
+                        )
+                        foreach ($path in $ahkPaths) {
+                            if (Test-Path $path) {
+                                Info "[OK] AutoHotkey is actually installed at $path"
+                                return $true
+                            }
+                        }
+                    } else {
+                        Write-Warning "AutoHotkey installation returned exit code $LASTEXITCODE"
+                    }
                     Write-Warning "This often indicates UAC permission dialogs were cancelled or other permission issues."
                 }
                 if ($i -lt $MaxRetries) {
@@ -110,9 +128,9 @@ function Install-WingetPackage {
     Write-Warning "Failed to install $PackageName after $MaxRetries attempts."
     if ($PackageName -eq "AutoHotkey") {
         Write-Warning "For AutoHotkey, this is often caused by:"
-        Write-Warning "• Cancelled UAC permission dialogs"
-        Write-Warning "• Insufficient administrator privileges"
-        Write-Warning "• Installation conflicts with existing AutoHotkey versions"
+        Write-Warning "- Cancelled UAC permission dialogs"
+        Write-Warning "- Insufficient administrator privileges"
+        Write-Warning "- Installation conflicts with existing AutoHotkey versions"
     }
     return $false
 }

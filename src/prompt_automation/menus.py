@@ -11,7 +11,47 @@ from . import logger
 from .renderer import fill_placeholders, load_template
 from .variables import get_variables
 
-DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
+# Try to find prompts directory in multiple locations
+def _find_prompts_dir():
+    # Environment variable override
+    env_path = os.environ.get("PROMPT_AUTOMATION_PROMPTS")
+    if env_path:
+        env_prompts = Path(env_path)
+        if env_prompts.exists():
+            return env_prompts
+    
+    # List of potential locations in order of preference
+    locations = [
+        # Development structure (3 levels up from this file)
+        Path(__file__).resolve().parent.parent.parent / "prompts" / "styles",
+        
+        # Packaged installation - data files location
+        Path(__file__).resolve().parent / "prompts" / "styles",
+        
+        # Alternative package location (in site-packages)
+        Path(__file__).resolve().parent.parent / "prompts" / "styles",
+        
+        # pipx virtual environment location
+        Path(__file__).resolve().parent.parent.parent / "Lib" / "prompts" / "styles",
+        
+        # User's home directory
+        Path.home() / ".prompt-automation" / "prompts" / "styles",
+        Path.home() / ".local" / "share" / "prompt-automation" / "prompts" / "styles",
+        
+        # System-wide locations
+        Path("/usr/local/share/prompt-automation/prompts/styles"),
+        Path("C:/ProgramData/prompt-automation/prompts/styles"),  # Windows system-wide
+    ]
+    
+    # Try each location
+    for location in locations:
+        if location.exists() and location.is_dir():
+            return location
+    
+    # If none exist, return the development location as fallback
+    return locations[0]
+
+DEFAULT_PROMPTS_DIR = _find_prompts_dir()
 PROMPTS_DIR = Path(os.environ.get("PROMPT_AUTOMATION_PROMPTS", DEFAULT_PROMPTS_DIR))
 
 
@@ -43,7 +83,25 @@ def _freq_sorted(names: List[str], freq: Dict[str, int]) -> List[str]:
 
 
 def list_styles() -> List[str]:
-    return [p.name for p in PROMPTS_DIR.iterdir() if p.is_dir()]
+    """List available prompt styles, with error handling for missing directories."""
+    try:
+        if not PROMPTS_DIR.exists():
+            print(f"Warning: Prompts directory not found at {PROMPTS_DIR}")
+            print("Available search locations were:")
+            for i, location in enumerate([
+                Path(__file__).resolve().parent.parent.parent / "prompts" / "styles",
+                Path(__file__).resolve().parent / "prompts" / "styles",
+                Path(__file__).resolve().parent.parent / "prompts" / "styles",
+                Path.home() / ".prompt-automation" / "prompts" / "styles",
+            ], 1):
+                exists = "✓" if location.exists() else "✗"
+                print(f"  {i}. {exists} {location}")
+            return []
+        
+        return [p.name for p in PROMPTS_DIR.iterdir() if p.is_dir()]
+    except Exception as e:
+        print(f"Error listing styles from {PROMPTS_DIR}: {e}")
+        return []
 
 
 def list_prompts(style: str) -> List[Path]:

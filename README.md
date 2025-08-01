@@ -61,6 +61,23 @@ A minimal example:
 
 **How do I use my own templates?** Set the `PROMPT_AUTOMATION_PROMPTS` environment variable or pass `--prompt-dir` when launching.
 
+## Troubleshooting
+
+**Windows Error `0x80070002` when launching:** This error typically occurs due to Windows keyboard library permissions. The application will automatically fallback to PowerShell-based key sending. To resolve:
+- Run PowerShell as Administrator when first installing
+- Or install with `pipx install prompt-automation[windows]` for optional keyboard support
+- The application works fine without the keyboard library using PowerShell fallback
+
+**WSL/Windows Path Issues:** If running from WSL but accessing Windows, ensure:
+- Use the provided PowerShell installation scripts from Windows
+- Prompts directory is accessible from both environments
+- Use `--troubleshoot` flag to see path resolution details
+
+**Missing Prompts Directory:** If you see "prompts directory not found":
+- Reinstall with `pipx install --force dist/prompt_automation-0.2.1-py3-none-any.whl`
+- Or set `PROMPT_AUTOMATION_PROMPTS` environment variable to your prompts location
+- Use `--troubleshoot` to see all attempted locations
+
 ## Directory Overview
 
 ```

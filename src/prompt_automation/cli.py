@@ -26,8 +26,10 @@ if not _log.handlers:
 def _is_wsl() -> bool:
     if os.environ.get("WSL_DISTRO_NAME"):
         return True
-    rel = platform.uname().release.lower()
-    return "microsoft" in rel or "wsl" in rel
+    if platform.system() == "Linux":
+        rel = platform.uname().release.lower()
+        return "microsoft" in rel or "wsl" in rel
+    return False
 
 
 def _check_cmd(name: str) -> bool:
@@ -57,8 +59,12 @@ def check_dependencies() -> bool:
     elif os_name == "Windows":
         try:
             import keyboard  # noqa: F401
-        except Exception:
-            missing.append("keyboard")
+            # Test keyboard library without actually hooking
+            # keyboard.is_pressed  # Just access a method to test import
+        except Exception as e:
+            _log.warning("keyboard library unavailable on Windows: %s", e)
+            # Don't add to missing - keyboard functionality is optional
+            # missing.append("keyboard")
 
     try:
         import pyperclip  # noqa: F401
@@ -77,7 +83,7 @@ def check_dependencies() -> bool:
         _log.warning(msg)
         os_name = platform.system()
         for dep in list(missing):
-            if dep in {"pyperclip", "keyboard"}:
+            if dep == "pyperclip":
                 _run_cmd([sys.executable, "-m", "pip", "install", dep])
             elif os_name == "Linux" and _check_cmd("apt"):
                 _run_cmd(["sudo", "apt", "install", "-y", dep])

@@ -1,18 +1,18 @@
 [project]
 name = "prompt-automation"
-version = "0.2.0"
+version = "0.2.1"
 description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
 authors = [{name="prompt-automation"}]
 dependencies = [
-    "pyperclip",
-    "keyboard; platform_system=='Windows'"
+    "pyperclip"
 ]
 
 [project.scripts]
 prompt-automation = "prompt_automation.cli:main"
 
 [project.optional-dependencies]
+windows = ["keyboard"]
 test = ["pytest", "pytest-cov", "ruff", "mypy"]
 
 [tool.ruff]
@@ -29,4 +29,8 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-prompt_automation = ["resources/*", "hotkey/*"]
+prompt_automation = ["resources/*", "hotkey/*", "prompts/**/*"]
+
+# Include prompts directory from root
+[tool.setuptools]
+include-package-data = true

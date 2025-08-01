@@ -1,0 +1,14 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include pyproject.toml
+recursive-include src/prompt_automation *
+recursive-include prompts *
+global-exclude *.pyc
+global-exclude __pycache__
+recursive-include src/prompt_automation/resources *
+recursive-include src/prompt_automation/hotkey *

@@ -1,6 +1,7 @@
 """Clipboard helper using pyperclip with robust fallbacks."""
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 from .utils import safe_run
@@ -14,8 +15,14 @@ _log = get_logger(__name__)
 
 
 def _is_wsl() -> bool:
-    rel = platform.uname().release.lower()
-    return "microsoft" in rel or "wsl" in rel
+    # Check for WSL environment variable first (most reliable)
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    # Only check uname if we're potentially in a Linux environment
+    if platform.system() == "Linux":
+        rel = platform.uname().release.lower()
+        return "microsoft" in rel or "wsl" in rel
+    return False
 
 
 def _copy_system(text: str, os_name: str) -> bool:
@@ -60,9 +67,20 @@ def paste_text(text: str) -> None:
 
     try:
         if os_name == "Windows":
-            import keyboard  # type: ignore
-
-            keyboard.send("ctrl+v")
+            try:
+                import keyboard  # type: ignore
+                keyboard.send("ctrl+v")
+            except Exception as e:
+                _log.warning("keyboard library failed on Windows: %s", e)
+                # Fallback to PowerShell approach
+                safe_run(
+                    [
+                        "powershell.exe",
+                        "-Command",
+                        "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')",
+                    ],
+                    check=False,
+                )
         elif os_name == "Darwin":
             safe_run(
                 ["osascript", "-e", 'tell app "System Events" to keystroke "v" using command down'],

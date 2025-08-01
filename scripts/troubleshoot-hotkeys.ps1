@@ -73,8 +73,32 @@ function Invoke-TroubleshootHotkeys {
         Debug "  Expected location: $startupScript"
         if ($Fix) {
             Info "Attempting to fix by copying the script..."
-            $sourceScript = Join-Path (Split-Path $MyInvocation.MyCommand.Definition) '..\src\prompt_automation\hotkey\windows.ahk'
-            if (Test-Path $sourceScript) { Copy-Item -Path $sourceScript -Destination $startupScript -Force; Info "✓ Script copied to startup folder" } else { Error "✗ Source script not found at: $sourceScript" }
+            $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+            $sourceScript = Join-Path $scriptDir '..\src\prompt_automation\hotkey\windows.ahk'
+            
+            # Handle WSL path issues
+            if ($sourceScript -like "\\wsl.localhost\*") {
+                $tempScript = Join-Path $env:TEMP 'prompt-automation-hotkey-temp.ahk'
+                try {
+                    Copy-Item -Path $sourceScript -Destination $tempScript -Force
+                    $sourceScript = $tempScript
+                } catch {
+                    Error "✗ Failed to copy script from WSL: $_"
+                    return
+                }
+            }
+            
+            if (Test-Path $sourceScript) { 
+                Copy-Item -Path $sourceScript -Destination $startupScript -Force
+                Info "✓ Script copied to startup folder"
+                
+                # Clean up temp file if used
+                if ($sourceScript -like "*temp*") {
+                    Remove-Item $sourceScript -Force -ErrorAction SilentlyContinue
+                }
+            } else { 
+                Error "✗ Source script not found at: $sourceScript" 
+            }
         }
     }
 

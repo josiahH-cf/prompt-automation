@@ -28,7 +28,36 @@ $pipxCmd = Get-Command pipx -ErrorAction SilentlyContinue
 if ($pipxCmd) { $global:pipxCommand = 'pipx' } else { $global:pipxCommand = 'python -m pipx' }
 
 # Get project root
-$projectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$projectRoot = Split-Path -Parent $scriptDir
+
+# Handle WSL path issues
+if ($projectRoot -like "\\wsl.localhost\*") {
+    Write-Warning "Detected installation from WSL path in Windows environment"
+    Info "Copying project to Windows temp directory for installation..."
+    
+    $tempProjectDir = Join-Path $env:TEMP "prompt-automation-install"
+    if (Test-Path $tempProjectDir) {
+        Remove-Item $tempProjectDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $tempProjectDir -Force | Out-Null
+    
+    # Copy essential files
+    $filesToCopy = @('pyproject.toml', 'README.md', 'LICENSE', 'src', 'prompts', 'MANIFEST.in')
+    foreach ($file in $filesToCopy) {
+        $sourcePath = Join-Path $projectRoot $file
+        $destPath = Join-Path $tempProjectDir $file
+        if (Test-Path $sourcePath) {
+            if ((Get-Item $sourcePath).PSIsContainer) {
+                Copy-Item -Path $sourcePath -Destination $destPath -Recurse -Force
+            } else {
+                Copy-Item -Path $sourcePath -Destination $destPath -Force
+            }
+        }
+    }
+    $projectRoot = $tempProjectDir
+}
+
 $pyprojectPath = Join-Path $projectRoot 'pyproject.toml'
 if (-not (Test-Path $pyprojectPath)) { Fail "pyproject.toml not found at $pyprojectPath" }
 
@@ -38,6 +67,16 @@ if ($global:pipxCommand -eq 'python -m pipx') {
     & $global:pipxCommand install --force "$projectRoot"
 }
 if ($LASTEXITCODE -ne 0) { Fail 'Failed to install prompt-automation from local source.' }
+
+# Clean up temp directory if used
+if ($projectRoot -like "*temp*prompt-automation-install*") {
+    try {
+        Remove-Item $projectRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Debug "Cleaned up temporary installation directory"
+    } catch {
+        Debug "Could not clean up temp directory: $_"
+    }
+}
 
 # Verify command
 $promptAutomationCmd = Get-Command prompt-automation -ErrorAction SilentlyContinue
