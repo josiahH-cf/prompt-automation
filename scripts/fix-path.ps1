@@ -7,6 +7,12 @@ This script helps diagnose and fix PATH issues that prevent the prompt-automatio
 
 . "$PSScriptRoot/utils.ps1"
 
+$LogDir = Join-Path $env:USERPROFILE '.prompt-automation\logs'
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+$LogFile = Join-Path $LogDir 'fix-path.log'
+Start-Transcript -Path $LogFile -Append | Out-Null
+trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $LogFile" }
+
 Info "Diagnosing prompt-automation PATH issues..."
 
 # Check if command is available
@@ -179,3 +185,6 @@ if ($env:PATH -like "*$foundPath*") {
         Info "4. Click New and add: $foundPath"
     }
 }
+
+Stop-Transcript | Out-Null
+Info "Log saved to $LogFile"

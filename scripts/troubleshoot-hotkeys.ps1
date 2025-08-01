@@ -73,7 +73,7 @@ function Invoke-TroubleshootHotkeys {
         Debug "  Expected location: $startupScript"
         if ($Fix) {
             Info "Attempting to fix by copying the script..."
-            $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+            $scriptDir = $PSScriptRoot
             $sourceScript = Join-Path $scriptDir '..\src\prompt_automation\hotkey\windows.ahk'
             
             # Handle WSL path issues

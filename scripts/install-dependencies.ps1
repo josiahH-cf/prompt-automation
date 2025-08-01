@@ -19,7 +19,7 @@ trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $
 Info "Starting dependency installation..."
 
 # Get script directory for later use
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$scriptDir = $PSScriptRoot
 
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
     Fail "This installer must be run on Windows."
