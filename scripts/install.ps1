@@ -7,7 +7,14 @@ basic verification. Handles logging, execution policy checks and WSL path
 scenarios.
 #>
 
-. "$PSScriptRoot/utils.ps1"
+# Import utility functions
+$utilsPath = Join-Path $PSScriptRoot 'utils.ps1'
+if (Test-Path $utilsPath) {
+    . $utilsPath
+} else {
+    Write-Host "ERROR: utils.ps1 not found at $utilsPath" -ForegroundColor Red
+    exit 1
+}
 
 if (-not (Test-ExecutionPolicy)) { Fail "Cannot proceed due to execution policy restrictions." }
 
@@ -38,7 +45,42 @@ $depScript = Join-Path $PSScriptRoot 'install-dependencies.ps1'
 if (Test-Path $depScript) {
     Info 'Installing dependencies...'
     & $depScript
-    if ($LASTEXITCODE -ne 0) { Fail 'Dependency installation failed.' }
+    $depExitCode = $LASTEXITCODE
+    Debug "Dependency script exit code: $depExitCode"
+    
+    if ($depExitCode -ne 0) { 
+        Write-Warning "Dependency installation script returned exit code: $depExitCode"
+        
+        # Check if critical components are actually available despite the error
+        $pythonAvailable = (Get-Command python -ErrorAction SilentlyContinue) -ne $null
+        $pipxAvailable = (Get-Command pipx -ErrorAction SilentlyContinue) -ne $null
+        
+        # Also check if pipx is available as a Python module
+        if (-not $pipxAvailable -and $pythonAvailable) {
+            try {
+                $pipxModuleTest = & python -m pipx --version 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    $pipxAvailable = $true
+                    Debug "pipx is available via 'python -m pipx'"
+                }
+            } catch {
+                Debug "pipx module not available: $_"
+            }
+        }
+        
+        if ($pythonAvailable -and $pipxAvailable) {
+            Write-Warning "Core dependencies (Python and pipx) appear to be available despite error code."
+            Write-Warning "Continuing with installation..."
+        } elseif ($pythonAvailable) {
+            Write-Warning "Python is available but pipx may have issues."
+            Write-Warning "Attempting to continue - some features may not work properly."
+        } else {
+            Write-Warning "Missing critical dependencies:"
+            if (-not $pythonAvailable) { Write-Warning "  - Python not found" }
+            if (-not $pipxAvailable) { Write-Warning "  - pipx not found" }
+            Fail 'Critical dependencies are missing. Cannot continue with installation.' 
+        }
+    }
 } else {
     Fail 'install-dependencies.ps1 not found.'
 }
@@ -62,19 +104,69 @@ if (Test-Path $hotkeyScript) {
 
 # Summary status
 Info "\n=== Installation Summary ==="
-$components = @(
-    @{Name='Python'; Command='python'; Status=(Get-Command python -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='pipx'; Command='pipx'; Status=(Get-Command pipx -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='fzf'; Command='fzf'; Status=(Get-Command fzf -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='espanso'; Command='espanso'; Status=(Get-Command espanso -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='AutoHotkey'; Command='AutoHotkey'; Status=(Get-Command AutoHotkey -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='prompt-automation'; Command='prompt-automation'; Status=(Get-Command prompt-automation -ErrorAction SilentlyContinue) -ne $null}
-)
-foreach ($component in $components) {
-    $status = if ($component.Status) { '[OK] Installed' } else { '[FAIL] Not found' }
-    $color = if ($component.Status) { 'Green' } else { 'Red' }
-    Write-Host "- $($component.Name): " -NoNewline
-    Write-Host $status -ForegroundColor $color
+Show-ComponentStatus -ComponentName 'Python'
+Show-ComponentStatus -ComponentName 'pipx'
+Show-ComponentStatus -ComponentName 'fzf'
+Show-ComponentStatus -ComponentName 'espanso'
+Show-ComponentStatus -ComponentName 'AutoHotkey'
+Show-ComponentStatus -ComponentName 'prompt-automation'
+
+# Check startup configuration
+Info "`n=== Startup Configuration ==="
+$startupStatus = Test-StartupConfiguration
+
+Write-Host "- AutoHotkey startup: " -NoNewline
+if ($startupStatus.AutoHotkey) { 
+    Write-Host "[OK] Configured" -ForegroundColor Green 
+} else { 
+    Write-Host "[FAIL] Not configured" -ForegroundColor Red 
+}
+
+Write-Host "- espanso service: " -NoNewline
+if ($startupStatus.Espanso) { 
+    Write-Host "[OK] Configured" -ForegroundColor Green 
+} elseif (Get-Command espanso -ErrorAction SilentlyContinue) {
+    # Check if espanso is at least running
+    try {
+        $espansoRunning = & espanso status 2>&1
+        if ($espansoRunning -match "espanso is running") {
+            Write-Host "[INFO] Running manually" -ForegroundColor Cyan
+        } else {
+            Write-Host "[WARN] Available but not running" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[WARN] Available but status unknown" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[N/A] Not installed" -ForegroundColor Gray
+}
+
+if ($startupStatus.Issues.Count -gt 0) {
+    # Filter out espanso service issues if espanso is actually running
+    $filteredIssues = @()
+    foreach ($issue in $startupStatus.Issues) {
+        if ($issue -like "*espanso service not registered*") {
+            # Check if espanso is running - if so, this isn't really an issue
+            try {
+                $espansoRunning = & espanso status 2>&1
+                if (-not ($espansoRunning -match "espanso is running")) {
+                    $filteredIssues += $issue
+                }
+            } catch {
+                $filteredIssues += $issue
+            }
+        } else {
+            $filteredIssues += $issue
+        }
+    }
+    
+    if ($filteredIssues.Count -gt 0) {
+        Info "`nStartup issues detected:"
+        foreach ($issue in $filteredIssues) {
+            Write-Host "  ! $issue" -ForegroundColor Yellow
+        }
+        Info "Run 'scripts\troubleshoot-hotkeys.ps1 --Fix' to resolve these issues"
+    }
 }
 
 Info "\nFor troubleshooting tips see docs or run scripts/troubleshoot-hotkeys.ps1 --Fix"

@@ -31,12 +31,46 @@ function Invoke-TroubleshootHotkeys {
     Info "=== prompt-automation Hotkey Troubleshooting ==="
     Info ""
 
-    $ahkCmd = Get-Command AutoHotkey -ErrorAction SilentlyContinue
-    if ($ahkCmd) {
-        Info "✓ AutoHotkey is installed at: $($ahkCmd.Source)"
-        try { $ahkVersion = & $ahkCmd.Source --version 2>&1; Debug "  Version: $ahkVersion" } catch { }
+    # Use smart AutoHotkey detection
+    $ahkAvailable = Test-ComponentAvailability -ComponentName 'AutoHotkey'
+    if ($ahkAvailable) {
+        # Try to find the actual path for version info
+        $ahkCmd = Get-Command AutoHotkey -ErrorAction SilentlyContinue
+        if ($ahkCmd) {
+            Info "[OK] AutoHotkey is installed at: $($ahkCmd.Source)"
+            try { 
+                $ahkVersion = (Get-ItemProperty -Path $ahkCmd.Source).VersionInfo.FileVersion
+                if ($ahkVersion) { Debug "  Version: $ahkVersion" }
+            } catch { }
+        } else {
+            # Check standard paths for version info
+            $standardPaths = @(
+                "${env:ProgramFiles}\AutoHotkey\AutoHotkey.exe",
+                "${env:ProgramFiles(x86)}\AutoHotkey\AutoHotkey.exe",
+                "${env:LOCALAPPDATA}\Programs\AutoHotkey\AutoHotkey.exe"
+            )
+            foreach ($path in $standardPaths) {
+                if (Test-Path $path) {
+                    Info "[OK] AutoHotkey is installed at: $path"
+                    try { 
+                        $ahkVersion = (Get-ItemProperty -Path $path).VersionInfo.FileVersion
+                        if ($ahkVersion) { Debug "  Version: $ahkVersion" }
+                    } catch { }
+                    break
+                }
+            }
+        }
+        
+        # If Fix mode is enabled, try to add AutoHotkey to PATH
+        if ($Fix -and -not $ahkAvailable) {
+            Info "Attempting to add AutoHotkey to PATH..."
+            if (Add-AutoHotkeyToPath) {
+                Info "[OK] AutoHotkey added to PATH successfully"
+                $ahkAvailable = Test-ComponentAvailability -ComponentName 'AutoHotkey'
+            }
+        }
     } else {
-        Error "✗ AutoHotkey is not installed or not in PATH"
+        Error "[FAIL] AutoHotkey is not installed or not in PATH"
         Info ""
         Info "AutoHotkey installation options:"
         Info "1. Via winget (recommended): winget install -e --id AutoHotkey.AutoHotkey"
@@ -54,92 +88,160 @@ function Invoke-TroubleshootHotkeys {
             try {
                 winget install -e --id AutoHotkey.AutoHotkey --accept-source-agreements --accept-package-agreements
                 if ($LASTEXITCODE -eq 0) {
-                    Info "✓ AutoHotkey installation attempted successfully"
+                    Info "[OK] AutoHotkey installation attempted successfully"
                 } else {
-                    Error "✗ AutoHotkey installation failed with exit code: $LASTEXITCODE"
+                    Error "[FAIL] AutoHotkey installation failed with exit code: $LASTEXITCODE"
                     Warn "This often indicates UAC dialogs were cancelled or permission issues"
                 }
-            } catch { Error "✗ AutoHotkey installation failed with exception: $_" }
+            } catch { 
+                Error "AutoHotkey installation failed with exception: $($_.Exception.Message)" 
+            }
         }
         return
     }
 
     $startupScript = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\prompt-automation.ahk'
     if (Test-Path $startupScript) {
-        Info "✓ AutoHotkey script found in startup folder"
+        Info "[OK] AutoHotkey script found in startup folder"
         Debug "  Location: $startupScript"
     } else {
-        Error "✗ AutoHotkey script not found in startup folder"
+        Error "[FAIL] AutoHotkey script not found in startup folder"
         Debug "  Expected location: $startupScript"
         if ($Fix) {
             Info "Attempting to fix by copying the script..."
-            $scriptDir = $PSScriptRoot
-            $sourceScript = Join-Path $scriptDir '..\src\prompt_automation\hotkey\windows.ahk'
-            
-            # Handle WSL path issues
-            if ($sourceScript -like "\\wsl.localhost\*") {
-                $tempScript = Join-Path $env:TEMP 'prompt-automation-hotkey-temp.ahk'
-                try {
-                    Copy-Item -Path $sourceScript -Destination $tempScript -Force
-                    $sourceScript = $tempScript
-                } catch {
-                    Error "✗ Failed to copy script from WSL: $_"
-                    return
-                }
-            }
-            
-            if (Test-Path $sourceScript) { 
-                Copy-Item -Path $sourceScript -Destination $startupScript -Force
-                Info "✓ Script copied to startup folder"
-                
-                # Clean up temp file if used
-                if ($sourceScript -like "*temp*") {
-                    Remove-Item $sourceScript -Force -ErrorAction SilentlyContinue
-                }
-            } else { 
-                Error "✗ Source script not found at: $sourceScript" 
+            if (Setup-AutoHotkeyStartup -Force) {
+                Info "[OK] AutoHotkey startup configuration fixed"
+            } else {
+                Error "[FAIL] Could not fix AutoHotkey startup configuration"
             }
         }
     }
 
     $ahkProcess = Get-Process -Name "AutoHotkey*" -ErrorAction SilentlyContinue
     if ($ahkProcess) {
-        Info "✓ AutoHotkey process is running:"
+        Info "[OK] AutoHotkey process is running:"
         foreach ($proc in $ahkProcess) { Debug "  PID: $($proc.Id), Name: $($proc.ProcessName)" }
     } else {
-        Warn "⚠ No AutoHotkey processes found running"
+        Warn "[WARN] No AutoHotkey processes found running"
         if ($Fix -or $Restart) {
             Info "Starting AutoHotkey script manually..."
             if (Test-Path $startupScript) {
                 try {
-                    Start-Process -FilePath $ahkCmd.Source -ArgumentList "`"$startupScript`"" -NoNewWindow
-                    Start-Sleep -Seconds 2
-                    $ahkProcess = Get-Process -Name "AutoHotkey*" -ErrorAction SilentlyContinue
-                    if ($ahkProcess) { Info "✓ AutoHotkey script started successfully" } else { Error "✗ Failed to start AutoHotkey script" }
-                } catch { Error "✗ Error starting AutoHotkey: $_" }
+                    # Find AutoHotkey executable
+                    $ahkExe = $null
+                    $ahkCmd = Get-Command AutoHotkey -ErrorAction SilentlyContinue
+                    if ($ahkCmd) {
+                        $ahkExe = $ahkCmd.Source
+                    } else {
+                        # Check standard paths
+                        $standardPaths = @(
+                            "${env:ProgramFiles}\AutoHotkey\AutoHotkey.exe",
+                            "${env:ProgramFiles(x86)}\AutoHotkey\AutoHotkey.exe",
+                            "${env:LOCALAPPDATA}\Programs\AutoHotkey\AutoHotkey.exe"
+                        )
+                        foreach ($path in $standardPaths) {
+                            if (Test-Path $path) {
+                                $ahkExe = $path
+                                break
+                            }
+                        }
+                    }
+                    
+                    if ($ahkExe) {
+                        Start-Process -FilePath $ahkExe -ArgumentList "`"$startupScript`"" -NoNewWindow
+                        Start-Sleep -Seconds 2
+                        $ahkProcess = Get-Process -Name "AutoHotkey*" -ErrorAction SilentlyContinue
+                        if ($ahkProcess) { 
+                            Info "[OK] AutoHotkey script started successfully" 
+                        } else { 
+                            Error "[FAIL] Failed to start AutoHotkey script" 
+                        }
+                    } else {
+                        Error "[FAIL] AutoHotkey executable not found"
+                    }
+                } catch { 
+                    Error "Error starting AutoHotkey: $($_.Exception.Message)" 
+                }
             }
         }
     }
 
     $paCmd = Get-Command prompt-automation -ErrorAction SilentlyContinue
     if ($paCmd) {
-        Info "✓ prompt-automation command is available"
-        try { $version = & prompt-automation --version 2>&1; Debug "  Version: $version" } catch { }
+        Info "prompt-automation command is available"
+        try { 
+            # Try to get help instead of version since --version isn't supported
+            $help = & prompt-automation --help 2>&1 | Select-Object -First 5
+            Debug "  Help output available: $($help -ne $null)" 
+        } catch { 
+            Debug "Could not get help: $($_.Exception.Message)"
+        }
     } else {
-        Error "✗ prompt-automation command not found"
+        Error "[FAIL] prompt-automation command not found"
         Info "  Install with: pipx install prompt-automation"
         Info "  Or from local source: pipx install --force ."
     }
 
     Info ""
-    Info "=== Checking for potential conflicts ==="
+    Info "=== Checking espanso Configuration ==="
     $espansoCmd = Get-Command espanso -ErrorAction SilentlyContinue
     if ($espansoCmd) {
-        try { $espansoStatus = & espanso status 2>&1; if ($espansoStatus -match 'espanso is running') { Warn "⚠ espanso is running - this may conflict with AutoHotkey" } else { Info "✓ espanso is installed but not running" } } catch { }
+        try { 
+            $espansoStatus = & espanso status 2>&1
+            Debug "espanso status output: $espansoStatus"
+            
+            if ($espansoStatus -match 'espanso is running') { 
+                Info "[OK] espanso is running and active"
+                
+                # Check if service is registered for startup
+                $serviceStatus = & espanso service status 2>&1
+                Debug "espanso service status: '$serviceStatus'"
+                
+                if ($serviceStatus -match 'registered') {
+                    Info "[OK] espanso service is configured for automatic startup"
+                } elseif ([string]::IsNullOrWhiteSpace($serviceStatus)) {
+                    Info "[INFO] espanso is running manually (not as a service)"
+                    Info "This is fine - espanso will work, but won't auto-start after reboot"
+                    if ($Fix) {
+                        Info "Configuring espanso for automatic startup..."
+                        if (Setup-EspansoStartup -Force) {
+                            Info "[OK] espanso startup configuration added"
+                        } else {
+                            Warn "Could not configure espanso for automatic startup"
+                        }
+                    }
+                } else {
+                    Warn "espanso is running but service status unclear: $serviceStatus"
+                    if ($Fix) {
+                        Info "Attempting to configure espanso for automatic startup..."
+                        if (Setup-EspansoStartup -Force) {
+                            Info "[OK] espanso startup configuration fixed"
+                        } else {
+                            Warn "Could not configure espanso for automatic startup"
+                        }
+                    }
+                }
+            } else { 
+                Warn "espanso is installed but not running"
+                Debug "espanso status was: $espansoStatus"
+                if ($Fix) {
+                    Info "Starting espanso and configuring for startup..."
+                    if (Setup-EspansoStartup -Force) {
+                        Info "[OK] espanso configured and started"
+                    } else {
+                        Warn "Could not start and configure espanso"
+                    }
+                }
+            } 
+        } catch { 
+            Debug "Could not check espanso status: $($_.Exception.Message)"
+        }
+    } else {
+        Debug "espanso not installed"
     }
     $startupDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
     $ahkFiles = Get-ChildItem -Path $startupDir -Filter '*.ahk' -ErrorAction SilentlyContinue
-    if ($ahkFiles.Count -gt 1) { Warn "⚠ Multiple AutoHotkey scripts found in startup" }
+    if ($ahkFiles.Count -gt 1) { Warn "[WARN] Multiple AutoHotkey scripts found in startup" }
 
     Info ""
     if ($Status) {

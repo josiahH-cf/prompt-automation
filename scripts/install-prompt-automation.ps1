@@ -81,28 +81,26 @@ if ($projectRoot -like "*temp*prompt-automation-install*") {
 # Verify command
 $promptAutomationCmd = Get-Command prompt-automation -ErrorAction SilentlyContinue
 if ($promptAutomationCmd) {
-    Info "✓ prompt-automation command is available"
-    try { $version = & prompt-automation --version 2>&1; Info "   Version: $version" } catch { }
+    Info "[OK] prompt-automation command is available"
+    try { 
+        # Test with help instead of version since --version isn't supported
+        $help = & prompt-automation --help 2>&1 | Select-Object -First 1
+        if ($help) { Info "   Command working: Help available" }
+    } catch { 
+        Debug "Could not get help: $($_.Exception.Message)"
+    }
 } else {
     Write-Warning 'prompt-automation command not found in PATH. You may need to restart your terminal.'
 }
 
 # Display summary
-Info "\n=== Installation Summary ==="
-$components = @(
-    @{Name='Python'; Command='python'; Status=(Get-Command python -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='pipx'; Command='pipx'; Status=(Get-Command pipx -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='fzf'; Command='fzf'; Status=(Get-Command fzf -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='espanso'; Command='espanso'; Status=(Get-Command espanso -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='AutoHotkey'; Command='AutoHotkey'; Status=(Get-Command AutoHotkey -ErrorAction SilentlyContinue) -ne $null},
-    @{Name='prompt-automation'; Command='prompt-automation'; Status=(Get-Command prompt-automation -ErrorAction SilentlyContinue) -ne $null}
-)
-foreach ($component in $components) {
-    $status = if ($component.Status) { '[OK] Installed' } else { '[FAIL] Not found' }
-    $color = if ($component.Status) { 'Green' } else { 'Red' }
-    Write-Host "- $($component.Name): " -NoNewline
-    Write-Host $status -ForegroundColor $color
-}
+Info "`n=== Installation Summary ==="
+Show-ComponentStatus -ComponentName 'Python'
+Show-ComponentStatus -ComponentName 'pipx'
+Show-ComponentStatus -ComponentName 'fzf'
+Show-ComponentStatus -ComponentName 'espanso'
+Show-ComponentStatus -ComponentName 'AutoHotkey'
+Show-ComponentStatus -ComponentName 'prompt-automation'
 
 Stop-Transcript | Out-Null
 Info "Installation complete. Log saved to $LogFile"
