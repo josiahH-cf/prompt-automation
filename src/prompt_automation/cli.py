@@ -44,12 +44,12 @@ def _run_cmd(cmd: list[str]) -> bool:
         return False
 
 
-def check_dependencies() -> bool:
+def check_dependencies(require_fzf: bool = True) -> bool:
     """Verify required dependencies; attempt install if possible."""
     os_name = platform.system()
     missing: list[str] = []
 
-    if not _check_cmd("fzf"):
+    if require_fzf and not _check_cmd("fzf"):
         missing.append("fzf")
     if os_name == "Linux":
         if not _check_cmd("zenity"):
@@ -102,6 +102,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--prompt-dir", type=Path, help="Directory containing prompt templates")
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
+    parser.add_argument("--gui", action="store_true", help="Launch GUI instead of terminal prompts")
     args = parser.parse_args(argv)
 
     if args.prompt_dir:
@@ -136,9 +137,18 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
+    gui_mode = args.gui or os.environ.get("PROMPT_AUTOMATION_GUI")
+
     _log.info("running on %s", platform.platform())
-    if not check_dependencies():
+    if not check_dependencies(require_fzf=not gui_mode):
         return
+
+    if gui_mode:
+        from . import gui
+
+        gui.run()
+        return
+
     banner = Path(__file__).with_name("resources").joinpath("banner.txt")
     print(banner.read_text())
     tmpl: dict[str, Any] | None = menus.pick_style()
