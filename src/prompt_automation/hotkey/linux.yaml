@@ -1,4 +1,4 @@
 matches:
   - trigger: "<ctrl>+<shift>+j"
-    run: "prompt-automation"
+    run: "prompt-automation --gui"
     propagate: false

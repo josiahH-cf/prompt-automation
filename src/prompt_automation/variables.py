@@ -7,7 +7,7 @@ import shutil
 from .utils import safe_run
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .errorlog import get_logger
 
@@ -64,37 +64,48 @@ def _editor_prompt() -> str | None:
         return None
 
 
-def get_variables(placeholders: List[Dict]) -> Dict[str, str]:
-    """Return dict of placeholder values using GUI/editor/CLI fallbacks."""
-    values: Dict[str, str] = {}
+def get_variables(placeholders: List[Dict], initial: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """Return dict of placeholder values using GUI/editor/CLI fallbacks.
+
+    ``initial`` allows pre-filled values (e.g. from a GUI) to be provided.
+    Any placeholders missing from ``initial`` will fall back to the usual
+    prompt mechanisms.
+    """
+
+    values: Dict[str, str] = dict(initial or {})
     for ph in placeholders:
-        label = ph.get("label", ph["name"])
-        opts = ph.get("options")
-        multiline = ph.get("multiline", False)
-        val = _gui_prompt(label, opts, multiline)
-        if val is None:
-            val = _editor_prompt()
-        if val is None:
-            _log.info("CLI fallback for %s", label)
-            if opts:
-                print(f"{label} options: {', '.join(opts)}")
-                val = input(f"{label}: ") or opts[0]
-            elif multiline:
-                print(f"{label} (end blank line):")
-                lines: List[str] = []
-                while True:
-                    line = input()
-                    if not line:
-                        break
-                    lines.append(line)
-                val = "\n".join(lines)
-            else:
-                val = input(f"{label}: ")
+        name = ph["name"]
+        if name in values and values[name] != "":
+            val = values[name]
+        else:
+            label = ph.get("label", name)
+            opts = ph.get("options")
+            multiline = ph.get("multiline", False)
+            val = _gui_prompt(label, opts, multiline)
+            if val is None:
+                val = _editor_prompt()
+            if val is None:
+                _log.info("CLI fallback for %s", label)
+                if opts:
+                    print(f"{label} options: {', '.join(opts)}")
+                    val = input(f"{label}: ") or opts[0]
+                elif multiline:
+                    print(f"{label} (end blank line):")
+                    lines: List[str] = []
+                    while True:
+                        line = input()
+                        if not line:
+                            break
+                        lines.append(line)
+                    val = "\n".join(lines)
+                else:
+                    val = input(f"{label}: ")
+
         if ph.get("type") == "number":
             try:
                 float(val)
             except ValueError:
                 val = "0"
-        values[ph["name"]] = val
+        values[name] = val
     return values
 

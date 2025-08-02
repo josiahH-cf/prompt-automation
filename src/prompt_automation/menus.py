@@ -134,8 +134,14 @@ def pick_prompt(style: str) -> Optional[Dict[str, Any]]:
     return load_template(path)
 
 
-def render_template(tmpl: Dict[str, Any]) -> str:
-    vars = get_variables(tmpl.get("placeholders", []))
+def render_template(tmpl: Dict[str, Any], values: Dict[str, str] | None = None) -> str:
+    """Render ``tmpl`` using provided ``values`` for placeholders.
+
+    If ``values`` is ``None`` any missing variables will be collected via
+    :func:`variables.get_variables` which falls back to GUI/CLI prompts.
+    """
+
+    vars = get_variables(tmpl.get("placeholders", []), initial=values)
     return fill_placeholders(tmpl["template"], vars)
 
 
