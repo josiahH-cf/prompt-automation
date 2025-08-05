@@ -21,7 +21,7 @@ def load_template(path: Path) -> Dict:
 
 
 def validate_template(data: Dict) -> bool:
-    """Basic schema validation used in tests."""
+    """Basic schema validation."""
     required = {"id", "title", "style", "template", "placeholders"}
     return required.issubset(data)
 

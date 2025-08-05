@@ -51,20 +51,18 @@ def check_dependencies(require_fzf: bool = True) -> bool:
 
     if require_fzf and not _check_cmd("fzf"):
         missing.append("fzf")
-    if os_name == "Linux":
-        if not _check_cmd("zenity"):
-            missing.append("zenity")
-        if not _check_cmd("xdotool"):
-            missing.append("xdotool")
-    elif os_name == "Windows":
-        try:
-            import keyboard  # noqa: F401
-            # Test keyboard library without actually hooking
-            # keyboard.is_pressed  # Just access a method to test import
-        except Exception as e:
-            _log.warning("keyboard library unavailable on Windows: %s", e)
-            # Don't add to missing - keyboard functionality is optional
-            # missing.append("keyboard")
+        if os_name == "Linux":
+            if not _check_cmd("zenity"):
+                missing.append("zenity")
+            if not _check_cmd("xdotool"):
+                missing.append("xdotool")
+        elif os_name == "Windows":
+            try:
+                import keyboard  # noqa: F401
+            except Exception as e:
+                _log.warning("keyboard library unavailable on Windows: %s", e)
+                # Don't add to missing - keyboard functionality is optional
+                # missing.append("keyboard")
 
     try:
         import pyperclip  # noqa: F401

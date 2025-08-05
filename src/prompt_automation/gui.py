@@ -31,7 +31,7 @@ def run() -> None:
     """Launch the GUI. Requires :mod:`PySimpleGUI`."""
     try:
         import PySimpleGUI as sg
-    except Exception as e:  # pragma: no cover - optional dependency
+    except Exception as e:
         print("[prompt-automation] PySimpleGUI not available:", e, file=sys.stderr)
         return
 

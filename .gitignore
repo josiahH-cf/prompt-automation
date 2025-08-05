@@ -4,12 +4,9 @@ scripts/venv/
 *.egg-info
 .DS_Store
 __pycache__/
-\.mypy_cache/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache/
-.coverage
 # Local config (logs, hotkey mappings)
 .prompt-automation/
 *.db
