@@ -7,7 +7,7 @@ import shutil
 from .utils import safe_run
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .errorlog import get_logger
 
@@ -64,7 +64,9 @@ def _editor_prompt() -> str | None:
         return None
 
 
-def get_variables(placeholders: List[Dict], initial: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+def get_variables(
+    placeholders: List[Dict], initial: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Return dict of placeholder values using GUI/editor/CLI fallbacks.
 
     ``initial`` allows pre-filled values (e.g. from a GUI) to be provided.
@@ -72,40 +74,47 @@ def get_variables(placeholders: List[Dict], initial: Optional[Dict[str, str]] = 
     prompt mechanisms.
     """
 
-    values: Dict[str, str] = dict(initial or {})
+    values: Dict[str, Any] = dict(initial or {})
     for ph in placeholders:
         name = ph["name"]
-        if name in values and values[name] != "":
-            val = values[name]
+        ptype = ph.get("type")
+        if name in values and values[name] not in ("", None):
+            val: Any = values[name]
         else:
             label = ph.get("label", name)
             opts = ph.get("options")
-            multiline = ph.get("multiline", False)
-            val = _gui_prompt(label, opts, multiline)
-            if val is None:
-                val = _editor_prompt()
+            multiline = ph.get("multiline", False) or ptype == "list"
+            val = None
+            if ptype != "file":
+                val = _gui_prompt(label, opts, multiline)
+                if val is None:
+                    val = _editor_prompt()
             if val is None:
                 _log.info("CLI fallback for %s", label)
                 if opts:
                     print(f"{label} options: {', '.join(opts)}")
                     val = input(f"{label}: ") or opts[0]
-                elif multiline:
-                    print(f"{label} (end blank line):")
+                elif ptype == "list" or multiline:
+                    print(f"{label} (one per line, blank line to finish):")
                     lines: List[str] = []
                     while True:
                         line = input()
                         if not line:
                             break
                         lines.append(line)
-                    val = "\n".join(lines)
+                    val = lines
+                elif ptype == "file":
+                    val = input(f"{label} path: ")
                 else:
                     val = input(f"{label}: ")
 
-        if ph.get("type") == "number":
+        if ptype == "number":
             try:
-                float(val)
-            except ValueError:
+                float(val)  # type: ignore[arg-type]
+            except Exception:
                 val = "0"
+        if ptype == "list" and isinstance(val, str):
+            val = [l for l in val.splitlines() if l]
         values[name] = val
     return values
 

@@ -4,11 +4,12 @@ from __future__ import annotations
 import json
 from .utils import safe_run
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import logger
-from .renderer import fill_placeholders, load_template
+from .renderer import fill_placeholders, load_template, validate_template
 from .variables import get_variables
 
 # Try to find prompts directory in multiple locations
@@ -134,7 +135,7 @@ def pick_prompt(style: str) -> Optional[Dict[str, Any]]:
     return load_template(path)
 
 
-def render_template(tmpl: Dict[str, Any], values: Dict[str, str] | None = None) -> str:
+def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) -> str:
     """Render ``tmpl`` using provided ``values`` for placeholders.
 
     If ``values`` is ``None`` any missing variables will be collected via
@@ -142,11 +143,71 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, str] | None = None) 
     """
 
     vars = get_variables(tmpl.get("placeholders", []), initial=values)
+    for ph in tmpl.get("placeholders", []):
+        if ph.get("type") == "file":
+            name = ph["name"]
+            path = vars.get(name)
+            try:
+                if path:
+                    vars[name] = Path(path).read_text()
+            except Exception:
+                vars[name] = ""
     return fill_placeholders(tmpl["template"], vars)
 
 
 def _slug(text: str) -> str:
     return "".join(c.lower() if c.isalnum() else "-" for c in text).strip("-")
+
+
+def _check_unique_id(pid: int, exclude: Path | None = None) -> None:
+    """Raise ``ValueError`` if ``pid`` already exists in prompts (excluding path)."""
+    for p in PROMPTS_DIR.rglob("*.json"):
+        if exclude and p.resolve() == exclude.resolve():
+            continue
+        try:
+            data = json.loads(p.read_text())
+            if data.get("id") == pid:
+                raise ValueError(f"Duplicate id {pid} in {p}")
+        except Exception:
+            continue
+
+
+def save_template(data: Dict[str, Any], orig_path: Path | None = None) -> Path:
+    """Write ``data`` to disk with validation and backup."""
+    if not validate_template(data):
+        raise ValueError("invalid template structure")
+    _check_unique_id(data["id"], exclude=orig_path)
+    dir_path = PROMPTS_DIR / data["style"]
+    dir_path.mkdir(parents=True, exist_ok=True)
+    fname = f"{int(data['id']):02d}_{_slug(data['title'])}.json"
+    path = dir_path / fname
+    if path.exists():
+        shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+    if orig_path and orig_path.exists() and orig_path != path:
+        shutil.copy2(orig_path, orig_path.with_suffix(orig_path.suffix + ".bak"))
+        orig_path.unlink()
+    path.write_text(json.dumps(data, indent=2))
+    return path
+
+
+def delete_template(path: Path) -> None:
+    """Remove ``path`` after creating a backup."""
+    if path.exists():
+        shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+        path.unlink()
+
+
+def add_style(name: str) -> Path:
+    path = PROMPTS_DIR / name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def delete_style(name: str) -> None:
+    path = PROMPTS_DIR / name
+    if any(path.iterdir()):
+        raise OSError("style folder not empty")
+    path.rmdir()
 
 
 def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
