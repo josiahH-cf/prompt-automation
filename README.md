@@ -27,7 +27,14 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
 
-Press **Ctrl+Shift+J** to open the style picker. Select a style, choose a template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
+Press **Ctrl+Shift+J** to launch the GUI style picker. Select a style, choose a template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
+
+To change the global hotkey, run:
+
+```bash
+prompt-automation --assign-hotkey
+```
+and press the desired key combination.
 
 ```
 [Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]

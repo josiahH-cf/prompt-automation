@@ -103,12 +103,23 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
     parser.add_argument("--gui", action="store_true", help="Launch GUI instead of terminal prompts")
+    parser.add_argument(
+        "--assign-hotkey",
+        action="store_true",
+        help="Interactively set or change the global GUI hotkey",
+    )
     args = parser.parse_args(argv)
 
     if args.prompt_dir:
         path = args.prompt_dir.expanduser().resolve()
         os.environ["PROMPT_AUTOMATION_PROMPTS"] = str(path)
         _log.info("using custom prompt directory %s", path)
+
+    if args.assign_hotkey:
+        from . import hotkeys
+
+        hotkeys.assign_hotkey()
+        return
 
     try:
         menus.ensure_unique_ids(menus.PROMPTS_DIR)

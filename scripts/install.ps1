@@ -27,6 +27,11 @@ trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $
 
 Info "Starting prompt-automation installation..."
 
+# Record default hotkey mapping
+$cfgDir = Join-Path $env:USERPROFILE '.prompt-automation'
+New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+@'{"hotkey": "ctrl+shift+j"}'@ | Set-Content (Join-Path $cfgDir 'hotkey.json')
+
 # Ensure we are running on Windows. If not, fall back to WSL-compatible installer
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
     Write-Warning 'Non-Windows environment detected. Running WSL-compatible installer if available.'

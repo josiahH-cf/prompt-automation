@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Added interactive `--assign-hotkey` command with per-user hotkey mapping file
+
 ## 0.2.1 - 2025-08-01
 - Enhanced cross-platform compatibility for WSL2/Windows environments
 - Fixed Unicode character encoding issues in PowerShell scripts  

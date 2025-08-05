@@ -1,7 +1,7 @@
 # Global Hotkey Setup
 
 This project provides platform-specific scripts for launching `prompt-automation` with a keyboard shortcut.
-The default key combination is **Ctrl+Shift+J**.
+The default key combination is **Ctrl+Shift+J**. Run `prompt-automation --assign-hotkey` to change it at any time.
 
 ## Windows
 1. Run `scripts/install.ps1` from PowerShell. The script installs dependencies, checks for AutoHotkey v2, and copies `windows.ahk` to your Startup folder.
@@ -9,7 +9,7 @@ The default key combination is **Ctrl+Shift+J**.
    ```powershell
    Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup" | Where-Object Name -eq 'prompt-automation.ahk'
    ```
-3. To unregister or change the hotkey, remove or edit `prompt-automation.ahk` from that folder and log out.
+3. To change the hotkey run `prompt-automation --assign-hotkey` or edit `prompt-automation.ahk` in that folder and log out.
 
 ## macOS
 1. Open `src/prompt_automation/hotkey/macos.applescript` with Automator and save it as an **Application**.
@@ -25,7 +25,7 @@ The default key combination is **Ctrl+Shift+J**.
 
 ## Linux / WSL2
 1. Ensure [Espanso](https://espanso.org) is installed.
-2. Copy `src/prompt_automation/hotkey/linux.yaml` to `$HOME/.config/espanso/match/prompt-automation.yml` and run `espanso restart`.
+2. Copy `src/prompt_automation/hotkey/linux.yaml` to `$HOME/.config/espanso/match/prompt-automation.yml` and run `espanso restart` (or use `prompt-automation --assign-hotkey`).
 3. If Espanso is unavailable, create `$HOME/.config/autostart/prompt-automation.desktop`:
    ```ini
    [Desktop Entry]

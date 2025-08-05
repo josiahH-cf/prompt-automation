@@ -19,6 +19,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
 │       ├── gui.py            # Optional PySimpleGUI interface for choosing templates
 │       ├── hotkey/           # Platform-specific hotkey definitions
+│       ├── hotkeys.py        # Interactive hotkey assignment and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
