@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- **Enhanced Hotkey System**: Comprehensive improvements to global hotkey functionality
+  - Robust GUI-first with terminal fallback mechanism for all platforms
+  - Automatic dependency checking and installation guidance
+  - Improved AutoHotkey script generation with multiple execution paths
+  - Enhanced Linux espanso integration with proper fallback commands
+  - Better macOS AppleScript handling with background execution
+  - Added `--update` command to refresh hotkey configuration and verify dependencies
+  - Automatic hotkey script placement verification and error reporting
+  - Support for multiple installation methods (pip, pipx, executable, python -m)
 - Added interactive `--assign-hotkey` command with per-user hotkey mapping file
 
 ## 0.2.1 - 2025-08-01

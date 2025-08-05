@@ -29,12 +29,23 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 Press **Ctrl+Shift+J** to launch the GUI style picker. Select a style, choose a template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
 
+The hotkey system automatically:
+- Tries to launch the GUI first
+- Falls back to terminal mode if GUI is unavailable
+- Handles multiple installation methods (pip, pipx, executable)
+
 To change the global hotkey, run:
 
 ```bash
 prompt-automation --assign-hotkey
 ```
 and press the desired key combination.
+
+To update existing hotkeys after installation or system changes:
+
+```bash
+prompt-automation --update
+```
 
 ```
 [Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]
@@ -62,7 +73,24 @@ A minimal example:
 
 - Run `prompt-automation --troubleshoot` to print log and database locations.
 - Use `prompt-automation --list` to list available templates.
+- Use `prompt-automation --update` to refresh hotkey configuration and ensure dependencies are properly installed.
 - If the hotkey does not work see [docs/HOTKEYS.md](docs/HOTKEYS.md) for manual setup instructions.
+
+### Hotkey Issues
+
+If **Ctrl+Shift+J** is not working:
+
+1. **Check dependencies**: Run `prompt-automation --update` to ensure all platform-specific hotkey dependencies are installed
+   - **Windows**: Requires AutoHotkey (`winget install AutoHotkey.AutoHotkey`)
+   - **Linux**: Requires espanso (see [espanso.org/install](https://espanso.org/install/))
+   - **macOS**: Uses built-in AppleScript (manual setup required in System Preferences)
+
+2. **Verify hotkey files**: The update command will check if hotkey scripts are in the correct locations:
+   - **Windows**: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\prompt-automation.ahk`
+   - **Linux**: `~/.config/espanso/match/prompt-automation.yml`
+   - **macOS**: `~/Library/Application Scripts/prompt-automation/macos.applescript`
+
+3. **Change hotkey**: Run `prompt-automation --assign-hotkey` to capture a new hotkey combination
 
 ## FAQ
 

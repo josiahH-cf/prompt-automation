@@ -27,10 +27,11 @@ trap { Write-Warning "Error on line $($_.InvocationInfo.ScriptLineNumber). See $
 
 Info "Starting prompt-automation installation..."
 
-# Record default hotkey mapping
+# Record default hotkey mapping and enable GUI mode
 $cfgDir = Join-Path $env:USERPROFILE '.prompt-automation'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 '{"hotkey": "ctrl+shift+j"}' | Set-Content (Join-Path $cfgDir 'hotkey.json')
+'PROMPT_AUTOMATION_GUI=1' | Set-Content (Join-Path $cfgDir 'environment')
 
 # Ensure we are running on Windows. If not, fall back to WSL-compatible installer
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
@@ -100,11 +101,24 @@ if (Test-Path $appScript) {
     Fail 'install-prompt-automation.ps1 not found.'
 }
 
+# Set up global hotkey with GUI mode
+Info 'Setting up global hotkey...'
+try {
+    $env:PYTHONPATH = (Resolve-Path (Join-Path $PSScriptRoot '..\src')).Path
+    python -c "import prompt_automation.hotkeys; prompt_automation.hotkeys.update_system_hotkey('ctrl+shift+j')"
+    Info 'Global hotkey configured successfully'
+} catch {
+    Write-Warning "Failed to configure global hotkey: $($_.Exception.Message)"
+    Write-Warning "You can set it up manually later with: prompt-automation --assign-hotkey"
+}
+
 # Verify hotkey setup
 $hotkeyScript = Join-Path $PSScriptRoot 'troubleshoot-hotkeys.ps1'
 if (Test-Path $hotkeyScript) {
     Info 'Verifying hotkey registration...'
     & $hotkeyScript -Status
+    # Reset exit code after hotkey status check
+    $global:LASTEXITCODE = 0
 }
 
 # Summary status
@@ -134,6 +148,8 @@ if ($startupStatus.Espanso) {
     # Check if espanso is at least running
     try {
         $espansoRunning = & espanso status 2>&1
+        # Reset exit code after espanso status
+        $global:LASTEXITCODE = 0
         if ($espansoRunning -match "espanso is running") {
             Write-Host "[INFO] Running manually" -ForegroundColor Cyan
         } else {
@@ -141,6 +157,8 @@ if ($startupStatus.Espanso) {
         }
     } catch {
         Write-Host "[WARN] Available but status unknown" -ForegroundColor Yellow
+        # Reset exit code after failed espanso status
+        $global:LASTEXITCODE = 0
     }
 } else {
     Write-Host "[N/A] Not installed" -ForegroundColor Gray
@@ -154,11 +172,15 @@ if ($startupStatus.Issues.Count -gt 0) {
             # Check if espanso is running - if so, this isn't really an issue
             try {
                 $espansoRunning = & espanso status 2>&1
+                # Reset exit code after espanso status check
+                $global:LASTEXITCODE = 0
                 if (-not ($espansoRunning -match "espanso is running")) {
                     $filteredIssues += $issue
                 }
             } catch {
                 $filteredIssues += $issue
+                # Reset exit code after failed espanso status
+                $global:LASTEXITCODE = 0
             }
         } else {
             $filteredIssues += $issue
@@ -193,3 +215,6 @@ Info "\nFor troubleshooting tips see docs or run scripts/troubleshoot-hotkeys.ps
 
 Stop-Transcript | Out-Null
 Info "Installation log saved to $LogFile"
+
+# Explicitly set success exit code
+exit 0

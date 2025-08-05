@@ -6,11 +6,12 @@ requires-python = ">=3.11"
 authors = [{name="prompt-automation"}]
 dependencies = [
     "pyperclip",
-    "PySimpleGUI"
+    "FreeSimpleGUI"
 ]
 
 [project.scripts]
 prompt-automation = "prompt_automation.cli:main"
+prompt-automation-mode = "prompt_automation.switch_mode:main"
 
 [project.optional-dependencies]
 windows = ["keyboard"]

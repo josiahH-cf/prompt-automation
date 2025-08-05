@@ -49,6 +49,23 @@ def _copy_system(text: str, os_name: str) -> bool:
     return False
 
 
+def copy_to_clipboard(text: str) -> None:
+    """Copy text to clipboard without simulating paste keystroke."""
+    os_name = platform.system()
+    copied = False
+    try:
+        pyperclip.copy(text)
+        copied = True
+    except Exception as e:  # pragma: no cover - can't easily simulate
+        _log.error("pyperclip failed: %s", e)
+    if not copied:
+        _log.warning("pyperclip failed; attempting system clipboard")
+        copied = _copy_system(text, os_name)
+    if not copied:
+        print("[prompt-automation] Unable to copy text to clipboard. See error log.")
+        return
+
+
 def paste_text(text: str) -> None:
     """Copy ``text`` to clipboard and simulate paste."""
     os_name = platform.system()

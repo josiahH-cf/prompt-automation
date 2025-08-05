@@ -103,10 +103,11 @@ elif [ "$PLATFORM" = "macOS" ]; then
     osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$WORKFLOW_DIR'/macos.applescript", hidden:false}' || true
 fi
 
-# record default hotkey mapping
+# record default hotkey mapping and enable GUI mode
 HOTKEY_CFG_DIR="$HOME/.prompt-automation"
 mkdir -p "$HOTKEY_CFG_DIR"
 echo '{"hotkey": "ctrl+shift+j"}' > "$HOTKEY_CFG_DIR/hotkey.json"
+echo 'PROMPT_AUTOMATION_GUI=1' > "$HOTKEY_CFG_DIR/environment"
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
@@ -120,6 +121,16 @@ fi
 info "Found pyproject.toml at: $PROJECT_ROOT/pyproject.toml"
 
 retry "pipx install --force \"$PROJECT_ROOT\"" || { err "Failed to install prompt-automation from local source"; exit 1; }
+
+# Set up global hotkey with GUI mode
+info "Setting up global hotkey..."
+PYTHONPATH="$PROJECT_ROOT/src" python3 -c "
+import prompt_automation.hotkeys
+prompt_automation.hotkeys.update_system_hotkey('ctrl+shift+j')
+print('Global hotkey configured successfully')
+" || {
+    err "Failed to configure global hotkey. You can set it up manually later with: prompt-automation --assign-hotkey"
+}
 
 # Summary verification
 info "\n=== Installation Summary ==="

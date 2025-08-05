@@ -1,4 +1,6 @@
 matches:
   - trigger: "<ctrl>+<shift>+j"
-    run: "prompt-automation --gui"
+    run: |
+      # Try GUI first, fall back to terminal
+      prompt-automation --gui || prompt-automation --terminal
     propagate: false

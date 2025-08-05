@@ -69,6 +69,29 @@ def check_dependencies(require_fzf: bool = True) -> bool:
     except Exception:
         missing.append("pyperclip")
 
+    # Check for GUI library only if GUI mode might be used
+    gui_mode = os.environ.get("PROMPT_AUTOMATION_GUI") != "0"
+    if gui_mode:
+        gui_available = False
+        try:
+            # Try FreeSimpleGUI first (open source), then PySimpleGUI (commercial)
+            try:
+                import FreeSimpleGUI  # noqa: F401
+                gui_available = True
+                _log.info("FreeSimpleGUI is available for GUI mode")
+            except ImportError:
+                try:
+                    import PySimpleGUI  # noqa: F401
+                    gui_available = True
+                    _log.info("PySimpleGUI is available for GUI mode")
+                except ImportError:
+                    pass
+        except Exception as e:
+            _log.warning("Error checking GUI libraries: %s", e)
+        
+        if not gui_available:
+            missing.append("FreeSimpleGUI or PySimpleGUI")
+
     if _is_wsl():
         if not _check_cmd("clip.exe"):
             _log.warning("WSL clipboard integration missing (clip.exe not found)")
@@ -81,7 +104,11 @@ def check_dependencies(require_fzf: bool = True) -> bool:
         _log.warning(msg)
         os_name = platform.system()
         for dep in list(missing):
-            if dep == "pyperclip":
+            if dep == "FreeSimpleGUI or PySimpleGUI":
+                # Try to install FreeSimpleGUI first, then PySimpleGUI as fallback
+                if not _run_cmd([sys.executable, "-m", "pip", "install", "FreeSimpleGUI"]):
+                    _run_cmd([sys.executable, "-m", "pip", "install", "PySimpleGUI"])
+            elif dep in ["pyperclip"]:
                 _run_cmd([sys.executable, "-m", "pip", "install", dep])
             elif os_name == "Linux" and _check_cmd("apt"):
                 _run_cmd(["sudo", "apt", "install", "-y", dep])
@@ -95,12 +122,22 @@ def check_dependencies(require_fzf: bool = True) -> bool:
 
 def main(argv: list[str] | None = None) -> None:
     """Program entry point."""
+    # Load environment from config file if it exists
+    config_dir = Path.home() / ".prompt-automation"
+    env_file = config_dir / "environment"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
+    
     parser = argparse.ArgumentParser(prog="prompt-automation")
     parser.add_argument("--troubleshoot", action="store_true", help="Show troubleshooting help and paths")
     parser.add_argument("--prompt-dir", type=Path, help="Directory containing prompt templates")
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
-    parser.add_argument("--gui", action="store_true", help="Launch GUI instead of terminal prompts")
+    parser.add_argument("--gui", action="store_true", help="Launch GUI (default)")
+    parser.add_argument("--terminal", action="store_true", help="Force terminal mode instead of GUI")
     parser.add_argument("--update", "-u", action="store_true", help="Check for and apply updates")
     parser.add_argument(
         "--assign-hotkey",
@@ -118,6 +155,27 @@ def main(argv: list[str] | None = None) -> None:
         from . import hotkeys
 
         hotkeys.assign_hotkey()
+        return
+
+    if args.update:
+        from . import hotkeys
+        
+        # Force update check and installation
+        update.check_and_prompt(force=True)
+        
+        # Ensure dependencies are still met after update
+        print("[prompt-automation] Checking dependencies after update...")
+        if not check_dependencies(require_fzf=False):  # Check basic deps
+            print("[prompt-automation] Some dependencies may need to be reinstalled.")
+        
+        # Check hotkey-specific dependencies
+        if not hotkeys.ensure_hotkey_dependencies():
+            print("[prompt-automation] Warning: Hotkey dependencies missing. Hotkeys may not work properly.")
+        
+        # Update hotkeys to use GUI mode
+        hotkeys.update_hotkeys()
+        
+        print("[prompt-automation] Update complete!")
         return
 
     try:
@@ -147,15 +205,13 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    gui_mode = args.gui or os.environ.get("PROMPT_AUTOMATION_GUI")
+    gui_mode = not args.terminal and (args.gui or os.environ.get("PROMPT_AUTOMATION_GUI") != "0")
 
     _log.info("running on %s", platform.platform())
     if not check_dependencies(require_fzf=not gui_mode):
         return
-    # Manual update flag: perform update and exit
-    update.check_and_prompt(force=args.update)
-    if args.update:
-        return
+    # Check for updates on startup unless explicitly running update
+    update.check_and_prompt()
 
     if gui_mode:
         from . import gui
@@ -170,7 +226,10 @@ def main(argv: list[str] | None = None) -> None:
         return
     text = menus.render_template(tmpl)
     if text:
-        paste.paste_text(text)
+        # In terminal mode, only copy to clipboard - don't auto-paste
+        # to avoid pasting into the terminal where the app is running
+        paste.copy_to_clipboard(text)
+        print("\n[prompt-automation] Text copied to clipboard. Press Ctrl+V to paste where needed.")
         logger.log_usage(tmpl, len(text))
 
 

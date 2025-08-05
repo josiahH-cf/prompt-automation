@@ -86,8 +86,12 @@ if ($promptAutomationCmd) {
         # Test with help instead of version since --version isn't supported
         $help = & prompt-automation --help 2>&1 | Select-Object -First 1
         if ($help) { Info "   Command working: Help available" }
+        # Reset exit code after help command
+        $global:LASTEXITCODE = 0
     } catch { 
         Debug "Could not get help: $($_.Exception.Message)"
+        # Reset exit code after failed help command
+        $global:LASTEXITCODE = 0
     }
 } else {
     Write-Warning 'prompt-automation command not found in PATH. You may need to restart your terminal.'
@@ -104,3 +108,6 @@ Show-ComponentStatus -ComponentName 'prompt-automation'
 
 Stop-Transcript | Out-Null
 Info "Installation complete. Log saved to $LogFile"
+
+# Explicitly set success exit code
+exit 0
