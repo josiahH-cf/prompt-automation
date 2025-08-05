@@ -174,6 +174,21 @@ if ($startupStatus.Issues.Count -gt 0) {
     }
 }
 
+# Health check
+Info "`n=== Health Check ==="
+$env:PYTHONPATH = (Resolve-Path (Join-Path $PSScriptRoot '..\src')).Path
+$healthScript = @"
+import sys
+try:
+    import prompt_automation.cli, prompt_automation.gui
+    print('OK')
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+"@
+python -c $healthScript
+if ($LASTEXITCODE -ne 0) { Fail 'Health check failed.' }
+
 Info "\nFor troubleshooting tips see docs or run scripts/troubleshoot-hotkeys.ps1 --Fix"
 
 Stop-Transcript | Out-Null

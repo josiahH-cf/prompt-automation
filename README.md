@@ -125,7 +125,6 @@ project/
 │   └── prompt_automation/
 │       ├── hotkey/     # Platform hotkey scripts
 │       └── ...         # Application modules
-└── tests/              # Test suite
 ```
 
 Enjoy!

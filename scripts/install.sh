@@ -60,6 +60,10 @@ if ! command -v python3 >/dev/null; then
     retry "$PM_INSTALL python3" || { err "Failed to install Python3"; exit 1; }
 fi
 
+if ! python3 -m pip --version >/dev/null 2>&1; then
+    err "pip is required but could not be found"; exit 1
+fi
+
 # Ensure pipx
 if ! command -v pipx >/dev/null; then
     info "Installing pipx..."
@@ -126,6 +130,17 @@ for cmd in python3 pipx fzf espanso prompt-automation; do
         err "- $cmd: missing"
     fi
 done
+
+# Health check
+info "\n=== Health Check ==="
+PYTHONPATH="$PROJECT_ROOT/src" python3 - <<'PY' || { err "Health check failed"; exit 1; }
+try:
+    import prompt_automation.cli, prompt_automation.gui
+    print("OK")
+except Exception as e:
+    print(f"ERROR: {e}")
+    raise SystemExit(1)
+PY
 
 if [ "$PLATFORM" = "WSL2" ]; then
     info "WSL2 detected. For Windows hotkey integration run: powershell.exe -Command \"(Get-Location).Path; .\\scripts\\install.ps1\""

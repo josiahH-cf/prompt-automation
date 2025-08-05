@@ -5,7 +5,8 @@ description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
 authors = [{name="prompt-automation"}]
 dependencies = [
-    "pyperclip"
+    "pyperclip",
+    "PySimpleGUI"
 ]
 
 [project.scripts]
@@ -13,13 +14,6 @@ prompt-automation = "prompt_automation.cli:main"
 
 [project.optional-dependencies]
 windows = ["keyboard"]
-test = ["pytest", "pytest-cov", "ruff", "mypy"]
-
-[tool.ruff]
-line-length = 88
-
-[tool.pytest.ini_options]
-addopts = ""
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]

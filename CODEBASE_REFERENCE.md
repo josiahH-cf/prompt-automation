@@ -28,8 +28,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── resources/        # Static assets like banner.txt
 │       ├── utils.py          # Safe subprocess execution helpers
 │       └── variables.py      # Collect values for placeholders via GUI/editor/CLI
-├── tests/                    # Pytest suite
-├── tasks.py                  # Invoke tasks: lint, test, build
+├── tasks.py                  # Invoke tasks for building distributions
 └── ...                       # Root configuration files (pyproject.toml, README.md, etc.)
 ```
 
@@ -53,7 +52,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 ## Scripts and Utilities
 
 - `scripts/install.sh`, `scripts/install.ps1`, and related scripts automate installation on Linux/macOS/Windows.
-- `tasks.py` defines Invoke tasks for linting (`invoke lint`), running tests (`invoke test`), and building distributable packages (`invoke build`).
+- `tasks.py` defines an Invoke task for building distributable packages (`invoke build`).
 
 ## Prompt Templates
 
