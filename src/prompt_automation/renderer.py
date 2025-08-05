@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Sequence, Union
 
 from .errorlog import get_logger
 
@@ -26,11 +26,25 @@ def validate_template(data: Dict) -> bool:
     return required.issubset(data)
 
 
-def fill_placeholders(lines: Iterable[str], vars: Dict[str, str]) -> str:
-    """Replace ``{{name}}`` placeholders with values."""
+def fill_placeholders(
+    lines: Iterable[str], vars: Dict[str, Union[str, Sequence[str]]]
+) -> str:
+    """Replace ``{{name}}`` placeholders with values.
+
+    ``vars`` may contain either strings or sequences of strings. Sequence
+    values (used for dynamic list placeholders) are joined with newlines before
+    replacement. ``None`` values are treated as empty strings.
+    """
+
     out: List[str] = []
     for line in lines:
         for k, v in vars.items():
-            line = line.replace(f"{{{{{k}}}}}", v)
+            if v is None:
+                repl = ""
+            elif isinstance(v, (list, tuple)):
+                repl = "\n".join(str(item) for item in v)
+            else:
+                repl = str(v)
+            line = line.replace(f"{{{{{k}}}}}", repl)
         out.append(line)
     return "\n".join(out)
