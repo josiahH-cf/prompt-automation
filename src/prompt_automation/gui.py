@@ -3,9 +3,14 @@ from __future__ import annotations
 
 import sys
 import json
+from pathlib import Path
 from typing import Dict
 
 from . import logger, menus, paste, update
+from .errorlog import get_logger
+
+
+_log = get_logger(__name__)
 
 
 def _build_placeholder_layout(sg, tmpl):
@@ -22,8 +27,9 @@ def _build_placeholder_layout(sg, tmpl):
         elif ptype == "file":
             layout.append([
                 sg.Text(label),
-                sg.Input(key=key, size=(30, 1)),
-                sg.FileBrowse(),
+                sg.Input(key=key, size=(30, 1), enable_events=True),
+                sg.FileBrowse(target=key),
+                sg.Button("Clear", key=f"{key}_clear"),
             ])
         elif ptype == "list" or ph.get("multiline"):
             layout.append([
@@ -33,6 +39,42 @@ def _build_placeholder_layout(sg, tmpl):
         else:
             layout.append([sg.Text(label), sg.Input(key=key, size=(30, 1))])
     return layout
+
+
+def _validate_file_inputs(window, tmpl, values):
+    invalid = []
+    if not tmpl:
+        return invalid
+    for ph in tmpl.get("placeholders", []):
+        if ph.get("type") == "file":
+            key = ph["name"]
+            path = values.get(key, "")
+            if path and not Path(path).expanduser().is_file():
+                window[key].update(background_color="#ffdddd")
+                invalid.append(key)
+            else:
+                window[key].update(background_color=None)
+    return invalid
+
+
+def _prompt_missing_file(sg, window, key, path):
+    choice = sg.popup(
+        f"File not found:\n{path}",
+        "Browse to locate, Skip to ignore, or Remove to clear.",
+        custom_text=("Browse", "Skip", "Remove"),
+    )
+    if choice == "Browse":
+        new_path = sg.popup_get_file("Select file", no_window=True)
+        if new_path:
+            window[key].update(new_path)
+            _log.info("updated file placeholder %s to %s", key, new_path)
+            return new_path, False
+    elif choice == "Remove":
+        window[key].update("")
+        _log.info("removed file placeholder %s", key)
+        return "", False
+    _log.info("skipped missing file %s for %s", path, key)
+    return path, True
 
 
 def _edit_template_window(sg, data=None, path=None):
@@ -129,6 +171,7 @@ def run() -> None:
     window = sg.Window("Prompt Automation", layout, return_keyboard_events=True)
     current_tmpl = None
     current_path = None
+    file_keys: set[str] = set()
     while True:
         event, values = window.read()
         if event in (sg.WIN_CLOSED, "Exit"):
@@ -184,6 +227,7 @@ def run() -> None:
                 templates_cache[style] = templates
                 window["-TEMPLATE-"].update(templates)
                 window["-PH-"].update(_build_placeholder_layout(sg, current_tmpl))
+                file_keys = {p["name"] for p in current_tmpl.get("placeholders", []) if p.get("type") == "file"}
         elif event == "Del" and current_path:
             if sg.popup_ok_cancel(f"Delete {current_path.name}?") == "OK":
                 menus.delete_template(current_path)
@@ -197,6 +241,7 @@ def run() -> None:
                     window["-TEMPLATE-"].update(templates)
                 window["-PH-"].update([])
                 window["-OUTPUT-"].update("")
+                file_keys = set()
         elif event == "-TEMPLATE-FILTER-":
             sel = values["-STYLE-"]
             if sel:
@@ -212,11 +257,29 @@ def run() -> None:
                 current_path = menus.PROMPTS_DIR / style_sel[0] / tmpl_sel[0]
                 current_tmpl = menus.load_template(current_path)
                 window["-PH-"].update(_build_placeholder_layout(sg, current_tmpl))
+                file_keys = {p["name"] for p in current_tmpl.get("placeholders", []) if p.get("type") == "file"}
+        elif current_tmpl and event in file_keys:
+            _validate_file_inputs(window, current_tmpl, values)
+        elif current_tmpl and isinstance(event, str) and event.endswith("_clear"):
+            key = event[:-6]
+            window[key].update("")
+            values[key] = ""
+            _validate_file_inputs(window, current_tmpl, values)
         elif event == "Render" and current_tmpl:
+            skip_keys = set()
+            invalid = _validate_file_inputs(window, current_tmpl, values)
+            for key in invalid:
+                path = values.get(key, "")
+                new_path, skip = _prompt_missing_file(sg, window, key, path)
+                values[key] = new_path
+                if skip:
+                    skip_keys.add(key)
             ph_vals = {}
             for ph in current_tmpl.get("placeholders", []):
                 key = ph["name"]
                 val = values.get(key, "")
+                if key in skip_keys:
+                    val = ""
                 if ph.get("type") == "list":
                     val = [v for v in val.splitlines() if v]
                 ph_vals[key] = val
@@ -225,10 +288,20 @@ def run() -> None:
         elif event == "Paste":
             text = values.get("-OUTPUT-", "")
             if not text and current_tmpl:
+                skip_keys = set()
+                invalid = _validate_file_inputs(window, current_tmpl, values)
+                for key in invalid:
+                    path = values.get(key, "")
+                    new_path, skip = _prompt_missing_file(sg, window, key, path)
+                    values[key] = new_path
+                    if skip:
+                        skip_keys.add(key)
                 ph_vals = {}
                 for ph in current_tmpl.get("placeholders", []):
                     key = ph["name"]
                     val = values.get(key, "")
+                    if key in skip_keys:
+                        val = ""
                     if ph.get("type") == "list":
                         val = [v for v in val.splitlines() if v]
                     ph_vals[key] = val
