@@ -2,6 +2,8 @@
 
 **prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and instantly paste the result into the active application.
 
+
+For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md). AI coding partners should consult it before making changes.
 ---
 
 ## Getting Started
