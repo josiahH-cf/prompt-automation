@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import logger, menus, paste
+from . import logger, menus, paste, update
 
 
 LOG_DIR = Path.home() / ".prompt-automation" / "logs"
@@ -101,6 +101,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
     parser.add_argument("--gui", action="store_true", help="Launch GUI instead of terminal prompts")
+    parser.add_argument("--update", "-u", action="store_true", help="Check for and apply updates")
     parser.add_argument(
         "--assign-hotkey",
         action="store_true",
@@ -150,6 +151,10 @@ def main(argv: list[str] | None = None) -> None:
 
     _log.info("running on %s", platform.platform())
     if not check_dependencies(require_fzf=not gui_mode):
+        return
+    # Manual update flag: perform update and exit
+    update.check_and_prompt(force=args.update)
+    if args.update:
         return
 
     if gui_mode:
