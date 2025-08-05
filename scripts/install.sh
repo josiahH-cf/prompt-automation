@@ -99,6 +99,11 @@ elif [ "$PLATFORM" = "macOS" ]; then
     osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$WORKFLOW_DIR'/macos.applescript", hidden:false}' || true
 fi
 
+# record default hotkey mapping
+HOTKEY_CFG_DIR="$HOME/.prompt-automation"
+mkdir -p "$HOTKEY_CFG_DIR"
+echo '{"hotkey": "ctrl+shift+j"}' > "$HOTKEY_CFG_DIR/hotkey.json"
+
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
