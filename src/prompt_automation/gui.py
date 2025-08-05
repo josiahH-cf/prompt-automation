@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from typing import Dict
 
-from . import logger, menus, paste
+from . import logger, menus, paste, update
 
 
 def _build_placeholder_layout(sg, tmpl):
@@ -29,6 +29,7 @@ def _build_placeholder_layout(sg, tmpl):
 
 def run() -> None:
     """Launch the GUI. Requires :mod:`PySimpleGUI`."""
+    update.check_and_prompt()
     try:
         import PySimpleGUI as sg
     except Exception as e:
