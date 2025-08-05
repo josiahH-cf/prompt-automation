@@ -10,6 +10,15 @@ from .errorlog import get_logger
 _log = get_logger(__name__)
 
 
+def read_file_safe(path: str) -> str:
+    """Return file contents or empty string with logging."""
+    try:
+        return Path(path).expanduser().read_text()
+    except Exception as e:
+        _log.error("cannot read file %s: %s", path, e)
+        return ""
+
+
 def load_template(path: Path) -> Dict:
     """Load JSON template file with validation."""
     path = path.expanduser().resolve()

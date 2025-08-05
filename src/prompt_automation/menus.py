@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import logger
-from .renderer import fill_placeholders, load_template, validate_template
+from .renderer import fill_placeholders, load_template, validate_template, read_file_safe
 from .variables import get_variables
 
 # Try to find prompts directory in multiple locations
@@ -147,10 +147,9 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
         if ph.get("type") == "file":
             name = ph["name"]
             path = vars.get(name)
-            try:
-                if path:
-                    vars[name] = Path(path).read_text()
-            except Exception:
+            if path:
+                vars[name] = read_file_safe(path)
+            else:
                 vars[name] = ""
     return fill_placeholders(tmpl["template"], vars)
 

@@ -49,6 +49,35 @@ def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | No
     return None
 
 
+def _gui_file_prompt(label: str) -> str | None:
+    sys = platform.system()
+    try:
+        safe_label = label.replace('"', '\"')
+        if sys == "Linux" and shutil.which("zenity"):
+            cmd = ["zenity", "--file-selection", "--title", safe_label]
+        elif sys == "Darwin" and shutil.which("osascript"):
+            cmd = ["osascript", "-e", f'choose file with prompt "{safe_label}"']
+        elif sys == "Windows":
+            cmd = [
+                "powershell",
+                "-Command",
+                (
+                    "Add-Type -AssemblyName System.windows.forms;"
+                    "$f=New-Object System.Windows.Forms.OpenFileDialog;"
+                    f'$f.Title="{safe_label}";'
+                    "$null=$f.ShowDialog();$f.FileName"
+                ),
+            ]
+        else:
+            return None
+        res = safe_run(cmd, capture_output=True, text=True)
+        if res.returncode == 0:
+            return res.stdout.strip()
+    except Exception as e:  # pragma: no cover - GUI may be missing
+        _log.error("GUI file prompt failed: %s", e)
+    return None
+
+
 def _editor_prompt() -> str | None:
     """Use ``$EDITOR`` as fallback."""
     try:
@@ -78,14 +107,16 @@ def get_variables(
     for ph in placeholders:
         name = ph["name"]
         ptype = ph.get("type")
-        if name in values and values[name] not in ("", None):
+        if name in values and (values[name] not in ("", None) or ptype == "file"):
             val: Any = values[name]
         else:
             label = ph.get("label", name)
             opts = ph.get("options")
             multiline = ph.get("multiline", False) or ptype == "list"
             val = None
-            if ptype != "file":
+            if ptype == "file":
+                val = _gui_file_prompt(label)
+            else:
                 val = _gui_prompt(label, opts, multiline)
                 if val is None:
                     val = _editor_prompt()
@@ -107,6 +138,20 @@ def get_variables(
                     val = input(f"{label} path: ")
                 else:
                     val = input(f"{label}: ")
+
+        if ptype == "file" and isinstance(val, str):
+            while val:
+                path = Path(val).expanduser()
+                if path.exists():
+                    break
+                _log.error("file not found: %s", path)
+                new_val = _gui_file_prompt(label) or input(
+                    f"{label} not found. Enter new path or leave blank to skip: "
+                )
+                if not new_val:
+                    val = ""
+                    break
+                val = new_val
 
         if ptype == "number":
             try:
