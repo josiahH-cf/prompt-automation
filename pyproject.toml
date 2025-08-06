@@ -5,8 +5,7 @@ description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
 authors = [{name="prompt-automation"}]
 dependencies = [
-    "pyperclip",
-    "FreeSimpleGUI"
+    "pyperclip"
 ]
 
 [project.scripts]

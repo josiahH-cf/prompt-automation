@@ -91,6 +91,18 @@ if (Test-Path $depScript) {
     Fail 'install-dependencies.ps1 not found.'
 }
 
+# Verify Tkinter availability
+try {
+    python -c "import tkinter" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'Tkinter not found. Reinstall Python from python.org to include Tkinter support.'
+    } else {
+        Info '[OK] Tkinter module available'
+    }
+} catch {
+    Write-Warning 'Python not available to check Tkinter. Ensure Python is installed with Tk support.'
+}
+
 # Install the application from local source
 $appScript = Join-Path $PSScriptRoot 'install-prompt-automation.ps1'
 if (Test-Path $appScript) {

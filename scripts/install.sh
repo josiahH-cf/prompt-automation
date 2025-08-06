@@ -64,6 +64,18 @@ if ! python3 -m pip --version >/dev/null 2>&1; then
     err "pip is required but could not be found"; exit 1
 fi
 
+# Ensure Tkinter
+if ! python3 - <<'PY' >/dev/null 2>&1; then
+import tkinter
+PY
+    info "Tkinter not found. Attempting installation..."
+    if command -v apt-get >/dev/null; then
+        retry "$PM_INSTALL python3-tk" || info "Please install python3-tk manually."
+    else
+        err "Tkinter is missing. Install Python with Tk support (e.g., via python.org)."
+    fi
+fi
+
 # Ensure pipx
 if ! command -v pipx >/dev/null; then
     info "Installing pipx..."

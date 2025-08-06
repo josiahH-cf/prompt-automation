@@ -178,3 +178,10 @@ Set-Alias python "C:\Users\YourName\AppData\Local\Programs\Python\Python312\pyth
 - ✅ **Graceful Degradation**: Works with Python-only when pipx has issues
 
 The installer should now work in many more scenarios and provide much better guidance when manual intervention is needed.
+
+## Tkinter Missing
+
+If you receive an error about Tkinter or the GUI not launching:
+
+- **Debian/Ubuntu**: Install with `sudo apt install python3-tk` and rerun the installer.
+- **Windows/macOS**: Reinstall Python using the official installer from [python.org](https://python.org/downloads/) to ensure Tkinter is included.

@@ -17,7 +17,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │   └── prompt_automation/
 │       ├── cli.py            # Command-line entry point and dependency checks
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
-│       ├── gui.py            # Optional PySimpleGUI interface for choosing templates
+│       ├── gui.py            # Optional Tkinter interface for choosing templates
 │       ├── hotkey/           # Platform-specific hotkey definitions
 │       ├── hotkeys.py        # Interactive hotkey assignment, dependency checking, and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation

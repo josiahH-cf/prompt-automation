@@ -72,25 +72,11 @@ def check_dependencies(require_fzf: bool = True) -> bool:
     # Check for GUI library only if GUI mode might be used
     gui_mode = os.environ.get("PROMPT_AUTOMATION_GUI") != "0"
     if gui_mode:
-        gui_available = False
         try:
-            # Try FreeSimpleGUI first (open source), then PySimpleGUI (commercial)
-            try:
-                import FreeSimpleGUI  # noqa: F401
-                gui_available = True
-                _log.info("FreeSimpleGUI is available for GUI mode")
-            except ImportError:
-                try:
-                    import PySimpleGUI  # noqa: F401
-                    gui_available = True
-                    _log.info("PySimpleGUI is available for GUI mode")
-                except ImportError:
-                    pass
-        except Exception as e:
-            _log.warning("Error checking GUI libraries: %s", e)
-        
-        if not gui_available:
-            missing.append("FreeSimpleGUI or PySimpleGUI")
+            import tkinter  # noqa: F401
+            _log.info("Tkinter is available for GUI mode")
+        except Exception:
+            missing.append("tkinter")
 
     if _is_wsl():
         if not _check_cmd("clip.exe"):
@@ -104,16 +90,16 @@ def check_dependencies(require_fzf: bool = True) -> bool:
         _log.warning(msg)
         os_name = platform.system()
         for dep in list(missing):
-            if dep == "FreeSimpleGUI or PySimpleGUI":
-                # Try to install FreeSimpleGUI first, then PySimpleGUI as fallback
-                if not _run_cmd([sys.executable, "-m", "pip", "install", "FreeSimpleGUI"]):
-                    _run_cmd([sys.executable, "-m", "pip", "install", "PySimpleGUI"])
-            elif dep in ["pyperclip"]:
+            if dep in ["pyperclip"]:
                 _run_cmd([sys.executable, "-m", "pip", "install", dep])
             elif os_name == "Linux" and _check_cmd("apt"):
-                _run_cmd(["sudo", "apt", "install", "-y", dep])
+                if dep == "tkinter":
+                    _run_cmd(["sudo", "apt", "install", "-y", "python3-tk"])
+                else:
+                    _run_cmd(["sudo", "apt", "install", "-y", dep])
             elif os_name == "Darwin" and _check_cmd("brew"):
-                _run_cmd(["brew", "install", dep])
+                if dep != "tkinter":
+                    _run_cmd(["brew", "install", dep])
         print("[prompt-automation] Re-run after installing missing dependencies.")
         return False
 
