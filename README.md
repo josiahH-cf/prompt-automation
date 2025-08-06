@@ -23,6 +23,8 @@ For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE
      bash scripts/install.sh
      ```
 
+The GUI relies on the standard Tkinter module. Most Python distributions include it, but Debian/Ubuntu users may need `sudo apt install python3-tk`.
+
 After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
@@ -75,6 +77,13 @@ A minimal example:
 - Use `prompt-automation --list` to list available templates.
 - Use `prompt-automation --update` to refresh hotkey configuration and ensure dependencies are properly installed.
 - If the hotkey does not work see [docs/HOTKEYS.md](docs/HOTKEYS.md) for manual setup instructions.
+
+### Tkinter Missing
+
+If the GUI fails to launch due to a missing Tkinter module:
+
+- **Debian/Ubuntu**: `sudo apt install python3-tk`
+- **Windows/macOS**: Reinstall Python using the official installer from [python.org](https://python.org/downloads/), which bundles Tkinter by default.
 
 ### Hotkey Issues
 

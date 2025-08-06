@@ -1,4 +1,4 @@
-"""Simple GUI front-end for prompt selection and rendering."""
+"""Simple GUI front-end for prompt selection and rendering using Tkinter."""
 from __future__ import annotations
 
 import sys
@@ -13,337 +13,394 @@ from .errorlog import get_logger
 _log = get_logger(__name__)
 
 
-def _build_placeholder_layout(sg, tmpl):
-    layout = []
-    for ph in tmpl.get("placeholders", []):
-        label = ph.get("label", ph["name"])
-        key = ph["name"]
-        ptype = ph.get("type")
-        if ph.get("options"):
-            layout.append([
-                sg.Text(label),
-                sg.Combo(ph["options"], key=key, size=(30, 1)),
-            ])
-        elif ptype == "file":
-            layout.append([
-                sg.Text(label),
-                sg.Input(key=key, size=(30, 1), enable_events=True),
-                sg.FileBrowse(target=key),
-                sg.Button("Clear", key=f"{key}_clear"),
-            ])
-        elif ptype == "list" or ph.get("multiline"):
-            layout.append([
-                sg.Text(label),
-                sg.Multiline(key=key, size=(30, 3)),
-            ])
-        else:
-            layout.append([sg.Text(label), sg.Input(key=key, size=(30, 1))])
-    return layout
-
-
-def _validate_file_inputs(window, tmpl, values):
-    invalid = []
-    if not tmpl:
-        return invalid
-    for ph in tmpl.get("placeholders", []):
-        if ph.get("type") == "file":
-            key = ph["name"]
-            path = values.get(key, "")
-            if path and not Path(path).expanduser().is_file():
-                window[key].update(background_color="#ffdddd")
-                invalid.append(key)
-            else:
-                window[key].update(background_color=None)
-    return invalid
-
-
-def _prompt_missing_file(sg, window, key, path):
-    choice = sg.popup(
-        f"File not found:\n{path}",
-        "Browse to locate, Skip to ignore, or Remove to clear.",
-        custom_text=("Browse", "Skip", "Remove"),
-    )
-    if choice == "Browse":
-        new_path = sg.popup_get_file("Select file", no_window=True)
-        if new_path:
-            window[key].update(new_path)
-            _log.info("updated file placeholder %s to %s", key, new_path)
-            return new_path, False
-    elif choice == "Remove":
-        window[key].update("")
-        _log.info("removed file placeholder %s", key)
-        return "", False
-    _log.info("skipped missing file %s for %s", path, key)
-    return path, True
-
-
-def _edit_template_window(sg, data=None, path=None):
-    """Open modal editor for a template and return saved path or ``None``."""
-    if data is None:
-        data = {"id": "", "title": "", "style": "", "role": "", "template": [], "placeholders": []}
-    layout = [
-        [sg.Text("ID"), sg.Input(str(data.get("id", "")), key="id")],
-        [sg.Text("Title"), sg.Input(data.get("title", ""), key="title")],
-        [sg.Text("Style"), sg.Input(data.get("style", ""), key="style")],
-        [sg.Text("Role"), sg.Input(data.get("role", ""), key="role")],
-        [
-            sg.Text("Template"),
-            sg.Multiline("\n".join(data.get("template", [])), size=(60, 10), key="template"),
-        ],
-        [
-            sg.Text("Placeholders (JSON)"),
-            sg.Multiline(
-                json.dumps(data.get("placeholders", []), indent=2),
-                size=(60, 10),
-                key="placeholders",
-            ),
-        ],
-        [sg.Button("Save"), sg.Button("Cancel")],
-    ]
-    win = sg.Window("Template", layout, modal=True)
-    result = None
-    while True:
-        ev, vals = win.read()
-        if ev in (sg.WIN_CLOSED, "Cancel"):
-            break
-        if ev == "Save":
-            try:
-                tpl = {
-                    "id": int(vals["id"]),
-                    "title": vals["title"],
-                    "style": vals["style"],
-                    "role": vals["role"],
-                    "template": [l for l in vals["template"].splitlines()],
-                    "placeholders": json.loads(vals["placeholders"] or "[]"),
-                }
-                result = menus.save_template(tpl, orig_path=path)
-                break
-            except Exception as e:
-                sg.popup_error(f"Error saving template: {e}")
-    win.close()
-    return result
-
-
 def run() -> None:
-    """Launch the GUI. Requires :mod:`FreeSimpleGUI` or :mod:`PySimpleGUI`. Falls back to CLI if GUI fails."""
+    """Launch the GUI using Tkinter. Falls back to CLI if GUI fails."""
     update.check_and_prompt()
     try:
-        # Try FreeSimpleGUI first (open source), then PySimpleGUI (commercial)
-        try:
-            import FreeSimpleGUI as sg
-            _log.info("Using FreeSimpleGUI for GUI")
-        except ImportError:
-            try:
-                import PySimpleGUI as sg
-                _log.info("Using PySimpleGUI for GUI")
-            except ImportError:
-                raise ImportError("Neither FreeSimpleGUI nor PySimpleGUI is available")
+        import tkinter as tk
+        from tkinter import ttk, filedialog, messagebox, simpledialog
     except Exception as e:
-        _log.warning("GUI library not available: %s", e)
-        print("[prompt-automation] GUI not available, falling back to terminal mode:", e, file=sys.stderr)
-        # Fall back to CLI
+        _log.warning("Tkinter not available: %s", e)
+        print(
+            "[prompt-automation] GUI not available, falling back to terminal mode:",
+            e,
+            file=sys.stderr,
+        )
         from . import cli
+
         cli.main(["--terminal"])
         return
 
-    try:
-        sg.theme("SystemDefault")
-        styles = menus.list_styles()
-        templates_cache: Dict[str, list[str]] = {}
-
-        layout = [
-            [
-                sg.Text("Style"),
-                sg.Input(key="-STYLE-FILTER-", enable_events=True),
-                sg.Button("New Style"),
-                sg.Button("Del Style"),
-            ],
-            [
-                sg.Listbox(styles, size=(25, 10), key="-STYLE-", enable_events=True),
-                sg.Column(
-                    [
-                        [
-                            sg.Text("Template"),
-                            sg.Input(key="-TEMPLATE-FILTER-", enable_events=True),
-                            sg.Button("New"),
-                            sg.Button("Edit"),
-                            sg.Button("Del"),
-                        ],
-                        [
-                            sg.Listbox(
-                                [], size=(30, 10), key="-TEMPLATE-", enable_events=True
-                            )
-                        ],
-                    ]
-                ),
-            ],
-            [sg.Column([], key="-PH-")],
-            [sg.Button("Render"), sg.Button("Paste"), sg.Button("Exit")],
-            [sg.Multiline(size=(80, 20), key="-OUTPUT-")],
-        ]
-    except Exception as e:
-        _log.error("Failed to initialize GUI: %s", e)
-        print("[prompt-automation] Failed to initialize GUI, falling back to terminal mode:", e, file=sys.stderr)
-        # Fall back to CLI
-        from . import cli
-        cli.main(["--terminal"])
-        return
-
-    try:
-        window = sg.Window("Prompt Automation", layout, return_keyboard_events=True)
-        current_tmpl = None
-        current_path = None
+    def build_placeholder_widgets(frame: tk.Frame, tmpl: dict):
+        widgets: dict[str, tk.Widget] = {}
         file_keys: set[str] = set()
-        while True:
-            event, values = window.read()
-            if event in (sg.WIN_CLOSED, "Exit"):
-                break
-            if event == "-STYLE-FILTER-":
-                query = values["-STYLE-FILTER-"].lower()
-                filtered = [s for s in styles if query in s.lower()]
-                window["-STYLE-"].update(filtered)
-            elif event == "New Style":
-                name = sg.popup_get_text("New style name:")
-                if name:
-                    menus.add_style(name)
+        for idx, ph in enumerate(tmpl.get("placeholders", [])):
+            label = ph.get("label", ph["name"])
+            key = ph["name"]
+            ptype = ph.get("type")
+            tk.Label(frame, text=label).grid(row=idx, column=0, sticky="w")
+            if ph.get("options"):
+                cb = ttk.Combobox(frame, values=ph["options"], width=30)
+                cb.grid(row=idx, column=1, sticky="ew")
+                widgets[key] = cb
+            elif ptype == "file":
+                entry = tk.Entry(frame, width=30)
+                entry.grid(row=idx, column=1, sticky="ew")
+
+                def browse(e=entry):
+                    path = filedialog.askopenfilename()
+                    if path:
+                        e.delete(0, "end")
+                        e.insert(0, path)
+
+                tk.Button(frame, text="Browse", command=browse).grid(row=idx, column=2)
+
+                def clear(e=entry):
+                    e.delete(0, "end")
+
+                tk.Button(frame, text="Clear", command=clear).grid(row=idx, column=3)
+                widgets[key] = entry
+                file_keys.add(key)
+            elif ptype == "list" or ph.get("multiline"):
+                txt = tk.Text(frame, width=30, height=3)
+                txt.grid(row=idx, column=1, sticky="ew")
+                widgets[key] = txt
+            else:
+                entry = tk.Entry(frame, width=30)
+                entry.grid(row=idx, column=1, sticky="ew")
+                widgets[key] = entry
+        return widgets, file_keys
+
+    def validate_file_inputs(widgets: dict[str, tk.Widget], tmpl: dict):
+        invalid: list[str] = []
+        for ph in tmpl.get("placeholders", []):
+            if ph.get("type") == "file":
+                key = ph["name"]
+                w = widgets.get(key)
+                path = w.get()
+                if path and not Path(path).expanduser().is_file():
+                    w.config(bg="#ffdddd")
+                    invalid.append(key)
+                else:
+                    w.config(bg="white")
+        return invalid
+
+    def prompt_missing_file(widget: tk.Entry, key: str, path: str):
+        res = messagebox.askyesnocancel(
+            "File not found",
+            f"File not found:\n{path}\nYes = Browse, No = Skip, Cancel = Remove",
+        )
+        if res is True:
+            new_path = filedialog.askopenfilename()
+            if new_path:
+                widget.delete(0, "end")
+                widget.insert(0, new_path)
+                _log.info("updated file placeholder %s to %s", key, new_path)
+                return new_path, False
+        elif res is None:
+            widget.delete(0, "end")
+            _log.info("removed file placeholder %s", key)
+            return "", False
+        _log.info("skipped missing file %s for %s", path, key)
+        return path, True
+
+    def edit_template_window(root: tk.Tk, data=None, path=None):
+        if data is None:
+            data = {"id": "", "title": "", "style": "", "role": "", "template": [], "placeholders": []}
+        win = tk.Toplevel(root)
+        win.title("Template")
+        win.grab_set()
+        tk.Label(win, text="ID").grid(row=0, column=0, sticky="w")
+        id_var = tk.StringVar(value=str(data.get("id", "")))
+        tk.Entry(win, textvariable=id_var).grid(row=0, column=1, sticky="ew")
+        tk.Label(win, text="Title").grid(row=1, column=0, sticky="w")
+        title_var = tk.StringVar(value=data.get("title", ""))
+        tk.Entry(win, textvariable=title_var).grid(row=1, column=1, sticky="ew")
+        tk.Label(win, text="Style").grid(row=2, column=0, sticky="w")
+        style_var = tk.StringVar(value=data.get("style", ""))
+        tk.Entry(win, textvariable=style_var).grid(row=2, column=1, sticky="ew")
+        tk.Label(win, text="Role").grid(row=3, column=0, sticky="w")
+        role_var = tk.StringVar(value=data.get("role", ""))
+        tk.Entry(win, textvariable=role_var).grid(row=3, column=1, sticky="ew")
+        tk.Label(win, text="Template").grid(row=4, column=0, sticky="nw")
+        template_text = tk.Text(win, width=60, height=10)
+        template_text.insert("1.0", "\n".join(data.get("template", [])))
+        template_text.grid(row=4, column=1, sticky="ew")
+        tk.Label(win, text="Placeholders (JSON)").grid(row=5, column=0, sticky="nw")
+        placeholders_text = tk.Text(win, width=60, height=10)
+        placeholders_text.insert("1.0", json.dumps(data.get("placeholders", []), indent=2))
+        placeholders_text.grid(row=5, column=1, sticky="ew")
+        result = {"path": None}
+
+        def on_save():
+            try:
+                tpl = {
+                    "id": int(id_var.get()),
+                    "title": title_var.get(),
+                    "style": style_var.get(),
+                    "role": role_var.get(),
+                    "template": [l for l in template_text.get("1.0", "end-1c").splitlines()],
+                    "placeholders": json.loads(placeholders_text.get("1.0", "end-1c") or "[]"),
+                }
+                result["path"] = menus.save_template(tpl, orig_path=path)
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Error saving template: {e}")
+
+        tk.Button(win, text="Save", command=on_save).grid(row=6, column=0, pady=5)
+        tk.Button(win, text="Cancel", command=win.destroy).grid(row=6, column=1, pady=5)
+        win.wait_window()
+        return result["path"]
+
+    root = tk.Tk()
+    root.title("Prompt Automation")
+
+    styles = menus.list_styles()
+    templates_cache: Dict[str, list[str]] = {}
+    current_tmpl = None
+    current_path = None
+    widgets: dict[str, tk.Widget] = {}
+    file_keys: set[str] = set()
+
+    top_frame = tk.Frame(root)
+    top_frame.pack(padx=5, pady=5, fill="x")
+
+    tk.Label(top_frame, text="Style").grid(row=0, column=0, sticky="w")
+    style_filter_var = tk.StringVar()
+    style_filter_entry = tk.Entry(top_frame, textvariable=style_filter_var)
+    style_filter_entry.grid(row=0, column=1, sticky="ew")
+    new_style_btn = tk.Button(top_frame, text="New Style")
+    new_style_btn.grid(row=0, column=2, padx=2)
+    del_style_btn = tk.Button(top_frame, text="Del Style")
+    del_style_btn.grid(row=0, column=3, padx=2)
+
+    main_frame = tk.Frame(root)
+    main_frame.pack(padx=5, pady=5)
+
+    style_listbox = tk.Listbox(main_frame, height=10)
+    style_listbox.grid(row=0, column=0, sticky="ns")
+    for s in styles:
+        style_listbox.insert("end", s)
+
+    tmpl_frame = tk.Frame(main_frame)
+    tmpl_frame.grid(row=0, column=1, padx=5)
+
+    tk.Label(tmpl_frame, text="Template").grid(row=0, column=0, sticky="w")
+    template_filter_var = tk.StringVar()
+    template_filter_entry = tk.Entry(tmpl_frame, textvariable=template_filter_var)
+    template_filter_entry.grid(row=0, column=1, sticky="ew")
+    new_template_btn = tk.Button(tmpl_frame, text="New")
+    new_template_btn.grid(row=0, column=2, padx=2)
+    edit_template_btn = tk.Button(tmpl_frame, text="Edit")
+    edit_template_btn.grid(row=0, column=3, padx=2)
+    del_template_btn = tk.Button(tmpl_frame, text="Del")
+    del_template_btn.grid(row=0, column=4, padx=2)
+
+    template_listbox = tk.Listbox(tmpl_frame, height=10, width=30)
+    template_listbox.grid(row=1, column=0, columnspan=5, pady=2, sticky="nsew")
+
+    ph_frame = tk.Frame(root)
+    ph_frame.pack(padx=5, pady=5, fill="x")
+
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(padx=5, pady=5)
+    render_btn = tk.Button(btn_frame, text="Render")
+    render_btn.grid(row=0, column=0, padx=2)
+    paste_btn = tk.Button(btn_frame, text="Paste")
+    paste_btn.grid(row=0, column=1, padx=2)
+    tk.Button(btn_frame, text="Exit", command=root.destroy).grid(row=0, column=2, padx=2)
+
+    output_text = tk.Text(root, width=80, height=20)
+    output_text.pack(padx=5, pady=5)
+
+    def refresh_styles():
+        style_listbox.delete(0, "end")
+        for s in styles:
+            style_listbox.insert("end", s)
+
+    def on_style_filter(*args):
+        query = style_filter_var.get().lower()
+        filtered = [s for s in styles if query in s.lower()]
+        style_listbox.delete(0, "end")
+        for s in filtered:
+            style_listbox.insert("end", s)
+
+    style_filter_var.trace_add("write", on_style_filter)
+
+    def new_style():
+        nonlocal styles
+        name = simpledialog.askstring("New style name", "New style name:", parent=root)
+        if name:
+            menus.add_style(name)
+            styles = menus.list_styles()
+            refresh_styles()
+
+    def del_style():
+        nonlocal styles
+        sel = style_listbox.curselection()
+        if sel:
+            style = style_listbox.get(sel[0])
+            if messagebox.askokcancel("Delete style", f"Delete style {style}?"):
+                try:
+                    menus.delete_style(style)
                     styles = menus.list_styles()
-                    window["-STYLE-"].update(styles)
-            elif event == "Del Style":
-                sel = values["-STYLE-"]
-                if sel and sg.popup_ok_cancel(f"Delete style {sel[0]}?") == "OK":
-                    try:
-                        menus.delete_style(sel[0])
-                        styles = menus.list_styles()
-                        window["-STYLE-"].update(styles)
-                        window["-TEMPLATE-"].update([])
-                    except Exception as e:
-                        sg.popup_error(f"Cannot delete style: {e}")
-            elif event == "-STYLE-":
-                sel = values["-STYLE-"]
+                    refresh_styles()
+                    template_listbox.delete(0, "end")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Cannot delete style: {e}")
+
+    new_style_btn.config(command=new_style)
+    del_style_btn.config(command=del_style)
+
+    def on_style_select(event):
+        sel = style_listbox.curselection()
+        if sel:
+            style = style_listbox.get(sel[0])
+            templates = [p.name for p in menus.list_prompts(style)]
+            templates_cache[style] = templates
+            template_listbox.delete(0, "end")
+            for t in templates:
+                template_listbox.insert("end", t)
+            template_filter_var.set("")
+
+    style_listbox.bind("<<ListboxSelect>>", on_style_select)
+
+    def on_template_filter(*args):
+        sel = style_listbox.curselection()
+        if sel:
+            style = style_listbox.get(sel[0])
+            templates = templates_cache.get(style) or [p.name for p in menus.list_prompts(style)]
+            query = template_filter_var.get().lower()
+            filtered = [t for t in templates if query in t.lower()]
+            template_listbox.delete(0, "end")
+            for t in filtered:
+                template_listbox.insert("end", t)
+
+    template_filter_var.trace_add("write", on_template_filter)
+
+    def on_template_select(event):
+        nonlocal current_tmpl, current_path, widgets, file_keys
+        sel = template_listbox.curselection()
+        style_sel = style_listbox.curselection()
+        if style_sel and sel:
+            style = style_listbox.get(style_sel[0])
+            tmpl_name = template_listbox.get(sel[0])
+            current_path = menus.PROMPTS_DIR / style / tmpl_name
+            current_tmpl = menus.load_template(current_path)
+            for w in ph_frame.winfo_children():
+                w.destroy()
+            widgets, file_keys = build_placeholder_widgets(ph_frame, current_tmpl)
+
+    template_listbox.bind("<<ListboxSelect>>", on_template_select)
+
+    def new_template():
+        nonlocal styles
+        sel = style_listbox.curselection()
+        data = {"style": style_listbox.get(sel[0])} if sel else None
+        path = edit_template_window(root, data)
+        if path:
+            styles = menus.list_styles()
+            refresh_styles()
+            style = path.parent.name
+            templates = [p.name for p in menus.list_prompts(style)]
+            templates_cache[style] = templates
+            if sel and style_listbox.get(sel[0]) == style:
+                template_listbox.delete(0, "end")
+                for t in templates:
+                    template_listbox.insert("end", t)
+
+    def edit_template():
+        nonlocal current_tmpl, current_path, widgets, file_keys, styles
+        if current_tmpl and current_path:
+            path = edit_template_window(root, current_tmpl, current_path)
+            if path:
+                current_path = path
+                current_tmpl = menus.load_template(path)
+                styles = menus.list_styles()
+                refresh_styles()
+                style = path.parent.name
+                templates = [p.name for p in menus.list_prompts(style)]
+                templates_cache[style] = templates
+                template_listbox.delete(0, "end")
+                for t in templates:
+                    template_listbox.insert("end", t)
+                for w in ph_frame.winfo_children():
+                    w.destroy()
+                widgets, file_keys = build_placeholder_widgets(ph_frame, current_tmpl)
+
+    def del_template():
+        nonlocal current_tmpl, current_path, widgets, file_keys
+        if current_path:
+            if messagebox.askokcancel("Delete", f"Delete {current_path.name}?"):
+                menus.delete_template(current_path)
+                current_path = None
+                current_tmpl = None
+                sel = style_listbox.curselection()
                 if sel:
-                    style = sel[0]
+                    style = style_listbox.get(sel[0])
                     templates = [p.name for p in menus.list_prompts(style)]
                     templates_cache[style] = templates
-                    window["-TEMPLATE-"].update(templates)
-                    window["-TEMPLATE-FILTER-"].update("")
-            elif event == "New":
-                sel = values["-STYLE-"]
-                data = {"style": sel[0]} if sel else None
-                path = _edit_template_window(sg, data)
-                if path:
-                    styles = menus.list_styles()
-                    window["-STYLE-"].update(styles)
-                    style = path.parent.name
-                    templates = [p.name for p in menus.list_prompts(style)]
-                    templates_cache[style] = templates
-                    window["-TEMPLATE-"].update(templates)
-            elif event == "Edit" and current_tmpl and current_path:
-                path = _edit_template_window(sg, current_tmpl, current_path)
-                if path:
-                    current_path = path
-                    current_tmpl = menus.load_template(path)
-                    styles = menus.list_styles()
-                    window["-STYLE-"].update(styles)
-                    style = path.parent.name
-                    templates = [p.name for p in menus.list_prompts(style)]
-                    templates_cache[style] = templates
-                    window["-TEMPLATE-"].update(templates)
-                    window["-PH-"].update(_build_placeholder_layout(sg, current_tmpl))
-                    file_keys = {p["name"] for p in current_tmpl.get("placeholders", []) if p.get("type") == "file"}
-            elif event == "Del" and current_path:
-                if sg.popup_ok_cancel(f"Delete {current_path.name}?") == "OK":
-                    menus.delete_template(current_path)
-                    current_path = None
-                    current_tmpl = None
-                    sel = values["-STYLE-"]
-                    if sel:
-                        style = sel[0]
-                        templates = [p.name for p in menus.list_prompts(style)]
-                        templates_cache[style] = templates
-                        window["-TEMPLATE-"].update(templates)
-                    window["-PH-"].update([])
-                    window["-OUTPUT-"].update("")
-                    file_keys = set()
-            elif event == "-TEMPLATE-FILTER-":
-                sel = values["-STYLE-"]
-                if sel:
-                    style = sel[0]
-                    templates = templates_cache.get(style) or [p.name for p in menus.list_prompts(style)]
-                    query = values["-TEMPLATE-FILTER-"].lower()
-                    filtered = [t for t in templates if query in t.lower()]
-                    window["-TEMPLATE-"].update(filtered)
-            elif event == "-TEMPLATE-":
-                style_sel = values["-STYLE-"]
-                tmpl_sel = values["-TEMPLATE-"]
-                if style_sel and tmpl_sel:
-                    current_path = menus.PROMPTS_DIR / style_sel[0] / tmpl_sel[0]
-                    current_tmpl = menus.load_template(current_path)
-                    window["-PH-"].update(_build_placeholder_layout(sg, current_tmpl))
-                    file_keys = {p["name"] for p in current_tmpl.get("placeholders", []) if p.get("type") == "file"}
-            elif current_tmpl and event in file_keys:
-                _validate_file_inputs(window, current_tmpl, values)
-            elif current_tmpl and isinstance(event, str) and event.endswith("_clear"):
-                key = event[:-6]
-                window[key].update("")
-                values[key] = ""
-                _validate_file_inputs(window, current_tmpl, values)
-            elif event == "Render" and current_tmpl:
-                skip_keys = set()
-                invalid = _validate_file_inputs(window, current_tmpl, values)
-                for key in invalid:
-                    path = values.get(key, "")
-                    new_path, skip = _prompt_missing_file(sg, window, key, path)
-                    values[key] = new_path
-                    if skip:
-                        skip_keys.add(key)
-                ph_vals = {}
-                for ph in current_tmpl.get("placeholders", []):
-                    key = ph["name"]
-                    val = values.get(key, "")
-                    if key in skip_keys:
-                        val = ""
-                    if ph.get("type") == "list":
-                        val = [v for v in val.splitlines() if v]
-                    ph_vals[key] = val
-                text = menus.render_template(current_tmpl, ph_vals)
-                window["-OUTPUT-"].update(text)
-            elif event == "Paste":
-                text = values.get("-OUTPUT-", "")
-                if not text and current_tmpl:
-                    skip_keys = set()
-                    invalid = _validate_file_inputs(window, current_tmpl, values)
-                    for key in invalid:
-                        path = values.get(key, "")
-                        new_path, skip = _prompt_missing_file(sg, window, key, path)
-                        values[key] = new_path
-                        if skip:
-                            skip_keys.add(key)
-                    ph_vals = {}
-                    for ph in current_tmpl.get("placeholders", []):
-                        key = ph["name"]
-                        val = values.get(key, "")
-                        if key in skip_keys:
-                            val = ""
-                        if ph.get("type") == "list":
-                            val = [v for v in val.splitlines() if v]
-                        ph_vals[key] = val
-                    text = menus.render_template(current_tmpl, ph_vals)
-                    window["-OUTPUT-"].update(text)
-                if text:
-                    paste.paste_text(text)
-                    if current_tmpl:
-                        logger.log_usage(current_tmpl, len(text))
-            elif isinstance(event, str) and event.startswith("Return"):
-                text = values.get("-OUTPUT-", "")
-                if text:
-                    paste.paste_text(text)
-                    if current_tmpl:
-                        logger.log_usage(current_tmpl, len(text))
-        window.close()
-    except Exception as e:
-        _log.error("GUI runtime error: %s", e)
-        print("[prompt-automation] GUI failed during execution, falling back to terminal mode:", e, file=sys.stderr)
-        # Fall back to CLI
-        from . import cli
-        cli.main(["--terminal"])
-        return
+                    template_listbox.delete(0, "end")
+                    for t in templates:
+                        template_listbox.insert("end", t)
+                for w in ph_frame.winfo_children():
+                    w.destroy()
+                output_text.delete("1.0", "end")
+                widgets = {}
+                file_keys = set()
+
+    new_template_btn.config(command=new_template)
+    edit_template_btn.config(command=edit_template)
+    del_template_btn.config(command=del_template)
+
+    def render():
+        if not current_tmpl:
+            return
+        skip_keys = set()
+        invalid = validate_file_inputs(widgets, current_tmpl)
+        for key in invalid:
+            widget = widgets[key]
+            path = widget.get()
+            new_path, skip = prompt_missing_file(widget, key, path)
+            if skip:
+                skip_keys.add(key)
+        ph_vals = {}
+        for ph in current_tmpl.get("placeholders", []):
+            key = ph["name"]
+            widget = widgets.get(key)
+            if isinstance(widget, tk.Text):
+                val = widget.get("1.0", "end-1c")
+                if ph.get("type") == "list":
+                    val = [v for v in val.splitlines() if v]
+            else:
+                val = widget.get()
+            if key in skip_keys:
+                val = ""
+            ph_vals[key] = val
+        text = menus.render_template(current_tmpl, ph_vals)
+        output_text.delete("1.0", "end")
+        output_text.insert("1.0", text)
+
+    def paste_output():
+        text = output_text.get("1.0", "end-1c")
+        if not text and current_tmpl:
+            render()
+            text = output_text.get("1.0", "end-1c")
+        if text:
+            paste.paste_text(text)
+            if current_tmpl:
+                logger.log_usage(current_tmpl, len(text))
+
+    def on_return(event):
+        text = output_text.get("1.0", "end-1c")
+        if text:
+            paste.paste_text(text)
+            if current_tmpl:
+                logger.log_usage(current_tmpl, len(text))
+
+    render_btn.config(command=render)
+    paste_btn.config(command=paste_output)
+    output_text.bind("<Return>", on_return)
+
+    root.mainloop()
+
