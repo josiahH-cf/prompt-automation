@@ -1,0 +1,56 @@
+{
+  "id": 1,
+  "title": "Code Review Assistant",
+  "style": "advanced",
+  "role": "expert code reviewer",
+  "template": [
+    "Please review the following code for:",
+    "{{review_aspects}}",
+    "",
+    "Code to review:",
+    "```{{language}}",
+    "{{code_content}}",
+    "```",
+    "",
+    "Context: {{context}}",
+    "Performance considerations: {{performance_notes}}",
+    "",
+    "Please provide:",
+    "1. Overall assessment",
+    "2. Specific issues found",
+    "3. Suggestions for improvement",
+    "4. Security considerations (if applicable)",
+    "5. Performance optimization opportunities"
+  ],
+  "placeholders": [
+    {
+      "name": "code_content",
+      "label": "Code to review (paste or select file)",
+      "type": "text",
+      "multiline": true
+    },
+    {
+      "name": "language",
+      "label": "Programming language",
+      "type": "text",
+      "options": ["python", "javascript", "typescript", "java", "c++", "rust", "go", "other"]
+    },
+    {
+      "name": "review_aspects",
+      "label": "Review aspects (one per line)",
+      "type": "list"
+    },
+    {
+      "name": "context",
+      "label": "Additional context",
+      "type": "text",
+      "multiline": true
+    },
+    {
+      "name": "performance_notes",
+      "label": "Performance considerations",
+      "type": "text",
+      "multiline": true
+    }
+  ]
+}

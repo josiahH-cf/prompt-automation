@@ -1,0 +1,50 @@
+{
+  "id": 3,
+  "title": "Multi-step Task Planning",
+  "style": "basic",
+  "role": "assistant",
+  "template": [
+    "Create a detailed plan for: {{task_description}}",
+    "",
+    "Context:",
+    "{{context}}",
+    "",
+    "Requirements:",
+    "{{requirements}}",
+    "",
+    "Timeline: {{timeline}}",
+    "Priority: {{priority}}",
+    "",
+    "Please break this down into actionable steps with clear deliverables."
+  ],
+  "placeholders": [
+    {
+      "name": "task_description",
+      "label": "Task description",
+      "type": "text"
+    },
+    {
+      "name": "context",
+      "label": "Additional context",
+      "type": "text",
+      "multiline": true
+    },
+    {
+      "name": "requirements",
+      "label": "Requirements (one per line)",
+      "type": "list"
+    },
+    {
+      "name": "timeline",
+      "label": "Timeline",
+      "type": "text",
+      "options": ["1 day", "1 week", "1 month", "3 months", "6 months"]
+    },
+    {
+      "name": "priority",
+      "label": "Priority level",
+      "type": "text",
+      "options": ["Low", "Medium", "High", "Critical"]
+    }
+  ]
+}

@@ -205,18 +205,122 @@ def main(argv: list[str] | None = None) -> None:
         gui.run()
         return
 
+    # Enhanced CLI workflow
     banner = Path(__file__).with_name("resources").joinpath("banner.txt")
     print(banner.read_text())
-    tmpl: dict[str, Any] | None = menus.pick_style()
+    
+    # Template selection with improved UX
+    tmpl: dict[str, Any] | None = select_template_cli()
     if not tmpl:
         return
-    text = menus.render_template(tmpl)
+        
+    # Render with preview option
+    text = render_template_cli(tmpl)
     if text:
-        # In terminal mode, only copy to clipboard - don't auto-paste
-        # to avoid pasting into the terminal where the app is running
-        paste.copy_to_clipboard(text)
-        print("\n[prompt-automation] Text copied to clipboard. Press Ctrl+V to paste where needed.")
-        logger.log_usage(tmpl, len(text))
+        # Show preview and confirm
+        print("\n" + "="*60)
+        print("RENDERED OUTPUT:")
+        print("="*60)
+        print(text)
+        print("="*60)
+        
+        if input("\nProceed with clipboard copy? [Y/n]: ").lower() not in {'n', 'no'}:
+            paste.copy_to_clipboard(text)
+            print("\n[prompt-automation] Text copied to clipboard. Press Ctrl+V to paste where needed.")
+            logger.log_usage(tmpl, len(text))
+
+
+def select_template_cli() -> dict[str, Any] | None:
+    """Enhanced CLI template selection with better navigation."""
+    styles = menus.list_styles()
+    if not styles:
+        print("No template styles found.")
+        return None
+    
+    # Show styles with numbering and usage frequency
+    usage = logger.usage_counts()
+    style_freq = {s: sum(c for (pid, st), c in usage.items() if st == s) for s in styles}
+    sorted_styles = sorted(styles, key=lambda s: (-style_freq.get(s, 0), s.lower()))
+    
+    print("\nAvailable Styles:")
+    for i, style in enumerate(sorted_styles, 1):
+        freq_info = f" ({style_freq[style]} recent)" if style_freq.get(style, 0) > 0 else ""
+        print(f"{i:2d}. {style}{freq_info}")
+    
+    while True:
+        try:
+            choice = input(f"\nSelect style (1-{len(sorted_styles)}) or press Enter to cancel: ").strip()
+            if not choice:
+                return None
+            if choice.isdigit() and 1 <= int(choice) <= len(sorted_styles):
+                selected_style = sorted_styles[int(choice) - 1]
+                return pick_prompt_cli(selected_style)
+            print("Invalid selection. Please try again.")
+        except KeyboardInterrupt:
+            return None
+
+
+def pick_prompt_cli(style: str) -> dict[str, Any] | None:
+    """Enhanced CLI prompt selection."""
+    prompts = menus.list_prompts(style)
+    if not prompts:
+        print(f"No templates found in style '{style}'.")
+        return None
+    
+    # Show templates with usage frequency
+    usage = logger.usage_counts()
+    prompt_freq = {p.name: usage.get((p.stem.split("_")[0], style), 0) for p in prompts}
+    sorted_prompts = sorted(prompts, key=lambda p: (-prompt_freq.get(p.name, 0), p.name.lower()))
+    
+    print(f"\nTemplates in '{style}':")
+    for i, prompt_path in enumerate(sorted_prompts, 1):
+        template = menus.load_template(prompt_path)
+        title = template.get('title', prompt_path.stem)
+        freq_info = f" ({prompt_freq[prompt_path.name]} recent)" if prompt_freq.get(prompt_path.name, 0) > 0 else ""
+        print(f"{i:2d}. {title}{freq_info}")
+        
+        # Show placeholder count if any
+        if template.get('placeholders'):
+            ph_count = len(template['placeholders'])
+            print(f"     {ph_count} input(s) required")
+    
+    while True:
+        try:
+            choice = input(f"\nSelect template (1-{len(sorted_prompts)}) or press Enter to go back: ").strip()
+            if not choice:
+                return select_template_cli()  # Go back to style selection
+            if choice.isdigit() and 1 <= int(choice) <= len(sorted_prompts):
+                return menus.load_template(sorted_prompts[int(choice) - 1])
+            print("Invalid selection. Please try again.")
+        except KeyboardInterrupt:
+            return None
+
+
+def render_template_cli(tmpl: dict[str, Any]) -> str:
+    """Enhanced CLI template rendering with better prompts."""
+    print(f"\nRendering template: {tmpl.get('title', 'Unknown')}")
+    print(f"Style: {tmpl.get('style', 'Unknown')}")
+    
+    if tmpl.get('placeholders'):
+        print(f"\nThis template requires {len(tmpl['placeholders'])} input(s):")
+        for ph in tmpl['placeholders']:
+            label = ph.get('label', ph['name'])
+            ptype = ph.get('type', 'text')
+            options = ph.get('options', [])
+            multiline = ph.get('multiline', False)
+            
+            type_info = ptype
+            if multiline:
+                type_info += ", multiline"
+            if options:
+                type_info += f", options: {', '.join(options)}"
+            
+            print(f"  - {label} ({type_info})")
+        
+        if input("\nProceed with input collection? [Y/n]: ").lower() in {'n', 'no'}:
+            return ""
+    
+    return menus.render_template(tmpl)
 
 
 if __name__ == "__main__":

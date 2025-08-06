@@ -1,0 +1,44 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Prompt Automation (GUI)",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"prompt_automation",
+				"--gui"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run Prompt Automation (CLI)",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"prompt_automation",
+				"--terminal"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Install Development Dependencies",
+			"type": "shell",
+			"command": "pip",
+			"args": [
+				"install",
+				"-e",
+				"."
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

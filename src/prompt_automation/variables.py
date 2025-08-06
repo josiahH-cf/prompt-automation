@@ -50,6 +50,7 @@ def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | No
 
 
 def _gui_file_prompt(label: str) -> str | None:
+    """Enhanced cross-platform file dialog with better accessibility."""
     sys = platform.system()
     try:
         safe_label = label.replace('"', '\"')
@@ -58,13 +59,16 @@ def _gui_file_prompt(label: str) -> str | None:
         elif sys == "Darwin" and shutil.which("osascript"):
             cmd = ["osascript", "-e", f'choose file with prompt "{safe_label}"']
         elif sys == "Windows":
+            # Enhanced Windows file dialog with better error handling
             cmd = [
                 "powershell",
                 "-Command",
                 (
-                    "Add-Type -AssemblyName System.windows.forms;"
+                    "Add-Type -AssemblyName System.Windows.Forms;"
                     "$f=New-Object System.Windows.Forms.OpenFileDialog;"
                     f'$f.Title="{safe_label}";'
+                    "$f.Filter='All Files (*.*)|*.*';"
+                    "$f.CheckFileExists=$true;"
                     "$null=$f.ShowDialog();$f.FileName"
                 ),
             ]
@@ -72,7 +76,10 @@ def _gui_file_prompt(label: str) -> str | None:
             return None
         res = safe_run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
-            return res.stdout.strip()
+            result = res.stdout.strip()
+            # Validate file exists before returning
+            if result and Path(result).exists():
+                return result
     except Exception as e:  # pragma: no cover - GUI may be missing
         _log.error("GUI file prompt failed: %s", e)
     return None
@@ -124,7 +131,11 @@ def get_variables(
                 _log.info("CLI fallback for %s", label)
                 if opts:
                     print(f"{label} options: {', '.join(opts)}")
-                    val = input(f"{label}: ") or opts[0]
+                    while True:
+                        val = input(f"{label} [{opts[0]}]: ") or opts[0]
+                        if val in opts:
+                            break
+                        print(f"Invalid option. Choose from: {', '.join(opts)}")
                 elif ptype == "list" or multiline:
                     print(f"{label} (one per line, blank line to finish):")
                     lines: List[str] = []
@@ -135,7 +146,26 @@ def get_variables(
                         lines.append(line)
                     val = lines
                 elif ptype == "file":
-                    val = input(f"{label} path: ")
+                    while True:
+                        val = input(f"{label} path: ")
+                        if not val:
+                            break
+                        path = Path(val).expanduser()
+                        if path.exists():
+                            break
+                        print(f"File not found: {path}")
+                        retry = input("Try again? [Y/n]: ").lower()
+                        if retry in {'n', 'no'}:
+                            val = ""
+                            break
+                elif ptype == "number":
+                    while True:
+                        val = input(f"{label}: ")
+                        try:
+                            float(val)
+                            break
+                        except ValueError:
+                            print("Please enter a valid number.")
                 else:
                     val = input(f"{label}: ")
 
