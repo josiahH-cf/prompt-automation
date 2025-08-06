@@ -4,14 +4,13 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 ## Project Summary
 
-`prompt-automation` is a cross-platform prompt launcher. A global hotkey triggers a style picker, renders a chosen template with user-provided values, copies the result to the clipboard and optionally pastes it into the active application.
+`prompt-automation` is a cross-platform prompt launcher. A global hotkey triggers a template picker, renders the selection with user-provided values, copies the result to the clipboard and optionally pastes it into the active application.
 
 ## Directory Structure
 
 ```
 .
 ├── docs/                     # Additional documentation such as hotkey setup
-├── prompts/                  # Prompt template JSON files grouped by style
 ├── scripts/                  # Installation and troubleshooting scripts (PowerShell/bash)
 ├── src/
 │   └── prompt_automation/
@@ -23,7 +22,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
-│       ├── prompts/          # Packaged prompt templates
+│       ├── prompts/          # Packaged prompt templates (styles/basic/01_basic.json)
 │       ├── renderer.py       # Template loading, validation, and placeholder substitution
 │       ├── resources/        # Static assets like banner.txt
 │       ├── utils.py          # Safe subprocess execution helpers
@@ -61,7 +60,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 ## Prompt Templates
 
-Prompt JSON files live under `prompts/styles/<Style>/`. Each template includes an integer `id`, a `title`, a `style`, a list of `template` lines, and optional `placeholders`. The application enforces unique IDs via `menus.ensure_unique_ids()`.
+Prompt JSON files live under `prompts/styles/<Style>/`. The repository bundles only `basic/01_basic.json` as a minimal example. Each template includes an integer `id`, a `title`, a `style`, a list of `template` lines, and optional `placeholders`. The application enforces unique IDs via `menus.ensure_unique_ids()`.
 
 ## Hotkey System Architecture
 
