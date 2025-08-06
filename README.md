@@ -29,7 +29,7 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
 
-Press **Ctrl+Shift+J** to launch the GUI style picker. Select a style, choose a template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
+Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
 
 The hotkey system automatically:
 - Tries to launch the GUI first
@@ -50,14 +50,15 @@ prompt-automation --update
 ```
 
 ```
-[Hotkey] -> [Style] -> [Template] -> [Fill] -> [Paste]
+[Hotkey] -> [Template] -> [Fill] -> [Paste]
 ```
 
-Templates live under `prompts/styles/`. Choosing option `99` in the style picker lets you create a new template interactively.
+Templates live under `prompts/styles/`. Only `basic/01_basic.json` is bundled for now, but you can add your own templates in the same directory structure.
 
 ## Managing Templates
 
 Template files are plain JSON documents in `prompts/styles/<Style>/`.
+This repository currently includes a single example: `basic/01_basic.json`.
 A minimal example:
 
 ```json
@@ -155,12 +156,11 @@ powershell.exe -Command "cd 'C:\\temp\\prompt-automation'; Copy-Item -Path '\\ws
 ```
 project/
 ├── docs/               # Additional documentation
-├── prompts/
-│   └── styles/         # Prompt JSON files
 ├── scripts/            # Install helpers
 ├── src/
 │   └── prompt_automation/
 │       ├── hotkey/     # Platform hotkey scripts
+│       ├── prompts/    # Contains styles/basic/01_basic.json
 │       └── ...         # Application modules
 ```
 
