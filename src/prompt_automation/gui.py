@@ -12,6 +12,10 @@ from .errorlog import get_logger
 _log = get_logger(__name__)
 
 
+# sentinel object to signal user cancellation during input collection
+CANCELLED = object()
+
+
 def run() -> None:
     """Launch the GUI using Tkinter. Falls back to CLI if GUI fails."""
     # Perform background silent pipx upgrade (non-blocking) then existing
@@ -45,13 +49,14 @@ def run() -> None:
             # Collect variables for the template
             variables = collect_variables_gui(template)
             if variables is not None:
-                _log.info("Variables collected: %d placeholders", len(template.get('placeholders', [])))
+                _log.info(
+                    "Variables collected: %d placeholders",
+                    len(template.get("placeholders", [])),
+                )
                 # Render and review the output
                 final_text = review_output_gui(template, variables)
                 if final_text is not None:
                     _log.info("Final text confirmed, length: %d", len(final_text))
-                    # Copy to clipboard
-                    paste.copy_to_clipboard(final_text)
                     logger.log_usage(template, len(final_text))
                     _log.info("Workflow completed successfully")
                 else:
@@ -228,16 +233,16 @@ def collect_variables_gui(template):
         return {}
     
     variables = {}
-    
+
     for placeholder in placeholders:
-        name = placeholder['name']
-        label = placeholder.get('label', name)
-        ptype = placeholder.get('type', 'text')
-        options = placeholder.get('options', [])
-        multiline = placeholder.get('multiline', False) or ptype == 'list'
-        
+        name = placeholder["name"]
+        label = placeholder.get("label", name)
+        ptype = placeholder.get("type", "text")
+        options = placeholder.get("options", [])
+        multiline = placeholder.get("multiline", False) or ptype == "list"
+
         value = collect_single_variable(name, label, ptype, options, multiline)
-        if value is None:  # User cancelled
+        if value is CANCELLED:  # User cancelled entire workflow
             return None
         variables[name] = value
     
@@ -248,19 +253,19 @@ def collect_single_variable(name, label, ptype, options, multiline):
     """Collect a single variable with appropriate input method."""
     import tkinter as tk
     from tkinter import ttk, filedialog
-    
+
     root = tk.Tk()
     root.title(f"Input: {label}")
     root.geometry("500x300" if multiline else "500x150")
     root.resizable(False, False)
-    
+
     # Bring to foreground and focus
     root.lift()
     root.focus_force()
     root.attributes('-topmost', True)
     root.after(100, lambda: root.attributes('-topmost', False))
-    
-    result = None
+
+    result = CANCELLED
     
     # Main frame
     main_frame = tk.Frame(root, padx=20, pady=20)
@@ -324,19 +329,23 @@ def collect_single_variable(name, label, ptype, options, multiline):
     button_frame = tk.Frame(main_frame)
     button_frame.pack(fill="x")
     
-    def on_ok():
+    def on_ok(skip: bool = False):
         nonlocal result
-        if isinstance(input_widget, tk.Text):
+        if skip:
+            result = None
+        elif isinstance(input_widget, tk.Text):
             value = input_widget.get("1.0", "end-1c")
-            if ptype == 'list':
+            if ptype == "list":
                 result = [line.strip() for line in value.splitlines() if line.strip()]
             else:
                 result = value
         else:
             result = input_widget.get()
         root.destroy()
-    
+
     def on_cancel():
+        nonlocal result
+        result = CANCELLED
         root.destroy()
     
     ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, 
@@ -350,8 +359,18 @@ def collect_single_variable(name, label, ptype, options, multiline):
     # Keyboard bindings
     def on_enter(event):
         # For multi-line text, Ctrl+Enter submits, Enter adds new line
-        if isinstance(input_widget, tk.Text) and not (event.state & 0x4):
+        is_ctrl = bool(event.state & 0x4)
+        if isinstance(input_widget, tk.Text) and not is_ctrl:
             return None  # Allow normal Enter behavior in text widget
+
+        if is_ctrl:
+            if isinstance(input_widget, tk.Text):
+                current = input_widget.get("1.0", "end-1c").strip()
+            else:
+                current = input_widget.get().strip()
+            if not current:
+                on_ok(skip=True)
+                return "break"
         on_ok()
         return "break"
     
@@ -400,7 +419,8 @@ def review_output_gui(template, variables):
     # Instructions / status area (updated dynamically)
     instructions_var = tk.StringVar()
     instructions_var.set(
-        "Edit the prompt below. Ctrl+Enter = Finish, Ctrl+Shift+C = Copy, Esc = Cancel"
+        "Edit the prompt below. Ctrl+Enter = Finish (copies & closes), "
+        "Ctrl+Shift+C = Copy without closing, Esc = Cancel"
     )
     instructions = tk.Label(
         main_frame,
@@ -441,7 +461,8 @@ def review_output_gui(template, variables):
             paste.copy_to_clipboard(text)
             status_var.set("Copied to clipboard ✔")
             instructions_var.set(
-                "Copied. You can keep editing. Ctrl+Enter = Finish, Ctrl+Shift+C = Copy again, Esc = Cancel"
+                "Copied. You can keep editing. Ctrl+Enter = Finish (copies & closes), "
+                "Ctrl+Shift+C = Copy again, Esc = Cancel"
             )
             # Clear status after a delay
             root.after(4000, lambda: status_var.set(""))

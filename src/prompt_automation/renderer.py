@@ -36,24 +36,39 @@ def validate_template(data: Dict) -> bool:
 
 
 def fill_placeholders(
-    lines: Iterable[str], vars: Dict[str, Union[str, Sequence[str]]]
+    lines: Iterable[str], vars: Dict[str, Union[str, Sequence[str], None]]
 ) -> str:
     """Replace ``{{name}}`` placeholders with values.
 
     ``vars`` may contain either strings or sequences of strings. Sequence
     values (used for dynamic list placeholders) are joined with newlines before
-    replacement. ``None`` values are treated as empty strings.
+    replacement. ``None`` or empty string values cause the entire line containing
+    the placeholder to be removed.
     """
 
     out: List[str] = []
     for line in lines:
+        skip_line = False
         for k, v in vars.items():
+            placeholder = f"{{{{{k}}}}}"
+            if placeholder not in line:
+                continue
+
             if v is None:
-                repl = ""
-            elif isinstance(v, (list, tuple)):
+                skip_line = True
+                break
+            if isinstance(v, (list, tuple)):
                 repl = "\n".join(str(item) for item in v)
+                if not repl.strip():
+                    skip_line = True
+                    break
             else:
                 repl = str(v)
-            line = line.replace(f"{{{{{k}}}}}", repl)
-        out.append(line)
+                if not repl.strip():
+                    skip_line = True
+                    break
+            line = line.replace(placeholder, repl)
+
+        if not skip_line:
+            out.append(line)
     return "\n".join(out)

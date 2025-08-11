@@ -148,11 +148,18 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
     """Render ``tmpl`` using provided ``values`` for placeholders.
 
     If ``values`` is ``None`` any missing variables will be collected via
-    :func:`variables.get_variables` which falls back to GUI/CLI prompts.
+    :func:`variables.get_variables` which falls back to GUI/CLI prompts. When
+    ``values`` is supplied it is used as-is, allowing ``None`` entries to skip
+    placeholders.
     """
 
-    vars = get_variables(tmpl.get("placeholders", []), initial=values)
-    for ph in tmpl.get("placeholders", []):
+    placeholders = tmpl.get("placeholders", [])
+    if values is None:
+        vars = get_variables(placeholders)
+    else:
+        vars = dict(values)
+
+    for ph in placeholders:
         if ph.get("type") == "file":
             name = ph["name"]
             path = vars.get(name)
@@ -160,6 +167,7 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
                 vars[name] = read_file_safe(path)
             else:
                 vars[name] = ""
+
     return fill_placeholders(tmpl["template"], vars)
 
 

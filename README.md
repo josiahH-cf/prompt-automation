@@ -42,7 +42,12 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
 
-Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in any required values. The rendered text is copied to your clipboard but not pasted automatically.
+Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in
+any required values. After entering values an editable review window appears.
+Press **Ctrl+Enter** to finish (copies and closes) or **Ctrl+Shift+C** to copy
+without closing. To skip a placeholder leave it blank and submit with
+**Ctrl+Enter** – the entire line is removed from the final prompt. The rendered
+text is copied to your clipboard but not pasted automatically.
 
 The hotkey system automatically:
 - Tries to launch the GUI first
@@ -84,6 +89,10 @@ A minimal example:
   "placeholders": [{"name": "name", "label": "Name"}]
 }
 ```
+
+Global defaults for common placeholders live in `prompts/styles/globals.json`.
+Templates can omit these entries to use the defaults or override them by
+defining placeholders with the same names.
 
 ## Troubleshooting
 
