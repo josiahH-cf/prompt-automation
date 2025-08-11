@@ -106,6 +106,56 @@ def check_dependencies(require_fzf: bool = True) -> bool:
     return True
 
 
+def dependency_status(gui_mode: bool) -> dict[str, dict[str, str]]:
+    """Return a structured view of dependency availability without installing.
+
+    Each entry maps to a dict with keys:
+      status: ok | missing | optional-missing
+      detail: short human readable note
+    """
+    import importlib
+
+    status: dict[str, dict[str, str]] = {}
+    def _add(name: str, ok: bool, optional: bool = False, detail: str = ""):
+        status[name] = {
+            "status": "ok" if ok else ("optional-missing" if optional else "missing"),
+            "detail": detail,
+        }
+
+    # Core Python module presence
+    try:
+        importlib.import_module("pyperclip")
+        _add("pyperclip", True, detail="available")
+    except Exception as e:
+        _add("pyperclip", False, detail=str(e))
+
+    if gui_mode:
+        try:
+            importlib.import_module("tkinter")
+            _add("tkinter", True, detail="available")
+        except Exception as e:
+            _add("tkinter", False, detail=str(e))
+    else:
+        # CLI mode: prefer fzf but it's optional if user wants simple menu
+        _add("fzf", shutil.which("fzf") is not None, optional=True, detail="path lookup")
+
+    # Clipboard tools (optional fallbacks)
+    if platform.system() == "Linux":
+        _add("xclip", shutil.which("xclip") is not None, optional=True)
+        _add("wl-copy", shutil.which("wl-copy") is not None, optional=True)
+    elif platform.system() == "Darwin":
+        _add("pbcopy", shutil.which("pbcopy") is not None, optional=True)
+    elif platform.system() == "Windows":
+        _add("clip.exe", shutil.which("clip") is not None, optional=True)
+        try:
+            importlib.import_module("keyboard")
+            _add("keyboard", True, optional=True)
+        except Exception as e:
+            _add("keyboard", False, optional=True, detail=str(e))
+
+    return status
+
+
 def main(argv: list[str] | None = None) -> None:
     """Program entry point."""
     # Load environment from config file if it exists
@@ -125,6 +175,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--gui", action="store_true", help="Launch GUI (default)")
     parser.add_argument("--terminal", action="store_true", help="Force terminal mode instead of GUI")
     parser.add_argument("--update", "-u", action="store_true", help="Check for and apply updates")
+    parser.add_argument("--self-test", action="store_true", help="Run dependency and template health checks and exit")
     parser.add_argument(
         "--assign-hotkey",
         action="store_true",
@@ -168,6 +219,33 @@ def main(argv: list[str] | None = None) -> None:
         menus.ensure_unique_ids(menus.PROMPTS_DIR)
     except ValueError as e:
         print(f"[prompt-automation] {e}")
+        return
+
+    if args.self_test:
+        # Gather template metrics
+        styles = menus.list_styles()
+        template_files = []
+        for s in styles:
+            for p in menus.list_prompts(s):
+                try:
+                    data = menus.load_template(p)
+                    if isinstance(data, dict) and "template" in data:
+                        template_files.append(p)
+                except Exception:
+                    pass
+        gui_mode = not args.terminal and (args.gui or os.environ.get("PROMPT_AUTOMATION_GUI") != "0")
+        dep_status = dependency_status(gui_mode)
+        missing_critical = [k for k,v in dep_status.items() if v["status"] == "missing"]
+        print("=== Self Test Report ===")
+        print(f"Styles: {len(styles)} | Templates: {len(template_files)}")
+        print("Dependencies:")
+        for name, info in sorted(dep_status.items()):
+            print(f"  - {name}: {info['status']} {('- ' + info['detail']) if info['detail'] else ''}")
+        if missing_critical:
+            print("Critical missing dependencies:", ", ".join(missing_critical))
+            print("Self test: FAIL")
+        else:
+            print("Self test: PASS")
         return
 
     if args.reset_log:

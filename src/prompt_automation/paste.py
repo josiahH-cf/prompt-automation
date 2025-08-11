@@ -6,7 +6,14 @@ import platform
 import shutil
 from .utils import safe_run
 
-import pyperclip
+try:  # Graceful fallback if pyperclip missing at runtime
+    import pyperclip  # type: ignore
+except Exception:  # pragma: no cover - import guard
+    class _PyperclipShim:  # minimal shim used when dependency missing
+        def copy(self, _text: str) -> None:
+            raise RuntimeError("pyperclip not installed")
+
+    pyperclip = _PyperclipShim()  # type: ignore
 
 from .errorlog import get_logger
 

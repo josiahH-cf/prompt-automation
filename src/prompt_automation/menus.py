@@ -210,14 +210,110 @@ def delete_style(name: str) -> None:
 
 
 def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
-    """Raise ``ValueError`` if duplicate template IDs are found."""
-    seen: Dict[int, Path] = {}
-    for path in base.rglob("*.json"):
-        data = json.loads(path.read_text())
-        pid = data["id"]
-        if pid in seen:
-            raise ValueError(f"Duplicate id {pid} in {path} and {seen[pid]}")
-        seen[pid] = path
+    """Ensure every template has a unique ID.
+
+    Behaviour improvements over the previous implementation:
+    - Missing ``id`` fields are auto-assigned the next free ID (01-98) per style
+      (falling back to global pool) instead of raising a raw ``KeyError``.
+    - Duplicate IDs are resolved by reassigning *later* files to a new ID.
+    - Files are renamed to keep the ``NN_`` prefix in sync with their ID.
+    - A concise summary of any fixes is printed so the user can review changes.
+
+    Any unrecoverable issues (e.g. ID pool exhausted) still raise ``ValueError``.
+    """
+
+    # Collect template file paths first to have deterministic ordering (path sort)
+    paths = sorted(base.rglob("*.json"))
+    used_ids_global: set[int] = set()
+    changes: List[str] = []
+    problems: List[str] = []
+
+    # Pre-load all data (skip unreadable files silently but note them)
+    templates: List[tuple[Path, Dict[str, Any]]] = []
+    for path in paths:
+        try:
+            data = json.loads(path.read_text())
+            templates.append((path, data))
+        except Exception as e:
+            problems.append(f"Unreadable JSON: {path} ({e})")
+
+    # Helper to generate next free ID within allowed range (1-98)
+    def next_free_id() -> int | None:
+        for i in range(1, 99):
+            if i not in used_ids_global:
+                return i
+        return None
+
+    for path, data in templates:
+        # Ignore non-template global/config files
+        if "template" not in data or data.get("type") == "globals":
+            continue
+        orig_id = data.get("id")
+        if not isinstance(orig_id, int):
+            new_id = next_free_id()
+            if new_id is None:
+                raise ValueError("No free IDs (01-98) remain to assign missing id")
+            data["id"] = new_id
+            used_ids_global.add(new_id)
+            changes.append(f"Assigned missing id {new_id:02d} -> {path}")
+        else:
+            if orig_id in used_ids_global:
+                # Duplicate – assign new id
+                new_id = next_free_id()
+                if new_id is None:
+                    raise ValueError(
+                        f"Duplicate id {orig_id:02d} in {path} and elsewhere; no free IDs left"
+                    )
+                data["id"] = new_id
+                used_ids_global.add(new_id)
+                changes.append(
+                    f"Reassigned duplicate id {orig_id:02d} -> {new_id:02d} in {path}"
+                )
+            else:
+                used_ids_global.add(orig_id)
+
+    # Persist any modified templates (id changed or added); rename files if needed
+    for path, data in templates:
+        # Skip non-template config/variable files (no 'template' field)
+        if "template" not in data:
+            continue
+        # Determine expected file prefix based on id + slug(title)
+        try:
+            pid = data["id"]
+            title = data.get("title")
+            # If no title and filename already starts with NN_ assume it's intentional (e.g. globals)
+            if not title and path.name.startswith(f"{int(pid):02d}_"):
+                expected_name = path.name  # keep as-is
+            else:
+                slug_title = _slug(title or path.stem)
+                expected_name = f"{int(pid):02d}_{slug_title}.json"
+            if path.name != expected_name:
+                new_path = path.with_name(expected_name)
+                # Write to new path then remove/backup old
+                path.write_text(json.dumps(data, indent=2))  # ensure current path has updated data
+                if new_path.exists() and new_path != path:
+                    # Backup existing conflicting file
+                    backup = new_path.with_suffix(new_path.suffix + ".bak")
+                    shutil.copy2(new_path, backup)
+                if new_path != path:
+                    path.rename(new_path)
+                    changes.append(f"Renamed {path.name} -> {new_path.name}")
+            else:
+                # Only write if id was changed (detect by reading file again?)
+                # Simpler: always rewrite – small cost, ensures consistency
+                path.write_text(json.dumps(data, indent=2))
+        except Exception as e:  # pragma: no cover - defensive
+            problems.append(f"Failed updating {path}: {e}")
+
+    if problems:
+        print("[prompt-automation] Issues during ID check:")
+        for p in problems:
+            print("  -", p)
+    if changes:
+        print("[prompt-automation] Template ID adjustments:")
+        for c in changes:
+            print("  -", c)
+    # If no changes and no problems, remain silent for fast startup
 
 
 def create_new_template() -> None:

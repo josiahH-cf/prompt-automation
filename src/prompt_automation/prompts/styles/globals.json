@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "type": "globals",
   "global_placeholders": {
     "importance": "normal",
     "think_deeply": "no",
