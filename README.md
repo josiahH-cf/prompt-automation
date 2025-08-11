@@ -1,6 +1,6 @@
 # prompt-automation
 
-**prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and instantly paste the result into the active application.
+**prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and copy the result to your clipboard for manual pasting.
 
 
 For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md). AI coding partners should consult it before making changes.
@@ -29,7 +29,7 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
 
-Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in any required values. The rendered text is copied to your clipboard and pasted automatically.
+Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in any required values. The rendered text is copied to your clipboard but not pasted automatically.
 
 The hotkey system automatically:
 - Tries to launch the GUI first
@@ -50,7 +50,7 @@ prompt-automation --update
 ```
 
 ```
-[Hotkey] -> [Template] -> [Fill] -> [Paste]
+[Hotkey] -> [Template] -> [Fill] -> [Copy]
 ```
 
 Templates live under `prompts/styles/`. Only `basic/01_basic.json` is bundled for now, but you can add your own templates in the same directory structure.
