@@ -6,7 +6,7 @@
 For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md). AI coding partners should consult it before making changes.
 ---
 
-## Getting Started with this Code
+## Getting Started
 
 1. **Clone the repository**
    ```bash
