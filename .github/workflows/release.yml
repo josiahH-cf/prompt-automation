@@ -37,10 +37,10 @@ jobs:
           skip-existing: true
           verbose: true
 
-- name: Show package metadata
-  run: |
-    python -m pip install --no-deps dist/*.whl
-    python -c "
-    import importlib.metadata as m
-    print('Installed version:', m.version('prompt-automation'))
-    "
+      - name: Show package metadata
+        run: |
+          python -m pip install --no-deps dist/*.whl
+          python -c "
+          import importlib.metadata as m
+          print('Installed version:', m.version('prompt-automation'))
+          "
