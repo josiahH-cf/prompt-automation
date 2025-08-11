@@ -43,8 +43,8 @@ def run() -> None:
                 final_text = review_output_gui(template, variables)
                 if final_text is not None:
                     _log.info("Final text confirmed, length: %d", len(final_text))
-                    # Copy to clipboard and paste
-                    paste.paste_text(final_text)
+                    # Copy to clipboard
+                    paste.copy_to_clipboard(final_text)
                     logger.log_usage(template, len(final_text))
                     _log.info("Workflow completed successfully")
                 else:
@@ -387,9 +387,11 @@ def review_output_gui(template, variables):
     main_frame.pack(fill="both", expand=True)
     
     # Instructions
-    instructions = tk.Label(main_frame, 
-                           text="Review and edit the output. Press Ctrl+Enter to confirm and paste, Esc to cancel:",
-                           font=("Arial", 12))
+    instructions = tk.Label(
+        main_frame,
+        text="Press Ctrl+Enter to confirm and copy to clipboard, Esc to cancel.",
+        font=("Arial", 12),
+    )
     instructions.pack(anchor="w", pady=(0, 10))
     
     # Text editor
@@ -419,8 +421,13 @@ def review_output_gui(template, variables):
     def on_cancel():
         root.destroy()
     
-    confirm_btn = tk.Button(button_frame, text="Confirm & Paste (Ctrl+Enter)", command=on_confirm,
-                           font=("Arial", 10), padx=20)
+    confirm_btn = tk.Button(
+        button_frame,
+        text="Confirm & Copy (Ctrl+Enter)",
+        command=on_confirm,
+        font=("Arial", 10),
+        padx=20,
+    )
     confirm_btn.pack(side="left", padx=(0, 10))
     
     cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel,
