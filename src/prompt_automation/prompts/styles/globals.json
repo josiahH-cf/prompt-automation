@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "global_placeholders": {
+    "importance": "normal",
+    "think_deeply": "no",
+    "two_parter": "no"
+  },
+  "notes": {
+    "importance": "How important is this prompt to get right? Use low | normal | high | critical. Higher values should enable stronger grounding and anti-hallucination controls.",
+    "think_deeply": "yes | no. 'yes' adds a 'think deeply about this' directive. Use sparingly; limited budget.",
+    "two_parter": "yes | no. 'yes' signals a two-stage flow: initial paste, then follow-up refinement."
+  },
+  "version": 1
+}
