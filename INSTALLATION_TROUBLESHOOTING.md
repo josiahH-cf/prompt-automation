@@ -70,6 +70,36 @@ The installation scripts have been significantly improved to handle several comm
 - Provides accurate status reporting
 
 ### "Critical dependencies are missing"
+### "Unable to parse package spec: C:\\Users\\<User>\\AppData\\Local\\Temp\\prompt-automation-install"
+
+**Cause**: The original install used a temporary directory path (e.g. `%TEMP%\prompt-automation-install`) which was removed after installation. `pipx` stores that exact path as the package spec. When upgrading later it attempts to re‑interpret the path and fails.
+
+**Current versions (>= 0.2.1+)**: The internal auto-updater now catches this message and force-reinstalls from PyPI (`pipx install --force prompt-automation`) to normalize the spec. Nothing extra needed unless you disabled the fallback.
+
+**Fix (manual)**:
+```powershell
+pipx uninstall prompt-automation
+pipx install prompt-automation
+```
+or if uninstall is blocked:
+```powershell
+pipx install --force prompt-automation
+```
+
+**Alternative (dev workflow)**: Install from a *stable* local folder (not `%TEMP%`) you keep around, or build a wheel:
+```powershell
+python -m build
+pipx install dist\prompt_automation-<version>-py3-none-any.whl
+```
+
+**Disable automatic fallback** (diagnostics / reproducibility):
+```powershell
+$env:PROMPT_AUTOMATION_DISABLE_PIPX_FALLBACK = '1'
+```
+Re-run the app, then reproduce the upgrade error intentionally.
+
+**Last resort (not recommended)**: Edit `%USERPROFILE%\pipx\venvs\prompt-automation\pipx_metadata.json` changing `package_or_url` to `"prompt-automation"`, then run `pipx upgrade prompt-automation`. Make a backup first.
+
 **Status**: Much more lenient now
 - Only fails if Python is completely unavailable
 - Allows continuation with Python-only setup

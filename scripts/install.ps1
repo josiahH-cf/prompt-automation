@@ -47,7 +47,12 @@ Info "Starting prompt-automation installation..."
 $cfgDir = Join-Path $env:USERPROFILE '.prompt-automation'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 '{"hotkey": "ctrl+shift+j"}' | Set-Content (Join-Path $cfgDir 'hotkey.json')
-'PROMPT_AUTOMATION_GUI=1' | Set-Content (Join-Path $cfgDir 'environment')
+@'
+PROMPT_AUTOMATION_GUI=1
+PROMPT_AUTOMATION_AUTO_UPDATE=1
+PROMPT_AUTOMATION_MANIFEST_AUTO=1
+'@ | Set-Content (Join-Path $cfgDir 'environment')
+Info 'Environment defaults written (GUI + auto-update enabled)'
 
 # Ensure we are running on Windows. If not, fall back to WSL-compatible installer
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
@@ -237,6 +242,25 @@ if (Test-Path $hotkeyScript) {
 }
 
 # Summary status
+try {
+    # Skip immediate upgrade if installation used a temporary local path which
+    # has now been deleted (prevents 'Unable to parse package spec' errors).
+    $tempInstallDir = Join-Path $env:TEMP 'prompt-automation-install'
+    if (Test-Path $tempInstallDir) {
+        pipx upgrade prompt-automation | Out-Null 2>&1
+    } else {
+        # Only attempt upgrade if the existing spec appears to be canonical (PyPI).
+        $pipxList = try { pipx list 2>&1 } catch { '' }
+        if ($pipxList -match 'prompt-automation') {
+            # Heuristic: avoid calling upgrade right after a local-path install; harmless otherwise.
+            pipx upgrade prompt-automation | Out-Null 2>&1
+        }
+    }
+} catch {}
+try {
+    prompt-automation --update | Out-Null 2>&1
+} catch {}
+
 Info "\n=== Installation Summary ==="
 Show-ComponentStatus -ComponentName 'Python'
 Show-ComponentStatus -ComponentName 'pipx'

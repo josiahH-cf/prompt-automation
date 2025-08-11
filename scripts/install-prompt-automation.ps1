@@ -298,6 +298,21 @@ if (-not $installSuccess) {
 
 # Clean up temp directory if used
 if ($projectRoot -like "*temp*prompt-automation-install*") {
+    Info 'Normalizing pipx package spec to canonical PyPI name (avoids broken upgrade due to deleted temp path)...'
+    try {
+        if ($global:pipxCommand -eq 'python -m pipx') {
+            & python -m pipx install --force prompt-automation 2>&1 | Out-Null
+        } else {
+            & $global:pipxCommand install --force prompt-automation 2>&1 | Out-Null
+        }
+        if ($LASTEXITCODE -eq 0) {
+            Info 'Spec normalized (future pipx upgrade will work)'
+        } else {
+            Write-Warning 'Failed to normalize spec; future pipx upgrade may show parse error until you reinstall from PyPI'
+        }
+    } catch {
+        Write-Warning "Could not rebind package spec: $($_.Exception.Message)"
+    }
     try {
         Remove-Item $projectRoot -Recurse -Force -ErrorAction SilentlyContinue
         Debug "Cleaned up temporary installation directory"

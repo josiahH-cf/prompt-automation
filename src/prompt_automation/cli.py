@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import logger, menus, paste, update
+from . import updater  # lightweight pipx auto-updater
 
 
 LOG_DIR = Path.home() / ".prompt-automation" / "logs"
@@ -274,7 +275,12 @@ def main(argv: list[str] | None = None) -> None:
     _log.info("running on %s", platform.platform())
     if not check_dependencies(require_fzf=not gui_mode):
         return
-    # Check for updates on startup unless explicitly running update
+    # Background silent pipx upgrade check (rate-limited)
+    try:  # never block startup
+        updater.check_for_update()
+    except Exception:
+        pass
+    # Existing manifest-based update system (interactive) retained
     update.check_and_prompt()
 
     if gui_mode:
@@ -353,9 +359,12 @@ def pick_prompt_cli(style: str) -> dict[str, Any] | None:
     print(f"\nTemplates in '{style}':")
     for i, prompt_path in enumerate(sorted_prompts, 1):
         template = menus.load_template(prompt_path)
+        # Show nested relative path (excluding style root) if present
+        rel = prompt_path.relative_to(menus.PROMPTS_DIR / style)
+        rel_display = str(rel.parent) + "/" if str(rel.parent) != "." else ""
         title = template.get('title', prompt_path.stem)
         freq_info = f" ({prompt_freq[prompt_path.name]} recent)" if prompt_freq.get(prompt_path.name, 0) > 0 else ""
-        print(f"{i:2d}. {title}{freq_info}")
+        print(f"{i:2d}. {rel_display}{title}{freq_info}")
         
         # Show placeholder count if any
         if template.get('placeholders'):

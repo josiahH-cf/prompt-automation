@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from . import logger, menus, paste, update
+from . import updater  # silent pipx auto-updater (rate-limited)
 from .errorlog import get_logger
 
 
@@ -13,6 +14,12 @@ _log = get_logger(__name__)
 
 def run() -> None:
     """Launch the GUI using Tkinter. Falls back to CLI if GUI fails."""
+    # Perform background silent pipx upgrade (non-blocking) then existing
+    # manifest-based interactive update (retained behaviour)
+    try:  # never block GUI startup
+        updater.check_for_update()
+    except Exception:
+        pass
     update.check_and_prompt()
     try:
         import tkinter as tk
@@ -105,8 +112,11 @@ def select_template_gui():
             try:
                 template = menus.load_template(prompt_path)
                 title = template.get('title', prompt_path.stem)
+                # Relative subfolder display (exclude style root)
+                rel = prompt_path.relative_to(menus.PROMPTS_DIR / style)
+                prefix = (str(rel.parent) + '/') if str(rel.parent) != '.' else ''
                 template_items.append({
-                    'display': f"{style}: {title}",
+                    'display': f"{style}: {prefix}{title}",
                     'template': template,
                     'path': prompt_path
                 })
@@ -365,6 +375,7 @@ def collect_single_variable(name, label, ptype, options, multiline):
 def review_output_gui(template, variables):
     """Review and edit the rendered output."""
     import tkinter as tk
+    from tkinter import messagebox
     
     # Render the template
     rendered_text = menus.render_template(template, variables)
@@ -386,13 +397,20 @@ def review_output_gui(template, variables):
     main_frame = tk.Frame(root, padx=20, pady=20)
     main_frame.pack(fill="both", expand=True)
     
-    # Instructions
+    # Instructions / status area (updated dynamically)
+    instructions_var = tk.StringVar()
+    instructions_var.set(
+        "Edit the prompt below. Ctrl+Enter = Finish, Ctrl+Shift+C = Copy, Esc = Cancel"
+    )
     instructions = tk.Label(
         main_frame,
-        text="Press Ctrl+Enter to confirm and copy to clipboard, Esc to cancel.",
-        font=("Arial", 12),
+        textvariable=instructions_var,
+        font=("Arial", 11),
+        justify="left",
+        anchor="w",
+        wraplength=760,
     )
-    instructions.pack(anchor="w", pady=(0, 10))
+    instructions.pack(fill="x", pady=(0, 8))
     
     # Text editor
     text_frame = tk.Frame(main_frame)
@@ -411,41 +429,76 @@ def review_output_gui(template, variables):
     
     # Button frame
     button_frame = tk.Frame(main_frame)
-    button_frame.pack(fill="x")
-    
-    def on_confirm():
+    button_frame.pack(fill="x", pady=(4, 0))
+
+    status_var = tk.StringVar(value="")
+    status_label = tk.Label(button_frame, textvariable=status_var, font=("Arial", 9), fg="#2d6a2d")
+    status_label.pack(side="right")
+
+    def on_copy_only(event=None):
+        text = text_widget.get("1.0", "end-1c")
+        try:
+            paste.copy_to_clipboard(text)
+            status_var.set("Copied to clipboard ✔")
+            instructions_var.set(
+                "Copied. You can keep editing. Ctrl+Enter = Finish, Ctrl+Shift+C = Copy again, Esc = Cancel"
+            )
+            # Clear status after a delay
+            root.after(4000, lambda: status_var.set(""))
+        except Exception as e:  # pragma: no cover - clipboard runtime
+            status_var.set("Copy failed – see logs")
+            messagebox.showerror("Clipboard Error", f"Unable to copy to clipboard:\n{e}")
+        return "break"
+
+    def on_confirm(event=None):
         nonlocal result
         result = text_widget.get("1.0", "end-1c")
+        # Perform a final copy so user always leaves with clipboard populated
+        try:
+            paste.copy_to_clipboard(result)
+        except Exception:
+            pass
         root.destroy()
-    
-    def on_cancel():
+        return "break"
+
+    def on_cancel(event=None):
+        result = None
         root.destroy()
-    
+        return "break"
+
+    copy_btn = tk.Button(
+        button_frame,
+        text="Copy (Ctrl+Shift+C)",
+        command=on_copy_only,
+        font=("Arial", 10),
+        padx=16,
+    )
+    copy_btn.pack(side="left", padx=(0, 8))
+
     confirm_btn = tk.Button(
         button_frame,
-        text="Confirm & Copy (Ctrl+Enter)",
+        text="Finish (Ctrl+Enter)",
         command=on_confirm,
         font=("Arial", 10),
-        padx=20,
+        padx=18,
     )
-    confirm_btn.pack(side="left", padx=(0, 10))
-    
-    cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel,
-                          font=("Arial", 10), padx=20)
+    confirm_btn.pack(side="left", padx=(0, 8))
+
+    cancel_btn = tk.Button(
+        button_frame,
+        text="Cancel (Esc)",
+        command=on_cancel,
+        font=("Arial", 10),
+        padx=18,
+    )
     cancel_btn.pack(side="left")
-    
+
     # Keyboard bindings
-    def on_ctrl_enter(event):
-        on_confirm()
-        return "break"
-    
-    def on_escape(event):
-        on_cancel()
-        return "break"
-    
-    root.bind('<Control-Return>', on_ctrl_enter)
-    root.bind('<Control-KP_Enter>', on_ctrl_enter)
-    root.bind('<Escape>', on_escape)
+    root.bind('<Control-Return>', on_confirm)
+    root.bind('<Control-KP_Enter>', on_confirm)
+    # Use Shift modifier to disambiguate from standard copy of selected text
+    root.bind('<Control-Shift-c>', on_copy_only)
+    root.bind('<Escape>', on_cancel)
     
     root.mainloop()
     return result

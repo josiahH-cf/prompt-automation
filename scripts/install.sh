@@ -115,11 +115,17 @@ elif [ "$PLATFORM" = "macOS" ]; then
     osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$WORKFLOW_DIR'/macos.applescript", hidden:false}' || true
 fi
 
-# record default hotkey mapping and enable GUI mode
+# record default hotkey mapping and enable GUI + auto updates
 HOTKEY_CFG_DIR="$HOME/.prompt-automation"
 mkdir -p "$HOTKEY_CFG_DIR"
 echo '{"hotkey": "ctrl+shift+j"}' > "$HOTKEY_CFG_DIR/hotkey.json"
-echo 'PROMPT_AUTOMATION_GUI=1' > "$HOTKEY_CFG_DIR/environment"
+ENV_FILE="$HOTKEY_CFG_DIR/environment"
+{
+    echo 'PROMPT_AUTOMATION_GUI=1'
+    echo 'PROMPT_AUTOMATION_AUTO_UPDATE=1'
+    echo 'PROMPT_AUTOMATION_MANIFEST_AUTO=1'
+} > "$ENV_FILE"
+info "Wrote environment defaults to $ENV_FILE"
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
@@ -134,6 +140,15 @@ info "Found pyproject.toml at: $PROJECT_ROOT/pyproject.toml"
 
 retry "pipx install --force \"$PROJECT_ROOT\"" || { err "Failed to install prompt-automation from local source"; exit 1; }
 
+# Perform immediate background upgrade + manifest update (idempotent) so future runs are current
+(pipx upgrade prompt-automation >/dev/null 2>&1 || true) &
+UPGRADE_PID=$!
+(
+    # Trigger manifest auto-update (if PROMPT_AUTOMATION_UPDATE_URL configured by user beforehand)
+    prompt-automation --update >/dev/null 2>&1 || true
+) &
+UPDATE_PID=$!
+
 # Set up global hotkey with GUI mode
 info "Setting up global hotkey..."
 PYTHONPATH="$PROJECT_ROOT/src" python3 -c "
@@ -145,6 +160,9 @@ print('Global hotkey configured successfully')
 }
 
 # Summary verification
+wait $UPGRADE_PID 2>/dev/null || true
+wait $UPDATE_PID 2>/dev/null || true
+
 info "\n=== Installation Summary ==="
 for cmd in python3 pipx fzf espanso prompt-automation; do
     if command -v "$cmd" >/dev/null; then

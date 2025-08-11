@@ -106,7 +106,16 @@ def list_styles() -> List[str]:
 
 
 def list_prompts(style: str) -> List[Path]:
-    return sorted((PROMPTS_DIR / style).glob("*.json"))
+    """Return all ``.json`` prompt templates under a style folder recursively.
+
+    Previously only files directly inside the style directory were returned, so
+    nested folders (e.g. ``Code/Code-Cleanup``) were ignored. We now recurse so
+    deeper organizational subfolders are supported transparently.
+    """
+    base = PROMPTS_DIR / style
+    if not base.exists():
+        return []
+    return sorted(base.rglob("*.json"))
 
 
 def pick_style() -> Optional[Dict[str, Any]]:

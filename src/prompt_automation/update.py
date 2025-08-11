@@ -67,6 +67,14 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 UPDATE_URL = os.environ.get("PROMPT_AUTOMATION_UPDATE_URL", "")
 """Remote manifest location.  Empty string disables update checks."""
 
+# Auto-apply behaviour (default enabled). Set ``PROMPT_AUTOMATION_MANIFEST_AUTO=0``
+# to restore interactive prompts. When enabled the manifest update system
+# applies updates silently and resolves file conflicts by backing up the
+# existing file to ``<name>.bak`` (or ``<name>.bak.N`` if needed) before
+# replacing it. Moved files are auto-migrated.
+def _auto_mode() -> bool:
+    return os.environ.get("PROMPT_AUTOMATION_MANIFEST_AUTO", "1") != "0"
+
 
 def _read_local_version() -> str:
     """Return the currently installed version of the application."""
@@ -137,43 +145,70 @@ def _apply_file_update(dest: Path, new_file: Path) -> None:
         if dest.read_bytes() == new_file.read_bytes():
             _log.info("%s already up to date", dest)
             return
-
-        print(f"Conflict for {dest}")
-        print("  [U]pdate to new version")
-        print("  [K]eep local version")
-        print("  [R]ename and keep both")
-        while True:
-            choice = input("Select (u/k/r): ").strip().lower()
-            if choice in {"u", "k", "r"}:
-                break
-
-        if choice == "k":
-            _log.info("kept local copy of %s", dest)
-            return
-        if choice == "r":
-            backup = dest.with_suffix(dest.suffix + ".local")
-            dest.rename(backup)
-            _log.info("renamed existing %s to %s", dest, backup)
+        if _auto_mode():
+            # Automatic resolution: create unique .bak backup then replace
+            backup = dest.with_suffix(dest.suffix + ".bak")
+            idx = 1
+            while backup.exists():
+                backup = dest.with_suffix(dest.suffix + f".bak.{idx}")
+                idx += 1
+            try:
+                dest.rename(backup)
+                _log.info("auto backup %s -> %s", dest, backup)
+            except Exception as e:  # pragma: no cover - filesystem edge
+                _log.warning("failed to backup %s: %s (continuing with overwrite)", dest, e)
+        else:
+            print(f"Conflict for {dest}")
+            print("  [U]pdate to new version")
+            print("  [K]eep local version")
+            print("  [R]ename and keep both")
+            while True:
+                choice = input("Select (u/k/r): ").strip().lower()
+                if choice in {"u", "k", "r"}:
+                    break
+            if choice == "k":
+                _log.info("kept local copy of %s", dest)
+                return
+            if choice == "r":
+                backup = dest.with_suffix(dest.suffix + ".local")
+                dest.rename(backup)
+                _log.info("renamed existing %s to %s", dest, backup)
 
     shutil.move(str(new_file), dest)
     _log.info("updated %s", dest)
 
 
 def _handle_moved_files(mapping: Dict[str, str]) -> None:
-    """Prompt the user to move or keep renamed files referenced in prompts."""
+    """Handle moved/renamed files.
+
+    In auto mode the move is applied silently (if target not already
+    present). In interactive mode the user is prompted per file.
+    """
 
     for old, new in mapping.items():
         old_path = ROOT_DIR / old
         new_path = ROOT_DIR / new
         if not old_path.exists():
             continue
-        msg = f"The file '{old}' has moved to '{new}'. Update path?"
-        if _prompt_yes_no(msg):
-            new_path.parent.mkdir(parents=True, exist_ok=True)
-            old_path.rename(new_path)
-            _log.info("moved %s to %s", old_path, new_path)
+        if _auto_mode():
+            try:
+                new_path.parent.mkdir(parents=True, exist_ok=True)
+                if new_path.exists():
+                    # Avoid overwriting existing target; keep original
+                    _log.info("target already exists for move %s -> %s; skipping", old_path, new_path)
+                else:
+                    old_path.rename(new_path)
+                    _log.info("auto moved %s to %s", old_path, new_path)
+            except Exception as e:  # pragma: no cover
+                _log.warning("auto move failed %s -> %s: %s", old_path, new_path, e)
         else:
-            _log.info("skipped moving %s", old_path)
+            msg = f"The file '{old}' has moved to '{new}'. Update path?"
+            if _prompt_yes_no(msg):
+                new_path.parent.mkdir(parents=True, exist_ok=True)
+                old_path.rename(new_path)
+                _log.info("moved %s to %s", old_path, new_path)
+            else:
+                _log.info("skipped moving %s", old_path)
 
 
 def apply_update(manifest: dict) -> None:
@@ -196,13 +231,13 @@ def apply_update(manifest: dict) -> None:
 
 
 def check_and_prompt(force: bool = False) -> None:
-    """Check for updates and optionally apply them.
+    """Check for updates and apply them.
 
-    Parameters
-    ----------
-    force:
-        When ``True`` an update check is performed even if the remote
-        version matches the local one (used for the ``--update`` CLI flag).
+    Behaviour:
+    - Auto mode (default): apply updates silently when a newer manifest version
+      is available; backup conflicting files; move renamed files.
+    - Interactive mode (``PROMPT_AUTOMATION_MANIFEST_AUTO=0``): original
+      behaviour with confirmation and per-file conflict prompts.
     """
 
     manifest = fetch_manifest()
@@ -216,12 +251,16 @@ def check_and_prompt(force: bool = False) -> None:
         _log.info("no updates available (local=%s remote=%s)", local_version, remote_version)
         return
 
-    if not _prompt_yes_no("Updates are available. Review and apply updates now?"):
-        _log.info("user skipped update")
-        return
+    if not _auto_mode():
+        if not _prompt_yes_no("Updates are available. Review and apply updates now?"):
+            _log.info("user skipped update")
+            return
+    else:
+        _log.info("auto applying manifest update (local=%s remote=%s)", local_version, remote_version)
 
     apply_update(manifest)
-    print("[prompt-automation] Update complete")
+    if not _auto_mode():
+        print("[prompt-automation] Update complete")
 
 
 __all__ = [

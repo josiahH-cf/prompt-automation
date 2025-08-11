@@ -21,6 +21,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── hotkeys.py        # Interactive hotkey assignment, dependency checking, and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
+│       ├── updater.py        # Lightweight PyPI version check + pipx upgrade (rate-limited, silent)
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
 │       ├── prompts/          # Packaged prompt templates (styles/basic/01_basic.json)
 │       ├── renderer.py       # Template loading, validation, and placeholder substitution
@@ -42,7 +43,7 @@ This document provides a machine-readable and human-readable overview of the `pr
    - `hotkeys.ensure_hotkey_dependencies()` checks for required platform dependencies (AutoHotkey, espanso)
    - Platform-specific functions generate scripts with GUI-first, terminal fallback execution chains
 3. **Template Selection**
-   - `menus.list_styles()` and `menus.list_prompts()` locate available JSON templates under `prompts/styles/`.
+   - `menus.list_styles()` and `menus.list_prompts()` locate available JSON templates under `prompts/styles/` (now recursive – nested subfolders inside each style are supported and discovered automatically).
    - `menus.pick_style()` and `menus.pick_prompt()` present fzf or text-based menus.
 4. **Rendering**
    - Selected templates are loaded with `renderer.load_template()` and placeholders are filled via `variables.get_variables()`.
