@@ -34,8 +34,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-    skip-existing: true
-    verbose: true
+          skip-existing: true
+          verbose: true
 
 - name: Show package metadata
   run: |
