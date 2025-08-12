@@ -119,6 +119,14 @@ Example template:
 This will copy the prompt to your clipboard and also append it to the selected
 log file when confirmed.
 
+### Context files
+
+Templates that include a `context` placeholder now open a popup that lets you
+type the context manually or load it from a file. If a file is chosen its
+contents populate the "Context" section before the prompt runs, and the final
+response is appended to that same file with a timestamped separator when you
+confirm with **Ctrl+Enter**.
+
 ## Troubleshooting
 
 - Run `prompt-automation --troubleshoot` to print log and database locations.

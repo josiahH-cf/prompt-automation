@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from datetime import datetime
 
 from . import logger, menus, paste, update
 from . import updater  # silent pipx auto-updater (rate-limited)
@@ -34,7 +35,11 @@ def _append_to_files(var_map: dict[str, str], text: str) -> None:
             try:
                 p = Path(path).expanduser()
                 with p.open("a", encoding="utf-8") as fh:
-                    fh.write(text + "\n")
+                    if key == "context_append_file":
+                        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        fh.write(f"\n\n--- {ts} ---\n{text}\n")
+                    else:
+                        fh.write(text + "\n")
             except Exception as e:
                 _log.warning("failed to append to %s: %s", path, e)
 
@@ -380,6 +385,84 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
     return result
 
 
+def collect_context_variable_gui(label: str):
+    """Collect context text with optional file loading."""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.title(f"Context: {label}")
+    root.geometry("700x500")
+    root.resizable(True, True)
+    root.lift()
+    root.focus_force()
+    root.attributes('-topmost', True)
+    root.after(100, lambda: root.attributes('-topmost', False))
+
+    result = CANCELLED
+    selected_path = ""
+
+    main_frame = tk.Frame(root, padx=20, pady=20)
+    main_frame.pack(fill="both", expand=True)
+
+    text_frame = tk.Frame(main_frame)
+    text_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+    text_widget = tk.Text(text_frame, font=("Consolas", 10), wrap="word")
+    scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+    text_widget.config(yscrollcommand=scrollbar.set)
+    text_widget.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    path_frame = tk.Frame(main_frame)
+    path_frame.pack(fill="x", pady=(0, 10))
+
+    path_var = tk.StringVar()
+    path_entry = tk.Entry(path_frame, textvariable=path_var, font=("Arial", 10))
+    path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+    def browse_file():
+        nonlocal selected_path
+        filename = filedialog.askopenfilename(parent=root, title=label)
+        if filename:
+            selected_path = filename
+            path_var.set(filename)
+            content = read_file_safe(filename)
+            text_widget.delete("1.0", "end")
+            text_widget.insert("1.0", content)
+
+    browse_btn = tk.Button(path_frame, text="Browse", command=browse_file, font=("Arial", 10))
+    browse_btn.pack(side="right")
+
+    button_frame = tk.Frame(main_frame)
+    button_frame.pack(pady=(10, 0))
+
+    def on_ok():
+        nonlocal result, selected_path
+        result = text_widget.get("1.0", "end-1c")
+        if path_var.get():
+            selected_path = path_var.get()
+        root.destroy()
+
+    def on_cancel():
+        nonlocal result
+        result = CANCELLED
+        root.destroy()
+
+    ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, font=("Arial", 10), padx=20)
+    ok_btn.pack(side="left", padx=(0, 10))
+
+    cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel, font=("Arial", 10), padx=20)
+    cancel_btn.pack(side="left")
+
+    root.bind('<Control-Return>', lambda e: (on_ok(), "break"))
+    root.bind('<Control-KP_Enter>', lambda e: (on_ok(), "break"))
+    root.bind('<Escape>', lambda e: (on_cancel(), "break"))
+
+    root.mainloop()
+    return result, selected_path
+
+
 def show_reference_file_content(path: str) -> None:
     """Display the contents of ``path`` in a read-only Tk window."""
     import tkinter as tk
@@ -453,6 +536,15 @@ def collect_variables_gui(template):
                 variables[name] = read_file_safe(str(p))
             else:
                 variables[name] = ""
+            continue
+
+        if name == "context":
+            value, ctx_path = collect_context_variable_gui(label)
+            if value is CANCELLED:
+                return None
+            variables[name] = value
+            if ctx_path:
+                variables["context_append_file"] = ctx_path
             continue
 
         if ptype == "file":
