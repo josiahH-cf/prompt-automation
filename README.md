@@ -73,6 +73,18 @@ prompt-automation --update
 
 Templates live under `prompts/styles/`. Only `basic/01_basic.json` is bundled for now, but you can add your own templates in the same directory structure.
 
+### Reference / Context File Placeholders
+
+Add a placeholder with `"type": "file"` (e.g. `reference_file`) followed by a plain placeholder named `reference_file_content` to trigger a popup viewer of the selected file. Include `{{reference_file_content}}` in your template lines if you want the file content injected; omit it to only view the popup.
+
+Skipping a file: Press the `Skip` button in the file picker dialog. That choice is persisted per template (stored in `~/.prompt-automation/placeholder-overrides.json` and mirrored to `prompts/styles/Settings/settings.json`) and you will not be prompted again unless you reset it.
+
+Manage or clear individual stored paths / skips via:
+* GUI: Options -> Manage overrides
+* CLI: `prompt-automation --list-overrides`, `--reset-one-override <TID> <NAME>`, or `--reset-file-overrides`
+
+The legacy global "reference_file_skip" flag has been removed—skipping is now an explicit per-template action only.
+
 ## Managing Templates
 
 Template files are plain JSON documents in `prompts/styles/<Style>/`. You can organize them in nested subfolders (e.g. `prompts/styles/Code/Advanced/`) and they will still be discovered.
@@ -126,6 +138,10 @@ type the context manually or load it from a file. If a file is chosen its
 contents populate the "Context" section before the prompt runs, and the final
 response is appended to that same file with a timestamped separator when you
 confirm with **Ctrl+Enter**.
+
+### Override & Settings Sync
+
+Per-template file selections and skip decisions are stored locally in `~/.prompt-automation/placeholder-overrides.json` and auto-synced to an editable settings file at `prompts/styles/Settings/settings.json` (key: `file_overrides.templates`). You can edit either location; changes propagate both ways on next run. This lets you version-control default overrides while still keeping user-specific runtime state local.
 
 ## Troubleshooting
 

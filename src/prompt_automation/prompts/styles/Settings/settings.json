@@ -1,0 +1,24 @@
+{
+  "_comment": "User-adjustable settings for prompt-automation. file_overrides mirrors placeholder-overrides.json entries.",
+  "file_overrides": {
+    "templates": {
+      "16": {
+        "reference_file": {
+          "path": "C:\\Users\\JosiahHunter\\Documents\\Josiah Hunter Sync Vault\\Josiah Hunter Sync Vault\\02 - Projects\\prompt-automation\\Reminders\\LLM Project Start Reminders.md",
+          "skip": false
+        }
+      },
+      "17": {
+        "reference_file": {
+          "path": "C:\\Users\\JosiahHunter\\Documents\\Josiah Hunter Sync Vault\\Josiah Hunter Sync Vault\\02 - Projects\\prompt-automation\\Reminders\\LLM Project Start Reminders.md",
+          "skip": false
+        }
+      }
+    }
+  },
+  "metadata": {
+    "created": "initial",
+    "notes": "Edit paths or set skip=true for any file placeholder. Changes sync to local overrides automatically.",
+    "last_sync": "Windows-11-10.0.26100-SP0"
+  }
+}

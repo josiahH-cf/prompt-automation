@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -16,6 +17,8 @@ from .variables import (
     _save_overrides,
     _set_template_entry,
     reset_file_overrides,
+    list_file_overrides,
+    reset_single_file_override,
 )
 
 
@@ -141,6 +144,49 @@ def select_template_gui():
         command=on_reset_refs,
         accelerator="Ctrl+Shift+R",
     )
+    def on_manage_overrides():
+        import tkinter as tk
+        from tkinter import messagebox
+        win = tk.Toplevel(root)
+        win.title("Manage Overrides")
+        win.geometry("550x300")
+        frame = tk.Frame(win, padx=12, pady=12)
+        frame.pack(fill="both", expand=True)
+        hint = tk.Label(frame, text="Remove an override to re-enable prompting. Entries mirror settings.json (two-way sync).", wraplength=520, justify="left", fg="#555")
+        hint.pack(anchor="w", pady=(0,6))
+        from tkinter import ttk
+        tree = ttk.Treeview(frame, columns=("tid","name","data"), show="headings")
+        tree.heading("tid", text="Template")
+        tree.heading("name", text="Placeholder")
+        tree.heading("data", text="Info")
+        tree.column("tid", width=80, anchor="center")
+        tree.column("name", width=130, anchor="w")
+        tree.column("data", width=300, anchor="w")
+        scrollbar = tk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        for tid, name, info in list_file_overrides():
+            tree.insert("", "end", values=(tid, name, json.dumps(info)))
+        btn_frame = tk.Frame(win)
+        btn_frame.pack(pady=8)
+        def do_remove():
+            sel = tree.selection()
+            if not sel:
+                return
+            item = tree.item(sel[0])
+            tid, name, _ = item['values']
+            if reset_single_file_override(int(tid), name):
+                tree.delete(sel[0])
+            else:
+                messagebox.showinfo("Override", "Nothing to remove")
+        rm_btn = tk.Button(btn_frame, text="Remove Selected", command=do_remove)
+        rm_btn.pack(side="left", padx=4)
+        def do_close():
+            win.destroy()
+        close_btn = tk.Button(btn_frame, text="Close", command=do_close)
+        close_btn.pack(side="left", padx=4)
+    options_menu.add_command(label="Manage overrides", command=on_manage_overrides)
     menubar.add_cascade(label="Options", menu=options_menu)
 
     root.bind("<Control-Shift-R>", lambda e: (on_reset_refs(), "break"))
@@ -163,23 +209,24 @@ def select_template_gui():
     instructions.pack(pady=(0, 10))
     
     # Get all templates organized by style
-    styles = menus.list_styles()
+    styles = [s for s in menus.list_styles() if s.lower() != "settings"]
     template_items = []
     
     for style in styles:
         prompts = menus.list_prompts(style)
         for prompt_path in prompts:
+            # Skip settings.json explicitly
+            if prompt_path.name.lower() == "settings.json":
+                continue
             try:
                 template = menus.load_template(prompt_path)
+                # Validate schema; skip if missing required keys
+                if not menus.validate_template(template):
+                    continue
                 title = template.get('title', prompt_path.stem)
-                # Relative subfolder display (exclude style root)
                 rel = prompt_path.relative_to(menus.PROMPTS_DIR / style)
                 prefix = (str(rel.parent) + '/') if str(rel.parent) != '.' else ''
-                template_items.append({
-                    'display': f"{style}: {prefix}{title}",
-                    'template': template,
-                    'path': prompt_path
-                })
+                template_items.append({'display': f"{style}: {prefix}{title}", 'template': template, 'path': prompt_path})
             except Exception as e:
                 _log.error(f"Failed to load template {prompt_path}: {e}")
     
@@ -288,20 +335,12 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
     name = placeholder["name"]
     label = placeholder.get("label", name)
-    skip_local_flag = f"{name}_skip_template"
-    skip_local = globals_map.get(skip_local_flag) == "yes" or placeholder.get("default") == "skip"
+    # No longer support template/global skip flags via globals.json; only persisted user skip
 
     overrides = _load_overrides()
     entry = _get_template_entry(overrides, template_id, name) or {}
 
-    if entry.get("skip") or skip_local:
-        _print_one_time_skip_reminder(overrides, template_id, name)
-        return ""
-
-    global_skip = globals_map.get("reference_file_skip") == "yes"
-    if global_skip and not entry:
-        _set_template_entry(overrides, template_id, name, {"skip": True})
-        _save_overrides(overrides)
+    if entry.get("skip"):
         _print_one_time_skip_reminder(overrides, template_id, name)
         return ""
 
@@ -464,50 +503,152 @@ def collect_context_variable_gui(label: str):
 
 
 def show_reference_file_content(path: str) -> None:
-    """Display the contents of ``path`` in a read-only Tk window."""
+    """Display the contents of ``path`` in a read-only Tk window with light Markdown rendering."""
     import tkinter as tk
+    import re
 
-    text = read_file_safe(path)
+    raw_text = read_file_safe(path)
 
     root = tk.Tk()
     root.title(f"Reference File: {Path(path).name}")
-    root.geometry("800x600")
+    root.geometry("900x650")
     root.resizable(True, True)
 
-    root.lift()
-    root.focus_force()
-    root.attributes('-topmost', True)
-    root.after(100, lambda: root.attributes('-topmost', False))
+    root.lift(); root.focus_force(); root.attributes('-topmost', True); root.after(100, lambda: root.attributes('-topmost', False))
 
-    main_frame = tk.Frame(root, padx=20, pady=20)
+    main_frame = tk.Frame(root, padx=16, pady=12)
     main_frame.pack(fill="both", expand=True)
 
-    text_frame = tk.Frame(main_frame)
-    text_frame.pack(fill="both", expand=True, pady=(0, 10))
+    # Toolbar
+    toolbar = tk.Frame(main_frame)
+    toolbar.pack(fill="x", pady=(0,6))
+    info_lbl = tk.Label(toolbar, text="Formatted preview (basic Markdown). Toggle raw to see original.", fg="#555")
+    info_lbl.pack(side="left")
 
-    text_widget = tk.Text(text_frame, font=("Consolas", 10), wrap="word")
+    text_frame = tk.Frame(main_frame)
+    text_frame.pack(fill="both", expand=True)
+
+    text_widget = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
     scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
     text_widget.config(yscrollcommand=scrollbar.set)
     text_widget.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    text_widget.insert("1.0", text)
-    text_widget.config(state="disabled")
+    # Tag styles
+    text_widget.tag_configure("h1", font=("Consolas", 15, "bold"))
+    text_widget.tag_configure("h2", font=("Consolas", 13, "bold"))
+    text_widget.tag_configure("h3", font=("Consolas", 12, "bold"))
+    text_widget.tag_configure("bold", font=("Consolas", 10, "bold"))
+    text_widget.tag_configure("codeblock", background="#f5f5f5", font=("Consolas", 10))
+    text_widget.tag_configure("inlinecode", background="#eee")
+    text_widget.tag_configure("hr", foreground="#666")
+
+    is_markdown = Path(path).suffix.lower() in {".md", ".markdown"} or any(l.startswith("#") for l in raw_text.splitlines()[:20])
+    show_raw = {"value": False}
+
+    def render(markdown: bool):
+        text_widget.config(state="normal")
+        text_widget.delete("1.0", "end")
+        if not markdown:
+            text_widget.insert("1.0", raw_text)
+            text_widget.config(state="disabled")
+            return
+        in_code = False
+        for line in raw_text.splitlines():
+            if line.strip().startswith("```"):
+                if not in_code:
+                    in_code = True
+                    text_widget.insert("end", "\n")
+                else:
+                    in_code = False
+                continue
+            if in_code:
+                start = text_widget.index("end-1c")
+                text_widget.insert("end", line + "\n")
+                text_widget.tag_add("codeblock", start, text_widget.index("end-1c"))
+                continue
+            # Horizontal rule
+            if re.match(r"^---+$", line.strip()):
+                start = text_widget.index("end-1c")
+                text_widget.insert("end", "\n" + line.strip() + "\n")
+                text_widget.tag_add("hr", start, text_widget.index("end-1c"))
+                continue
+            # Headings
+            m = re.match(r"^(#{1,6})\s+(.*)$", line)
+            if m:
+                hashes, content = m.groups()
+                lvl = min(len(hashes), 3)
+                start = text_widget.index("end-1c")
+                text_widget.insert("end", content + "\n")
+                tag = f"h{lvl}"
+                text_widget.tag_add(tag, start, text_widget.index("end-1c"))
+                continue
+            # Bold **text**
+            pos_before = text_widget.index("end-1c")
+            working = line
+            cursor = 0
+            bold_pattern = re.compile(r"\*\*(.+?)\*\*")
+            while True:
+                bm = bold_pattern.search(working, cursor)
+                if not bm:
+                    text_widget.insert("end", working[cursor:] + "\n")
+                    break
+                # text before bold
+                text_widget.insert("end", working[cursor:bm.start()])
+                bold_start = text_widget.index("end-1c")
+                text_widget.insert("end", bm.group(1))
+                bold_end = text_widget.index("end-1c")
+                text_widget.tag_add("bold", bold_start, bold_end)
+                cursor = bm.end()
+                if cursor >= len(working):
+                    text_widget.insert("end", "\n")
+                    break
+            # Inline code `code`
+            # After insertion, scan the just inserted line region for backticks
+            line_start_idx = pos_before
+            line_end_idx = text_widget.index("end-2c lineend")
+            line_text = text_widget.get(line_start_idx, line_end_idx)
+            inline_positions = [(m.start(), m.end()) for m in re.finditer(r"`([^`]+)`", line_text)]
+            # Adjust tags; remove backticks visually by replacing them
+            for s, e in reversed(inline_positions):
+                # Replace with inner content
+                inner = re.match(r"`([^`]+)`", line_text[s:e]).group(1)
+                abs_start = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + s}"
+                abs_end = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + e}"
+                text_widget.delete(abs_start, abs_end)
+                text_widget.insert(abs_start, inner)
+                # Compute new end after replacement
+                new_end_idx = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + s + len(inner)}"
+                text_widget.tag_add("inlinecode", abs_start, new_end_idx)
+        text_widget.config(state="disabled")
+
+    def toggle_view():
+        show_raw["value"] = not show_raw["value"]
+        raw_btn.config(text="Raw View" if not show_raw["value"] else "Formatted View")
+        render(markdown=is_markdown and not show_raw["value"])
+
+    def copy_all():
+        try:
+            paste.copy_to_clipboard(raw_text)
+        except Exception:
+            pass
+
+    raw_btn = tk.Button(toolbar, text="Raw View", command=toggle_view)
+    raw_btn.pack(side="right")
+    copy_btn = tk.Button(toolbar, text="Copy All", command=copy_all)
+    copy_btn.pack(side="right", padx=(0,6))
+
+    render(markdown=is_markdown)
 
     button_frame = tk.Frame(main_frame)
-    button_frame.pack(pady=(10, 0))
+    button_frame.pack(pady=(8, 0))
 
     def on_close(event=None):
-        root.destroy()
-        return "break"
-
-    close_btn = tk.Button(button_frame, text="Close (Esc)", command=on_close,
-                          font=("Arial", 10), padx=20)
+        root.destroy(); return "break"
+    close_btn = tk.Button(button_frame, text="Close (Esc)", command=on_close, font=("Arial", 10), padx=20)
     close_btn.pack()
-
     root.bind('<Escape>', on_close)
     root.bind('<Return>', on_close)
-
     root.mainloop()
 
 
@@ -735,8 +876,8 @@ def review_output_gui(template, variables):
     # Instructions / status area (updated dynamically)
     instructions_var = tk.StringVar()
     instructions_var.set(
-        "Edit the prompt below. Ctrl+Enter = Finish (copies & closes), "
-        "Ctrl+Shift+C = Copy without closing, Esc = Cancel"
+    "Edit the prompt below (this text is fully editable & will be copied). "
+    "Ctrl+Enter = Finish (copies & closes), Ctrl+Shift+C = Copy without closing, Esc = Cancel"
     )
     instructions = tk.Label(
         main_frame,

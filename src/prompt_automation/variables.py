@@ -7,7 +7,7 @@ import shutil
 from .utils import safe_run
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import json
 
 from .errorlog import get_logger
@@ -18,6 +18,87 @@ _log = get_logger(__name__)
 # Persistence for file placeholders & skip flags
 _PERSIST_DIR = Path.home() / ".prompt-automation"
 _PERSIST_FILE = _PERSIST_DIR / "placeholder-overrides.json"
+
+# Settings file (lives alongside templates so it can be edited via GUI / under VCS if desired)
+def _locate_prompts_root() -> Path:
+    """Best-effort discovery of the prompts/styles directory.
+
+    We intentionally avoid importing ``menus`` here to prevent circular imports.
+    Order of resolution:
+      1. PROMPT_AUTOMATION_PROMPTS env var
+      2. Package relative path (installed)
+      3. Development relative path
+    """
+    env = os.environ.get("PROMPT_AUTOMATION_PROMPTS")
+    if env:
+        p = Path(env).expanduser()
+        if p.exists():
+            return p
+    pkg_local = Path(__file__).resolve().parent / "prompts" / "styles"
+    if pkg_local.exists():
+        return pkg_local
+    dev_local = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
+    return dev_local
+
+_SETTINGS_DIR = _locate_prompts_root() / "Settings"
+_SETTINGS_FILE = _SETTINGS_DIR / "settings.json"
+
+def _load_settings_payload() -> Dict[str, Any]:
+    if not _SETTINGS_FILE.exists():
+        return {}
+    try:
+        return json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+    except Exception as e:  # pragma: no cover - corrupted file edge case
+        _log.error("failed to load settings file: %s", e)
+        return {}
+
+def _write_settings_payload(payload: Dict[str, Any]) -> None:
+    try:
+        _SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _SETTINGS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp.replace(_SETTINGS_FILE)
+    except Exception as e:  # pragma: no cover - I/O errors
+        _log.error("failed to write settings file: %s", e)
+
+def _sync_settings_from_overrides(overrides: Dict[str, Any]) -> None:
+    """Persist override template entries into settings file.
+
+    Layout inside settings.json::
+      {
+        "file_overrides": {"templates": { "<id>": {"<name>": {"path":...,"skip":bool}}}},
+        "generated": true
+      }
+    """
+    payload = _load_settings_payload()
+    file_overrides = payload.setdefault("file_overrides", {})
+    file_overrides["templates"] = overrides.get("templates", {})
+    payload.setdefault("metadata", {})["last_sync"] = platform.platform()
+    _write_settings_payload(payload)
+
+def _merge_overrides_with_settings(overrides: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge settings file values into overrides (settings take precedence for path/skip).
+
+    Returns merged dict (does not mutate original input).
+    """
+    settings_payload = _load_settings_payload()
+    settings_templates = (
+        settings_payload.get("file_overrides", {})
+        .get("templates", {})
+    )
+    if not settings_templates:
+        return overrides
+    merged = json.loads(json.dumps(overrides))  # deep copy via json
+    tmap = merged.setdefault("templates", {})
+    for tid, entries in settings_templates.items():
+        target = tmap.setdefault(tid, {})
+        for name, info in entries.items():
+            # Only accept known keys
+            if isinstance(info, dict):
+                filtered = {k: info[k] for k in ("path", "skip") if k in info}
+                if filtered:
+                    target[name] = {**target.get(name, {}), **filtered}
+    return merged
 
 
 # ----------------- GUI helpers (existing) -----------------
@@ -93,16 +174,19 @@ def _gui_file_prompt(label: str) -> str | None:
 # ----------------- Persistence helpers -----------------
 
 def _load_overrides() -> dict:
-    if not _PERSIST_FILE.exists():
-        return {"templates": {}, "reminders": {}}
-    try:
-        return json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
-    except Exception as e:
-        _log.error("failed to load overrides: %s", e)
-        return {"templates": {}, "reminders": {}}
+    base = {"templates": {}, "reminders": {}}
+    if _PERSIST_FILE.exists():
+        try:
+            base = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+        except Exception as e:
+            _log.error("failed to load overrides: %s", e)
+    # Merge with settings (settings override persist file values)
+    merged = _merge_overrides_with_settings(base)
+    return merged
 
 
 def _save_overrides(data: dict) -> None:
+    """Save overrides and propagate to settings file."""
     try:
         _PERSIST_DIR.mkdir(parents=True, exist_ok=True)
         tmp = _PERSIST_FILE.with_suffix(".tmp")
@@ -110,6 +194,11 @@ def _save_overrides(data: dict) -> None:
         tmp.replace(_PERSIST_FILE)
     except Exception as e:
         _log.error("failed to save overrides: %s", e)
+    # Best-effort sync (ignore failures silently after logging inside helper)
+    try:
+        _sync_settings_from_overrides(data)
+    except Exception as e:  # pragma: no cover - defensive
+        _log.error("failed to sync overrides to settings: %s", e)
 
 
 def _get_template_entry(data: dict, template_id: int, name: str) -> dict | None:
@@ -155,22 +244,11 @@ def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> No
 
 def _resolve_file_placeholder(ph: Dict[str, Any], template_id: int, globals_map: Dict[str, Any]) -> str:
     name = ph["name"]
-    # Per-template skip placeholder name convention
-    skip_local_flag_name = f"{name}_skip_template"
-    skip_local = globals_map.get(skip_local_flag_name) == "yes" or ph.get("default") == "skip"
     overrides = _load_overrides()
     entry = _get_template_entry(overrides, template_id, name) or {}
 
-    # Template persisted skip takes precedence
-    if entry.get("skip") or skip_local:
-        _print_one_time_skip_reminder(overrides, template_id, name)
-        return ""
-
-    # Global skip (but template is source of truth, so only if nothing stored yet)
-    global_skip = globals_map.get("reference_file_skip") == "yes"
-    if global_skip and not entry:
-        _set_template_entry(overrides, template_id, name, {"skip": True})
-        _save_overrides(overrides)
+    # Persisted skip takes precedence (GUI/CLI user action only)
+    if entry.get("skip"):
         _print_one_time_skip_reminder(overrides, template_id, name)
         return ""
 
@@ -331,8 +409,55 @@ def reset_file_overrides() -> bool:
     try:
         if _PERSIST_FILE.exists():
             _PERSIST_FILE.unlink()
+            # Also clear settings file template section (leave other settings intact)
+            if _SETTINGS_FILE.exists():
+                payload = _load_settings_payload()
+                if payload.get("file_overrides"):
+                    payload["file_overrides"]["templates"] = {}
+                    _write_settings_payload(payload)
             return True
     except Exception as e:
         _log.error("failed to reset overrides: %s", e)
     return False
+
+
+def reset_single_file_override(template_id: int, name: str) -> bool:
+    """Remove a single template/placeholder override (both local & settings).
+
+    Returns True if something was removed.
+    """
+    changed = False
+    data = _load_overrides()
+    tmap = data.get("templates", {}).get(str(template_id)) or {}
+    if name in tmap:
+        # Remove from base file (need to reload raw file to mutate correctly)
+        raw = {"templates": {}, "reminders": {}}
+        if _PERSIST_FILE.exists():
+            try:
+                raw = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        raw_tmap = raw.setdefault("templates", {}).get(str(template_id), {})
+        raw_tmap.pop(name, None)
+        _save_overrides(raw)
+        changed = True
+    # Update settings file too
+    if _SETTINGS_FILE.exists():
+        payload = _load_settings_payload()
+        st_tmap = payload.get("file_overrides", {}).get("templates", {}).get(str(template_id), {})
+        if name in st_tmap:
+            st_tmap.pop(name, None)
+            _write_settings_payload(payload)
+            changed = True
+    return changed
+
+
+def list_file_overrides() -> List[Tuple[str, str, Dict[str, Any]]]:
+    """Return list of (template_id, placeholder_name, data) for current overrides."""
+    data = _load_overrides()
+    out: List[Tuple[str, str, Dict[str, Any]]] = []
+    for tid, entries in data.get("templates", {}).items():
+        for name, info in entries.items():
+            out.append((tid, name, info))
+    return out
 

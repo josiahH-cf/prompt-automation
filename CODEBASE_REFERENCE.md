@@ -24,10 +24,11 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── updater.py        # Lightweight PyPI version check + pipx upgrade (rate-limited, silent)
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
 │       ├── prompts/          # Packaged prompt templates (styles/basic/01_basic.json)
+│       │   └── Settings/     # settings.json (mirrors per-template file overrides; editable)
 │       ├── renderer.py       # Template loading, validation, and placeholder substitution
 │       ├── resources/        # Static assets like banner.txt
 │       ├── utils.py          # Safe subprocess execution helpers
-│       └── variables.py      # Collect values for placeholders via GUI/editor/CLI
+│       └── variables.py      # Collect values for placeholders via GUI/editor/CLI; manages per-template file path/skip overrides
 ├── tasks.py                  # Invoke tasks for building distributions
 └── ...                       # Root configuration files (pyproject.toml, README.md, etc.)
 ```
@@ -62,6 +63,18 @@ This document provides a machine-readable and human-readable overview of the `pr
 ## Prompt Templates
 
 Prompt JSON files live under `prompts/styles/<Style>/`. The repository bundles only `basic/01_basic.json` as a minimal example. Each template includes an integer `id`, a `title`, a `style`, a list of `template` lines, and optional `placeholders`. The application enforces unique IDs via `menus.ensure_unique_ids()`.
+
+### File / Reference Placeholder Pattern
+To attach (and optionally inject) an external file:
+1. Add `{ "name": "reference_file", "type": "file" }` (collects path; persisted per template)
+2. Add `{ "name": "reference_file_content" }` (triggers popup; auto-filled with contents)
+3. Include `{{reference_file_content}}` in `template` lines to inline the file contents, or omit to just view it.
+
+Skipping the file via the GUI "Skip" button persists a `skip` flag; future runs won't prompt unless you reset it. Management:
+* GUI: Options → Manage overrides (remove an entry to re-enable prompting)
+* CLI: `--list-overrides`, `--reset-one-override <TID> <NAME>`, `--reset-file-overrides`
+
+Overrides are stored locally in `~/.prompt-automation/placeholder-overrides.json` and synced to `prompts/styles/Settings/settings.json` so a curated default set can be versioned. No global skip flag remains—behavior is explicit and per-template.
 
 ## Hotkey System Architecture
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import platform
@@ -14,7 +15,7 @@ from typing import Any
 
 from . import logger, menus, paste, update
 from . import updater  # lightweight pipx auto-updater
-from .variables import reset_file_overrides
+from .variables import reset_file_overrides, reset_single_file_override, list_file_overrides
 
 
 LOG_DIR = Path.home() / ".prompt-automation" / "logs"
@@ -194,6 +195,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
     parser.add_argument("--reset-file-overrides", action="store_true", help="Clear stored reference file paths & skip flags")
+    parser.add_argument("--reset-one-override", nargs=2, metavar=("TEMPLATE_ID", "NAME"), help="Reset a single placeholder override")
+    parser.add_argument("--list-overrides", action="store_true", help="List current file/skip overrides")
     parser.add_argument("--gui", action="store_true", help="Launch GUI (default)")
     parser.add_argument("--terminal", action="store_true", help="Force terminal mode instead of GUI")
     parser.add_argument("--update", "-u", action="store_true", help="Check for and apply updates")
@@ -324,6 +327,26 @@ def main(argv: list[str] | None = None) -> None:
             print("[prompt-automation] reference file overrides cleared")
         else:
             print("[prompt-automation] no overrides to clear")
+        return
+    if args.reset_one_override:
+        tid, name = args.reset_one_override
+        if not tid.isdigit():
+            print("[prompt-automation] TEMPLATE_ID must be an integer")
+            return
+        removed = reset_single_file_override(int(tid), name)
+        if removed:
+            print(f"[prompt-automation] override removed for template {tid} placeholder '{name}'")
+        else:
+            print(f"[prompt-automation] no override found for template {tid} placeholder '{name}'")
+        return
+    if args.list_overrides:
+        rows = list_file_overrides()
+        if not rows:
+            print("[prompt-automation] no overrides present")
+        else:
+            print("TemplateID | Placeholder | Data")
+            for tid, name, info in rows:
+                print(f"{tid:>9} | {name:<12} | {json.dumps(info)}")
         return
 
     if args.list:
