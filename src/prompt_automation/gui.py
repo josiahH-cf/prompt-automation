@@ -13,6 +13,7 @@ from .variables import (
     _print_one_time_skip_reminder,
     _save_overrides,
     _set_template_entry,
+    reset_file_overrides,
 )
 
 
@@ -96,6 +97,32 @@ def select_template_gui():
     root.title("Select Template - Prompt Automation")
     root.geometry("600x400")
     root.resizable(False, False)
+
+    # menu for additional actions
+    menubar = tk.Menu(root)
+    root.config(menu=menubar)
+
+    def on_reset_refs():
+        if reset_file_overrides():
+            messagebox.showinfo(
+                "Reset reference files",
+                "Reference file prompts will reappear.",
+            )
+        else:
+            messagebox.showinfo(
+                "Reset reference files",
+                "No reference file overrides found.",
+            )
+
+    options_menu = tk.Menu(menubar, tearoff=0)
+    options_menu.add_command(
+        label="Reset reference files",
+        command=on_reset_refs,
+        accelerator="Ctrl+Shift+R",
+    )
+    menubar.add_cascade(label="Options", menu=options_menu)
+
+    root.bind("<Control-Shift-R>", lambda e: (on_reset_refs(), "break"))
     
     # Bring to foreground and focus
     root.lift()
@@ -262,6 +289,9 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
         p = Path(path_str).expanduser()
         if p.exists():
             return str(p)
+        # remove stale path so user is prompted again
+        overrides.get("templates", {}).get(str(template_id), {}).pop(name, None)
+        _save_overrides(overrides)
 
     root = tk.Tk()
     root.title(f"File: {label}")
