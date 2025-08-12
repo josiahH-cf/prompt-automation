@@ -175,6 +175,16 @@ def render_template(
 
     vars = dict(raw_vars)
 
+    # Optional context file injection
+    context_path = raw_vars.get("context_append_file") or raw_vars.get("context_file")
+    if not context_path:
+        candidate = raw_vars.get("context")
+        if isinstance(candidate, str) and Path(candidate).expanduser().is_file():
+            context_path = candidate
+    if context_path:
+        vars["context"] = read_file_safe(str(context_path))
+        raw_vars["context_append_file"] = str(context_path)
+
     for ph in placeholders:
         if ph.get("type") == "file":
             name = ph["name"]

@@ -9,6 +9,7 @@ import shutil
 from .utils import safe_run
 import sys
 from pathlib import Path
+from datetime import datetime
 from typing import Any
 
 from . import logger, menus, paste, update
@@ -167,7 +168,11 @@ def _append_to_files(var_map: dict[str, Any], text: str) -> None:
             try:
                 p = Path(path).expanduser()
                 with p.open("a", encoding="utf-8") as fh:
-                    fh.write(text + "\n")
+                    if key == "context_append_file":
+                        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        fh.write(f"\n\n--- {ts} ---\n{text}\n")
+                    else:
+                        fh.write(text + "\n")
             except Exception as e:
                 _log.warning("failed to append to %s: %s", path, e)
 
