@@ -141,11 +141,13 @@ def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> No
         root.withdraw()
         messagebox.showinfo(
             "Reference file skipped",
-            f"Reference file ‘{name}’ skipped. You can reset this later.",
+            f"Reference file ‘{name}’ skipped. Use 'Reset reference files' to re-enable prompts.",
         )
         root.destroy()
     except Exception:
-        print(f"Reference file ‘{name}’ skipped. You can reset this later.")
+        print(
+            f"Reference file ‘{name}’ skipped. Use 'Reset reference files' to re-enable prompts."
+        )
     _save_overrides(data)
 
 
