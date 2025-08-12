@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-prompt-automation = "prompt_automation.cli:main"
+prompt-automation = "prompt_automation.cli.cli:main"
 prompt-automation-mode = "prompt_automation.switch_mode:main"
 
 [project.optional-dependencies]
