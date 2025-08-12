@@ -16,7 +16,13 @@ This document provides a machine-readable and human-readable overview of the `pr
 │   └── prompt_automation/
 │       ├── cli.py            # Command-line entry point and dependency checks
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
-│       ├── gui.py            # Optional Tkinter interface for choosing templates
+│       ├── gui/             # Optional Tkinter interface for choosing templates
+│       │   ├── controller.py       # Orchestrates workflow via PromptGUI
+│       │   ├── template_selector.py
+│       │   ├── variable_collector.py
+│       │   ├── review_window.py
+│       │   ├── file_append.py      # Shared append-to-file logic
+│       │   └── gui.py              # Entry point launching PromptGUI
 │       ├── hotkey/           # Platform-specific hotkey definitions
 │       ├── hotkeys.py        # Interactive hotkey assignment, dependency checking, and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation
@@ -37,7 +43,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 1. **Entry Points**
    - `cli.main()` runs when the command-line tool is invoked. It performs dependency checks and launches either the terminal picker or the GUI.
-   - `gui.run()` provides a graphical front-end when `--gui` is supplied.
+   - `gui.gui.run()` provides a graphical front-end when `--gui` is supplied.
 2. **Hotkey System**
    - `hotkeys.assign_hotkey()` captures user input and configures platform-specific global hotkeys
    - `hotkeys.update_hotkeys()` refreshes existing hotkey configuration and verifies dependencies
