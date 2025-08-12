@@ -4,14 +4,11 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 import os
-from pathlib import Path
 from typing import Dict, Tuple
 
-_LOCK_FH = None
+from .config import DB_PATH
 
-DEFAULT_DB_PATH = Path.home() / ".prompt-automation" / "usage.db"
-DB_PATH = Path(os.environ.get("PROMPT_AUTOMATION_DB", DEFAULT_DB_PATH))
-DB_PATH.parent.mkdir(exist_ok=True)
+_LOCK_FH = None
 
 
 def _lock_db() -> None:

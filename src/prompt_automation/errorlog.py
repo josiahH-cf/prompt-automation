@@ -1,9 +1,6 @@
 import logging
-from pathlib import Path
 
-LOG_DIR = Path.home() / ".prompt-automation" / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / "error.log"
+from .config import LOG_DIR, LOG_FILE
 
 
 def get_logger(name: str) -> logging.Logger:
