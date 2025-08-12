@@ -199,10 +199,55 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.update:
         from . import hotkeys
+        from .utils import safe_run
         
-        # Force update check and installation
-        update.check_and_prompt(force=True)
-        
+        # --- Local development fast update path ---------------------------------
+        # If user is inside a local project checkout (pyproject with matching
+        # name) allow `prompt-automation -u` to *reinstall from the local path*
+        # so edits to .json templates or Python code are reflected immediately
+        # without pushing to PyPI + `pipx upgrade`.
+        def _find_local_root(start: Path) -> Path | None:
+            try:
+                for parent in [start] + list(start.parents):
+                    cfg = parent / "pyproject.toml"
+                    if cfg.exists():
+                        try:
+                            text = cfg.read_text(encoding="utf-8", errors="ignore")
+                        except Exception:
+                            continue
+                        if 'name = "prompt-automation"' in text or 'name = "prompt_automation"' in text:
+                            # Skip if clearly inside an installed site-packages path
+                            if any(part == 'site-packages' for part in parent.parts):
+                                return None
+                            return parent
+                return None
+            except Exception:
+                return None
+
+        local_root = _find_local_root(Path.cwd())
+        performed_local = False
+        if local_root and local_root.exists():
+            print(f"[prompt-automation] Detected local project checkout at {local_root}. Performing editable reinstall...")
+            # Prefer pipx editable install if pipx present; fallback to pip
+            try:
+                from shutil import which
+                if which("pipx"):
+                    res = safe_run(["pipx", "install", "--force", "--editable", str(local_root)], capture_output=True, text=True)
+                    if res.returncode != 0:
+                        print("[prompt-automation] pipx editable install failed; falling back to pip -e .")
+                        safe_run([sys.executable, "-m", "pip", "install", "-e", str(local_root)])
+                else:
+                    safe_run([sys.executable, "-m", "pip", "install", "-e", str(local_root)])
+                performed_local = True
+                print("[prompt-automation] Local editable reinstall complete.")
+            except Exception as e:
+                print(f"[prompt-automation] Local reinstall attempt failed: {e}")
+
+        if not performed_local:
+            # --- Remote manifest update (original behaviour) -------------------
+            update.check_and_prompt(force=True)
+            print("[prompt-automation] Remote manifest update (if any) applied.")
+
         # Ensure dependencies are still met after update
         print("[prompt-automation] Checking dependencies after update...")
         if not check_dependencies(require_fzf=False):  # Check basic deps

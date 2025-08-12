@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build-and-publish:
@@ -29,13 +30,24 @@ jobs:
           python -m build
           ls -l dist
 
-      - name: Publish to PyPI
-        if: success()
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
-          verbose: true
+      - name: Publish to PyPI (twine)
+        id: twine_upload
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          echo "Uploading distributions to PyPI via twine"
+          python -m twine upload --skip-existing dist/*
+
+      - name: Retry upload (network transient workaround)
+        if: failure() && steps.twine_upload.outcome == 'failure'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          echo "First upload attempt failed; waiting 10s and retrying..."
+          sleep 10
+          python -m twine upload --skip-existing dist/* || echo "Retry failed"
 
       - name: Show package metadata
         run: |
