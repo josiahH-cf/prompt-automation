@@ -10,3 +10,29 @@ __pycache__/
 # Local config (logs, hotkey mappings)
 .prompt-automation/
 *.db
+# Backups created by ensure_unique_ids / updates
+*.bak
+*.bak.*
+# Logs
+*.log
+# Coverage / test cache
+.pytest_cache/
+.coverage
+coverage-html/
+# IDE/editor
+.idea/
+.vscode/
+# Virtual environments
+venv/
+.venv/
+env/
+# Distribution artifacts
+*.whl
+sdist/
+# OS noise
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Remove accidentally added binary assets
+espanso.deb

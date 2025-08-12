@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "id": 1,
+  "title": "Troubleshoot Bad Output from a Prompt",
+  "style": "Code",
+  "role": "{{role}}",
+  "template": [
+    "# Prompt Repair Request",
+    "",
+    "## Objective",
+    "{{objective}}",
+    "",
+    "## Current Prompt (failing section)",
+    "```",
+    "{{prompt_snippet}}",
+    "```",
+    "",
+    "## Success Criteria",
+    "{{expected_criteria}}",
+    "",
+    "## Constraints",
+    "{{constraints}}",
+    "",
+    "## Relevant Context",
+    "{{context}}",
+    "",
+    "## Fix Strategy",
+    "{{fix_strategy}}",
+    "",
+    "---",
+    "## Deliverables",
+    "1) A corrected prompt ready to paste so that I can retest in a separate chat window.",
+    "2) A 3-5 bullet rationale explaining the changes in plain language.",
+    "3) A quick self-check list verifying each success criterion.",
+    "4) Feedback on why the original prompt failed to meet expectations."
+  ],
+  "placeholders": [
+    {
+      "name": "role",
+      "label": "What role should this prompt take on?",
+      "multiline": false,
+      "required": false,
+      "default": "Expert Prompt Engineer"
+    },
+    {
+      "name": "objective",
+      "label": "In a few sentences, what is the main objective that you're trying to achieve with this scenario?",
+      "multiline": true,
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "prompt_snippet",
+      "label": "What areas of the prompt are failing? (paste the specific section)",
+      "multiline": true,
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "expected_criteria",
+      "label": "Success criteria: What should the prompt achieve after fixing? (e.g., more concise, clearer, etc.)",
+      "type": "list",
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "constraints",
+      "label": "What are the specific things you don't want the model to do? (optional)",
+      "type": "list",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "context",
+      "label": "Was there any missing context that could help? (optional)",
+      "type": "context",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "fix_strategy",
+      "label": "Fix strategy",
+      "type": "enum",
+      "options": [
+        "tighten",
+        "expand",
+        "restructure",
+        "don't hallucinate"
+      ],
+      "required": true,
+      "default": "tighten"
+    }
+  ],
+  "global_placeholders": {
+    "importance": "normal",
+    "think_deeply": "no",
+    "two_parter": "no",
+    "reference_file_default": ""
+  },
+  "metadata": {
+    "path": "Code/Troubleshoot/troubleshoot-bad-output-from-a-prompt.json",
+    "tags": [
+      "troubleshoot",
+      "prompt-repair"
+    ],
+    "version": 3,
+    "render": "markdown"
+  }
+}

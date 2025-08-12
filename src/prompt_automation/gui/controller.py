@@ -5,7 +5,7 @@ import sys
 
 from .. import logger, update, updater
 from ..errorlog import get_logger
-from .template_selector import select_template_gui
+from .selector import open_template_selector
 from .variable_collector import collect_variables_gui
 from .review_window import review_output_gui
 from .file_append import _append_to_files
@@ -43,7 +43,7 @@ class PromptGUI:
 
         try:
             self._log.info("Starting GUI workflow")
-            template = select_template_gui()
+            template = open_template_selector()
             if template:
                 self._log.info("Template selected: %s", template.get("title", "Unknown"))
                 variables = collect_variables_gui(template)

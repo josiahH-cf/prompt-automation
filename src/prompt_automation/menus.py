@@ -55,7 +55,6 @@ def list_styles() -> List[str]:
                 exists = "✓" if location.exists() else "✗"
                 print(f"  {i}. {exists} {location}")
             return []
-        
         return [p.name for p in PROMPTS_DIR.iterdir() if p.is_dir()]
     except Exception as e:
         print(f"Error listing styles from {PROMPTS_DIR}: {e}")
@@ -92,12 +91,18 @@ def pick_style() -> Optional[Dict[str, Any]]:
 def pick_prompt(style: str) -> Optional[Dict[str, Any]]:
     usage = logger.usage_counts()
     prompts = list_prompts(style)
-    freq = {p.name: usage.get((p.stem.split("_")[0], style), 0) for p in prompts}
-    ordered = _freq_sorted([p.name for p in prompts], freq)
+    # Use relative paths (support nested folders) for uniqueness & display
+    rel_map = {str(p.relative_to(PROMPTS_DIR / style)): p for p in prompts}
+    # Frequency based only on template ID extracted from filename stem
+    freq = {
+        rel: usage.get((orig.stem.split("_")[0], style), 0)
+        for rel, orig in rel_map.items()
+    }
+    ordered = _freq_sorted(list(rel_map.keys()), freq)
     sel = _run_picker(ordered, f"{style} prompt")
     if not sel:
         return None
-    path = (PROMPTS_DIR / style / sel)
+    path = rel_map[sel]
     return load_template(path)
 
 
