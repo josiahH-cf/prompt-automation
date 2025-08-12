@@ -7,6 +7,13 @@ from pathlib import Path
 from . import logger, menus, paste, update
 from . import updater  # silent pipx auto-updater (rate-limited)
 from .errorlog import get_logger
+from .variables import (
+    _get_template_entry,
+    _load_overrides,
+    _print_one_time_skip_reminder,
+    _save_overrides,
+    _set_template_entry,
+)
 
 
 _log = get_logger(__name__)
@@ -226,13 +233,116 @@ def select_template_gui():
     return selected_template
 
 
+def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: dict):
+    """GUI file selector with persistence and skip support."""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    name = placeholder["name"]
+    label = placeholder.get("label", name)
+    skip_local_flag = f"{name}_skip_template"
+    skip_local = globals_map.get(skip_local_flag) == "yes" or placeholder.get("default") == "skip"
+
+    overrides = _load_overrides()
+    entry = _get_template_entry(overrides, template_id, name) or {}
+
+    if entry.get("skip") or skip_local:
+        _print_one_time_skip_reminder(overrides, template_id, name)
+        return ""
+
+    global_skip = globals_map.get("reference_file_skip") == "yes"
+    if global_skip and not entry:
+        _set_template_entry(overrides, template_id, name, {"skip": True})
+        _save_overrides(overrides)
+        _print_one_time_skip_reminder(overrides, template_id, name)
+        return ""
+
+    path_str = entry.get("path")
+    if path_str:
+        p = Path(path_str).expanduser()
+        if p.exists():
+            return str(p)
+
+    root = tk.Tk()
+    root.title(f"File: {label}")
+    root.geometry("500x150")
+    root.resizable(False, False)
+    root.lift()
+    root.focus_force()
+    root.attributes('-topmost', True)
+    root.after(100, lambda: root.attributes('-topmost', False))
+
+    result = CANCELLED
+
+    main_frame = tk.Frame(root, padx=20, pady=20)
+    main_frame.pack(fill="both", expand=True)
+
+    path_var = tk.StringVar()
+    entry_widget = tk.Entry(main_frame, textvariable=path_var, font=("Arial", 10))
+    entry_widget.pack(side="left", fill="x", expand=True, padx=(0, 10))
+    entry_widget.focus_set()
+
+    def browse_file():
+        filename = filedialog.askopenfilename(parent=root, title=label)
+        if filename:
+            path_var.set(filename)
+
+    browse_btn = tk.Button(main_frame, text="Browse", command=browse_file, font=("Arial", 10))
+    browse_btn.pack(side="right")
+
+    button_frame = tk.Frame(root)
+    button_frame.pack(pady=(10, 0))
+
+    def on_ok():
+        nonlocal result
+        p = Path(path_var.get()).expanduser()
+        if p.exists():
+            _set_template_entry(overrides, template_id, name, {"path": str(p), "skip": False})
+            _save_overrides(overrides)
+            result = str(p)
+        else:
+            result = ""
+        root.destroy()
+
+    def on_skip():
+        nonlocal result
+        _set_template_entry(overrides, template_id, name, {"skip": True})
+        _save_overrides(overrides)
+        _print_one_time_skip_reminder(overrides, template_id, name)
+        result = ""
+        root.destroy()
+
+    def on_cancel():
+        nonlocal result
+        result = CANCELLED
+        root.destroy()
+
+    ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, font=("Arial", 10), padx=20)
+    ok_btn.pack(side="left", padx=(0, 10))
+
+    skip_btn = tk.Button(button_frame, text="Skip", command=on_skip, font=("Arial", 10), padx=20)
+    skip_btn.pack(side="left", padx=(0, 10))
+
+    cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel, font=("Arial", 10), padx=20)
+    cancel_btn.pack(side="left")
+
+    root.bind('<Return>', lambda e: (on_ok(), "break"))
+    root.bind('<KP_Enter>', lambda e: (on_ok(), "break"))
+    root.bind('<Escape>', lambda e: (on_cancel(), "break"))
+
+    root.mainloop()
+    return result
+
+
 def collect_variables_gui(template):
     """Collect variables for template placeholders - fully keyboard driven."""
     placeholders = template.get('placeholders', [])
     if not placeholders:
         return {}
-    
+
     variables = {}
+    template_id = template.get("id", 0)
+    globals_map = template.get("global_placeholders", {})
 
     for placeholder in placeholders:
         name = placeholder["name"]
@@ -241,11 +351,14 @@ def collect_variables_gui(template):
         options = placeholder.get("options", [])
         multiline = placeholder.get("multiline", False) or ptype == "list"
 
-        value = collect_single_variable(name, label, ptype, options, multiline)
+        if ptype == "file":
+            value = collect_file_variable_gui(template_id, placeholder, globals_map)
+        else:
+            value = collect_single_variable(name, label, ptype, options, multiline)
         if value is CANCELLED:  # User cancelled entire workflow
             return None
         variables[name] = value
-    
+
     return variables
 
 
