@@ -63,8 +63,8 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 ## Scripts and Utilities
 
-- `scripts/install.sh`, `scripts/install.ps1`, and related scripts automate installation on Linux/macOS/Windows.
-- `tasks.py` defines an Invoke task for building distributable packages (`invoke build`).
+ - `install/install.sh`, `install/install.ps1`, and related scripts automate installation on Linux/macOS/Windows.
+ - `tasks.py` defines an Invoke task for building distributable packages (`invoke build`).
 
 ## Prompt Templates
 

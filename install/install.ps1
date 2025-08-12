@@ -225,7 +225,7 @@ if (Test-Path $appScript) {
 Info 'Setting up global hotkey...'
 try {
     $env:PYTHONPATH = (Resolve-Path (Join-Path $PSScriptRoot '..\src')).Path
-    python -c "import prompt_automation.hotkeys; prompt_automation.hotkeys.update_system_hotkey('ctrl+shift+j')"
+    python -m prompt_automation.install.hotkey --hotkey 'ctrl+shift+j'
     Info 'Global hotkey configured successfully'
 } catch {
     Write-Warning "Failed to configure global hotkey: $($_.Exception.Message)"
@@ -233,7 +233,7 @@ try {
 }
 
 # Verify hotkey setup
-$hotkeyScript = Join-Path $PSScriptRoot 'troubleshoot-hotkeys.ps1'
+$hotkeyScript = Join-Path $PSScriptRoot '..\scripts\troubleshoot-hotkeys.ps1'
 if (Test-Path $hotkeyScript) {
     Info 'Verifying hotkey registration...'
     & $hotkeyScript -Status

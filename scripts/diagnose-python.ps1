@@ -6,7 +6,7 @@ This script helps identify multiple Python installations, version conflicts,
 and PATH issues that might be preventing the installer from finding Python.
 #>
 
-. "$PSScriptRoot/utils.ps1"
+. "$PSScriptRoot/../install/utils.ps1"
 
 Write-Host "Python Installation Diagnostic Tool" -ForegroundColor Green
 Write-Host "====================================" -ForegroundColor Green
