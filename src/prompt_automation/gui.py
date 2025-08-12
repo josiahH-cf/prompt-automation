@@ -7,6 +7,7 @@ from pathlib import Path
 from . import logger, menus, paste, update
 from . import updater  # silent pipx auto-updater (rate-limited)
 from .errorlog import get_logger
+from .renderer import read_file_safe
 from .variables import (
     _get_template_entry,
     _load_overrides,
@@ -364,6 +365,54 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
     return result
 
 
+def show_reference_file_content(path: str) -> None:
+    """Display the contents of ``path`` in a read-only Tk window."""
+    import tkinter as tk
+
+    text = read_file_safe(path)
+
+    root = tk.Tk()
+    root.title(f"Reference File: {Path(path).name}")
+    root.geometry("800x600")
+    root.resizable(True, True)
+
+    root.lift()
+    root.focus_force()
+    root.attributes('-topmost', True)
+    root.after(100, lambda: root.attributes('-topmost', False))
+
+    main_frame = tk.Frame(root, padx=20, pady=20)
+    main_frame.pack(fill="both", expand=True)
+
+    text_frame = tk.Frame(main_frame)
+    text_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+    text_widget = tk.Text(text_frame, font=("Consolas", 10), wrap="word")
+    scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+    text_widget.config(yscrollcommand=scrollbar.set)
+    text_widget.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    text_widget.insert("1.0", text)
+    text_widget.config(state="disabled")
+
+    button_frame = tk.Frame(main_frame)
+    button_frame.pack(pady=(10, 0))
+
+    def on_close(event=None):
+        root.destroy()
+        return "break"
+
+    close_btn = tk.Button(button_frame, text="Close (Esc)", command=on_close,
+                          font=("Arial", 10), padx=20)
+    close_btn.pack()
+
+    root.bind('<Escape>', on_close)
+    root.bind('<Return>', on_close)
+
+    root.mainloop()
+
+
 def collect_variables_gui(template):
     """Collect variables for template placeholders - fully keyboard driven."""
     placeholders = template.get('placeholders', [])
@@ -380,6 +429,16 @@ def collect_variables_gui(template):
         ptype = placeholder.get("type", "text")
         options = placeholder.get("options", [])
         multiline = placeholder.get("multiline", False) or ptype == "list"
+
+        if name == "reference_file_content":
+            path = variables.get("reference_file")
+            p = Path(path).expanduser() if path else None
+            if p and p.exists():
+                show_reference_file_content(str(p))
+                variables[name] = read_file_safe(str(p))
+            else:
+                variables[name] = ""
+            continue
 
         if ptype == "file":
             value = collect_file_variable_gui(template_id, placeholder, globals_map)
