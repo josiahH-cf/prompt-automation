@@ -23,7 +23,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-prompt_automation = ["resources/*", "hotkey/*", "prompts/**/*", "config.py"]
+prompt_automation = ["resources/*", "hotkey/*", "prompts/**/*", "config.py", "install/*"]
 
 # Include prompts directory from root
 [tool.setuptools]

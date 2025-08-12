@@ -151,11 +151,7 @@ UPDATE_PID=$!
 
 # Set up global hotkey with GUI mode
 info "Setting up global hotkey..."
-PYTHONPATH="$PROJECT_ROOT/src" python3 -c "
-import prompt_automation.hotkeys
-prompt_automation.hotkeys.update_system_hotkey('ctrl+shift+j')
-print('Global hotkey configured successfully')
-" || {
+PYTHONPATH="$PROJECT_ROOT/src" python3 -m prompt_automation.install.hotkey --hotkey "ctrl+shift+j" || {
     err "Failed to configure global hotkey. You can set it up manually later with: prompt-automation --assign-hotkey"
 }
 
@@ -184,7 +180,7 @@ except Exception as e:
 PY
 
 if [ "$PLATFORM" = "WSL2" ]; then
-    info "WSL2 detected. For Windows hotkey integration run: powershell.exe -Command \"(Get-Location).Path; .\\scripts\\install.ps1\""
+    info "WSL2 detected. For Windows hotkey integration run: powershell.exe -Command \"(Get-Location).Path; .\\install\\install.ps1\""
 fi
 
 info "Installation complete. You may need to restart your shell for PATH changes to take effect."

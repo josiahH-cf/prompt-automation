@@ -11,7 +11,7 @@ param(
     [switch]$Restart
 )
 
-. "$PSScriptRoot/utils.ps1"
+. "$PSScriptRoot/../install/utils.ps1"
 
 $LogDir = Join-Path $env:USERPROFILE '.prompt-automation\logs'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null

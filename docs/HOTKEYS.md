@@ -4,7 +4,7 @@ This project provides platform-specific scripts for launching `prompt-automation
 The default key combination is **Ctrl+Shift+J**. Run `prompt-automation --assign-hotkey` to change it at any time.
 
 ## Windows
-1. Run `scripts/install.ps1` from PowerShell. The script installs dependencies, checks for AutoHotkey v2, and copies `windows.ahk` to your Startup folder.
+1. Run `install/install.ps1` from PowerShell. The script installs dependencies, checks for AutoHotkey v2, and copies `windows.ahk` to your Startup folder.
 2. Verify registration with:
    ```powershell
    Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup" | Where-Object Name -eq 'prompt-automation.ahk'
@@ -41,7 +41,7 @@ The default key combination is **Ctrl+Shift+J**. Run `prompt-automation --assign
 ### WSL Notes
 
 When using WSL, the hotkey runs inside Linux only. To trigger the Windows
-application, install from Windows using `scripts\install.ps1` and copy the
+application, install from Windows using `install\install.ps1` and copy the
 repository with `\wsl.localhost` paths as described in the README.
 
 After installation, press **Ctrl+Shift+J** to activate the launcher. If the hotkey fails, rerun the installer or consult your platform's hotkey settings.

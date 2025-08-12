@@ -16,11 +16,11 @@ For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE
 2. **Run the installer** for your platform. The script installs all dependencies (Python, pipx, fzf and espanso) and registers the global hotkey.
    - **Windows**
      ```powershell
-     scripts\install.ps1
+    install\install.ps1
      ```
    - **macOS / Linux / WSL2**
      ```bash
-     bash scripts/install.sh
+    bash install/install.sh
      ```
 
    Windows + WSL note: If you launch the Windows installer from a repository that lives inside WSL (\\wsl.localhost\...), the script stages a temporary copy for installation. As of version 0.2.1+ the installer now performs a post‑install "spec normalization" step (a forced pipx install from PyPI) so future `pipx upgrade prompt-automation` calls work. Earlier manual installs that deleted the temp directory could cause:
@@ -206,7 +206,7 @@ Windows.
    mkdir prompt-automation
    cd prompt-automation
    Copy-Item -Path "\\wsl.localhost\Ubuntu\home\$env:USERNAME\path\to\prompt-automation\*" -Destination . -Recurse -Force
-   .\scripts\install.ps1
+   .\install\install.ps1
    ```
 
 **Alternative**: Run the installation directly from your WSL environment but
@@ -214,7 +214,7 @@ ensure Windows integration:
 
 ```bash
 # In WSL, but installs to Windows
-powershell.exe -Command "cd 'C:\\temp\\prompt-automation'; Copy-Item -Path '\\wsl.localhost\\Ubuntu\\home\\$(whoami)\\path\\to\\prompt-automation\\*' -Destination . -Recurse -Force; .\\scripts\\install.ps1"
+powershell.exe -Command "cd 'C:\\temp\\prompt-automation'; Copy-Item -Path '\\wsl.localhost\\Ubuntu\\home\\$(whoami)\\path\\to\\prompt-automation\\*' -Destination . -Recurse -Force; .\\install\\install.ps1"
 ```
 
 **Missing Prompts Directory:** If you see "prompts directory not found":

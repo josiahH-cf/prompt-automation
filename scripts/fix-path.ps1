@@ -5,7 +5,7 @@ Fixes PATH issues for prompt-automation command
 This script helps diagnose and fix PATH issues that prevent the prompt-automation command from being found.
 #>
 
-. "$PSScriptRoot/utils.ps1"
+. "$PSScriptRoot/../install/utils.ps1"
 
 $LogDir = Join-Path $env:USERPROFILE '.prompt-automation\logs'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
