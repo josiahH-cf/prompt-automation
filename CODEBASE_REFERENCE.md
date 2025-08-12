@@ -24,7 +24,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       │   ├── file_append.py      # Shared append-to-file logic
 │       │   └── gui.py              # Entry point launching PromptGUI
 │       ├── hotkey/           # Platform-specific hotkey definitions
-│       ├── hotkeys.py        # Interactive hotkey assignment, dependency checking, and system integration
+│       ├── hotkeys/         # Interactive hotkey assignment, dependency checking, and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
 │       ├── updater.py        # Lightweight PyPI version check + pipx upgrade (rate-limited, silent)
