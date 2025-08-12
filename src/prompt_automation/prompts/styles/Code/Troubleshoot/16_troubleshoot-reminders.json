@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "id": 16,
-  "title": "Troubleshoot Reminders",
+  "title": "This will be the title of the prompt",
   "style": "Code",
   "role": "{{role}}",
   "template": [
-    "## Objective",
+    "## Is this in the final window or the beginning window?",
     "{{objective}}",
     "",
     "## Context",
@@ -13,85 +13,26 @@
     "",
     "## Instructions",
     "{{instructions}}",
-    "",
-    "## Inputs",
-    "{{inputs}}",
-    "",
-    "## Constraints",
-    "{{constraints}}",
-    "",
-    "## Output Format",
-    "{{output_format}}",
-    "",
-    "## Quality Checks",
-    "{{quality_checks}}",
-    "",
-    "## Follow-ups",
-    "{{follow_ups}}",
-    "",
-    "## Reference File",
-    "{{reference_file_content}}"
+    ""
   ],
   "placeholders": [
     {
       "name": "role",
       "label": "Role",
       "multiline": false,
-      "required": true,
+      "required": false,
       "default": "assistant"
     },
     {
       "name": "objective",
       "label": "Objective",
       "multiline": false,
-      "required": true,
-      "default": ""
+      "required": false,
+      "default": "Objective - test to see if it automatically fills in if I just 'enter'"
     },
     {
       "name": "context",
       "label": "Context",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "instructions",
-      "label": "Instructions",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "inputs",
-      "label": "Inputs",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "constraints",
-      "label": "Constraints",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "output_format",
-      "label": "Output Format",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "quality_checks",
-      "label": "Quality Checks",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "follow_ups",
-      "label": "Follow-ups",
       "multiline": true,
       "required": false,
       "default": ""
@@ -106,7 +47,7 @@
     },
     {
       "name": "think_deeply",
-      "label": "Think Deeply (Use Sparingly)",
+      "label": "Do you want to add 'think deeply' to the prompt?",
       "multiline": false,
       "required": false,
       "default": "no",
@@ -122,7 +63,7 @@
     },
     {
       "name": "reference_file",
-      "label": "Reference File (path only, remembered)",
+      "label": "Select a Reference File",
       "type": "file",
       "required": false,
       "default": "",
@@ -156,6 +97,6 @@
     "path": "Code/Troubleshoot/troubleshoot-reminders.json",
     "tags": [],
     "version": 2,
-    "render": "markdown"
+    "render": "text"
   }
 }
