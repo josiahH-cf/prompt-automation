@@ -158,6 +158,20 @@ def dependency_status(gui_mode: bool) -> dict[str, dict[str, str]]:
     return status
 
 
+def _append_to_files(var_map: dict[str, Any], text: str) -> None:
+    """Append ``text`` to any paths specified by append_file placeholders."""
+    for key, path in var_map.items():
+        if key == "append_file" or key.endswith("_append_file"):
+            if not path:
+                continue
+            try:
+                p = Path(path).expanduser()
+                with p.open("a", encoding="utf-8") as fh:
+                    fh.write(text + "\n")
+            except Exception as e:
+                _log.warning("failed to append to %s: %s", path, e)
+
+
 def main(argv: list[str] | None = None) -> None:
     """Program entry point."""
     # Load environment from config file if it exists
@@ -350,20 +364,22 @@ def main(argv: list[str] | None = None) -> None:
     tmpl: dict[str, Any] | None = select_template_cli()
     if not tmpl:
         return
-        
+
     # Render with preview option
-    text = render_template_cli(tmpl)
-    if text:
+    res = render_template_cli(tmpl)
+    if res:
+        text, var_map = res
         # Show preview and confirm
         print("\n" + "="*60)
         print("RENDERED OUTPUT:")
         print("="*60)
         print(text)
         print("="*60)
-        
+
         if input("\nProceed with clipboard copy? [Y/n]: ").lower() not in {'n', 'no'}:
             paste.copy_to_clipboard(text)
             print("\n[prompt-automation] Text copied to clipboard. Press Ctrl+V to paste where needed.")
+            _append_to_files(var_map, text)
             logger.log_usage(tmpl, len(text))
 
 
@@ -436,7 +452,7 @@ def pick_prompt_cli(style: str) -> dict[str, Any] | None:
             return None
 
 
-def render_template_cli(tmpl: dict[str, Any]) -> str:
+def render_template_cli(tmpl: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     """Enhanced CLI template rendering with better prompts."""
     print(f"\nRendering template: {tmpl.get('title', 'Unknown')}")
     print(f"Style: {tmpl.get('style', 'Unknown')}")
@@ -458,9 +474,9 @@ def render_template_cli(tmpl: dict[str, Any]) -> str:
             print(f"  - {label} ({type_info})")
         
         if input("\nProceed with input collection? [Y/n]: ").lower() in {'n', 'no'}:
-            return ""
-    
-    return menus.render_template(tmpl)
+            return None
+
+    return menus.render_template(tmpl, return_vars=True)
 
 
 if __name__ == "__main__":

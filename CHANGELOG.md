@@ -9,8 +9,9 @@
   - Better macOS AppleScript handling with background execution
   - Added `--update` command to refresh hotkey configuration and verify dependencies
   - Automatic hotkey script placement verification and error reporting
-  - Support for multiple installation methods (pip, pipx, executable, python -m)
+- Support for multiple installation methods (pip, pipx, executable, python -m)
 - Added interactive `--assign-hotkey` command with per-user hotkey mapping file
+- Added optional `append_file` placeholder to append rendered output to files
 
 ## 0.2.1 - 2025-08-01
 - Enhanced cross-platform compatibility for WSL2/Windows environments

@@ -1,0 +1,10 @@
+{
+  "id": 45,
+  "title": "Append log entry",
+  "style": "Tool",
+  "template": ["{{entry}}"],
+  "placeholders": [
+    {"name": "entry", "label": "Log entry", "multiline": true},
+    {"name": "append_file", "label": "Log file", "type": "file"}
+  ]
+}

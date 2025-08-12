@@ -94,6 +94,31 @@ Global defaults for common placeholders live in `prompts/styles/globals.json`.
 Templates can omit these entries to use the defaults or override them by
 defining placeholders with the same names.
 
+### Appending output to a file
+
+File placeholders named `append_file` (or ending with `_append_file`) cause the
+final rendered text to be appended to the chosen path after you confirm the
+prompt with **Ctrl+Enter**. The text is written in UTF-8 with a trailing
+newline.
+
+Example template:
+
+```json
+{
+  "id": 45,
+  "title": "Append log entry",
+  "style": "Tool",
+  "template": ["{{entry}}"],
+  "placeholders": [
+    {"name": "entry", "label": "Log entry", "multiline": true},
+    {"name": "append_file", "label": "Log file", "type": "file"}
+  ]
+}
+```
+
+This will copy the prompt to your clipboard and also append it to the selected
+log file when confirmed.
+
 ## Troubleshooting
 
 - Run `prompt-automation --troubleshoot` to print log and database locations.
