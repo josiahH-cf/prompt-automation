@@ -13,6 +13,7 @@ from typing import Any
 
 from . import logger, menus, paste, update
 from . import updater  # lightweight pipx auto-updater
+from .variables import reset_file_overrides
 
 
 LOG_DIR = Path.home() / ".prompt-automation" / "logs"
@@ -173,6 +174,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--prompt-dir", type=Path, help="Directory containing prompt templates")
     parser.add_argument("--list", action="store_true", help="List available prompt styles and templates")
     parser.add_argument("--reset-log", action="store_true", help="Clear usage log database")
+    parser.add_argument("--reset-file-overrides", action="store_true", help="Clear stored reference file paths & skip flags")
     parser.add_argument("--gui", action="store_true", help="Launch GUI (default)")
     parser.add_argument("--terminal", action="store_true", help="Force terminal mode instead of GUI")
     parser.add_argument("--update", "-u", action="store_true", help="Check for and apply updates")
@@ -252,6 +254,12 @@ def main(argv: list[str] | None = None) -> None:
     if args.reset_log:
         logger.clear_usage_log()
         print("[prompt-automation] usage log cleared")
+        return
+    if args.reset_file_overrides:
+        if reset_file_overrides():
+            print("[prompt-automation] reference file overrides cleared")
+        else:
+            print("[prompt-automation] no overrides to clear")
         return
 
     if args.list:

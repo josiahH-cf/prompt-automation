@@ -4,12 +4,16 @@
   "global_placeholders": {
     "importance": "normal",
     "think_deeply": "no",
-    "two_parter": "no"
+    "two_parter": "no",
+    "reference_file_skip": "no",
+    "reference_file_default": ""
   },
   "notes": {
     "importance": "How important is this prompt to get right? Use low | normal | high | critical. Higher values should enable stronger grounding and anti-hallucination controls.",
     "think_deeply": "yes | no. 'yes' adds a 'think deeply about this' directive. Use sparingly; limited budget.",
-    "two_parter": "yes | no. 'yes' signals a two-stage flow: initial paste, then follow-up refinement."
+    "two_parter": "yes | no. 'yes' signals a two-stage flow: initial paste, then follow-up refinement.",
+    "reference_file_skip": "yes | no. 'yes' suppresses per-template reference file prompts globally unless the template already stored a path.",
+    "reference_file_default": "Optional absolute path used as initial default for reference file placeholders (will copy per template on first use)."
   },
   "version": 1
 }

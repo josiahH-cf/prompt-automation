@@ -27,7 +27,10 @@
     "{{quality_checks}}",
     "",
     "## Follow-ups",
-    "{{follow_ups}}"
+    "{{follow_ups}}",
+    "",
+    "## Reference File",
+    "{{reference_file_content}}"
   ],
   "placeholders": [
     {
@@ -116,17 +119,43 @@
       "required": false,
       "default": "no",
       "description": "yes | no. If yes, expect a second pass after initial paste."
+    },
+    {
+      "name": "reference_file",
+      "label": "Reference File (path only, remembered)",
+      "type": "file",
+      "required": false,
+      "default": "",
+      "description": "Select once; path stored per template. Will re-prompt if missing."
+    },
+    {
+      "name": "reference_file_skip_template",
+      "label": "Skip Reference File For This Template",
+      "multiline": false,
+      "required": false,
+      "default": "no",
+      "description": "yes | no. 'yes' skips reference file prompts for this template only (persisted)."
+    },
+    {
+      "name": "reference_file_content",
+      "label": "(internal) Reference File Content (auto-filled)",
+      "multiline": true,
+      "required": false,
+      "default": "",
+      "description": "Populated automatically with file contents if reference_file is set."
     }
   ],
   "global_placeholders": {
     "importance": "normal",
     "think_deeply": "no",
-    "two_parter": "no"
+    "two_parter": "no",
+    "reference_file_skip": "no",
+    "reference_file_default": ""
   },
   "metadata": {
     "path": "Code/Troubleshoot/troubleshoot-reminders.json",
     "tags": [],
-    "version": 1,
+    "version": 2,
     "render": "markdown"
   }
 }

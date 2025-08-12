@@ -154,8 +154,10 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
     """
 
     placeholders = tmpl.get("placeholders", [])
+    template_id = tmpl.get("id")
+    globals_map = tmpl.get("global_placeholders", {})
     if values is None:
-        vars = get_variables(placeholders)
+        vars = get_variables(placeholders, template_id=template_id, globals_map=globals_map)
     else:
         vars = dict(values)
 
@@ -163,10 +165,20 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
         if ph.get("type") == "file":
             name = ph["name"]
             path = vars.get(name)
-            if path:
-                vars[name] = read_file_safe(path)
+            if name == "reference_file" or name.endswith("reference_file"):
+                # Populate companion content placeholder if present
+                if path:
+                    content = read_file_safe(path)
+                else:
+                    content = ""
+                # find content placeholder
+                if "reference_file_content" in vars:
+                    vars["reference_file_content"] = content
             else:
-                vars[name] = ""
+                if path:
+                    vars[name] = read_file_safe(path)
+                else:
+                    vars[name] = ""
 
     return fill_placeholders(tmpl["template"], vars)
 

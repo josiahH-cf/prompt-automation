@@ -8,13 +8,19 @@ from .utils import safe_run
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import json
 
 from .errorlog import get_logger
 
 
 _log = get_logger(__name__)
 
+# Persistence for file placeholders & skip flags
+_PERSIST_DIR = Path.home() / ".prompt-automation"
+_PERSIST_FILE = _PERSIST_DIR / "placeholder-overrides.json"
 
+
+# ----------------- GUI helpers (existing) -----------------
 def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | None:
     """Try platform GUI for input; return ``None`` on failure."""
     sys = platform.system()
@@ -59,7 +65,6 @@ def _gui_file_prompt(label: str) -> str | None:
         elif sys == "Darwin" and shutil.which("osascript"):
             cmd = ["osascript", "-e", f'choose file with prompt "{safe_label}"']
         elif sys == "Windows":
-            # Enhanced Windows file dialog with better error handling
             cmd = [
                 "powershell",
                 "-Command",
@@ -85,6 +90,112 @@ def _gui_file_prompt(label: str) -> str | None:
     return None
 
 
+# ----------------- Persistence helpers -----------------
+
+def _load_overrides() -> dict:
+    if not _PERSIST_FILE.exists():
+        return {"templates": {}, "reminders": {}}
+    try:
+        return json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        _log.error("failed to load overrides: %s", e)
+        return {"templates": {}, "reminders": {}}
+
+
+def _save_overrides(data: dict) -> None:
+    try:
+        _PERSIST_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _PERSIST_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(_PERSIST_FILE)
+    except Exception as e:
+        _log.error("failed to save overrides: %s", e)
+
+
+def _get_template_entry(data: dict, template_id: int, name: str) -> dict | None:
+    return data.get("templates", {}).get(str(template_id), {}).get(name)
+
+
+def _set_template_entry(data: dict, template_id: int, name: str, payload: dict) -> None:
+    data.setdefault("templates", {}).setdefault(str(template_id), {})[name] = payload
+
+
+def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> None:
+    # Only print once per template/name
+    key = f"{template_id}:{name}"
+    reminders = data.setdefault("reminders", {})
+    if reminders.get(key):
+        return
+    reminders[key] = True
+    _log.info(
+        "Reference file '%s' skipped for template %s. Remove entry in %s to re-enable.",
+        name,
+        template_id,
+        _PERSIST_FILE,
+    )
+    _save_overrides(data)
+
+
+# ----------------- Extended file placeholder resolution -----------------
+
+def _resolve_file_placeholder(ph: Dict[str, Any], template_id: int, globals_map: Dict[str, Any]) -> str:
+    name = ph["name"]
+    # Per-template skip placeholder name convention
+    skip_local_flag_name = f"{name}_skip_template"
+    skip_local = globals_map.get(skip_local_flag_name) == "yes" or ph.get("default") == "skip"
+    overrides = _load_overrides()
+    entry = _get_template_entry(overrides, template_id, name) or {}
+
+    # Template persisted skip takes precedence
+    if entry.get("skip") or skip_local:
+        _print_one_time_skip_reminder(overrides, template_id, name)
+        return ""
+
+    # Global skip (but template is source of truth, so only if nothing stored yet)
+    global_skip = globals_map.get("reference_file_skip") == "yes"
+    if global_skip and not entry:
+        _set_template_entry(overrides, template_id, name, {"skip": True})
+        _save_overrides(overrides)
+        _print_one_time_skip_reminder(overrides, template_id, name)
+        return ""
+
+    # If path stored and exists, return
+    path_str = entry.get("path")
+    if path_str:
+        p = Path(path_str).expanduser()
+        if p.exists():
+            return str(p)
+        # if missing ask again
+
+    # Offer selection or skip permanently
+    label = ph.get("label", name)
+    chosen = _gui_file_prompt(label)
+    if not chosen:
+        # Ask via CLI fallback for skip/permanent skip
+        while True:
+            choice = input(f"No file selected for {label}. (c)hoose again, (s)kip, (p)ermanent skip: ").lower().strip() or "c"
+            if choice in {"c", "choose"}:
+                chosen = _gui_file_prompt(label) or input(f"Enter path for {label} (blank to cancel): ")
+                if chosen and Path(chosen).expanduser().exists():
+                    break
+                if not chosen:
+                    continue
+            elif choice in {"s", "skip"}:
+                return ""
+            elif choice in {"p", "perm", "permanent"}:
+                _set_template_entry(overrides, template_id, name, {"skip": True})
+                _save_overrides(overrides)
+                _print_one_time_skip_reminder(overrides, template_id, name)
+                return ""
+        # fallthrough with chosen
+    if chosen and Path(chosen).expanduser().exists():
+        _set_template_entry(overrides, template_id, name, {"path": str(Path(chosen).expanduser()), "skip": False})
+        _save_overrides(overrides)
+        return str(Path(chosen).expanduser())
+    return ""
+
+
+# ----------------- Original functions (modified integration) -----------------
 def _editor_prompt() -> str | None:
     """Use ``$EDITOR`` as fallback."""
     try:
@@ -95,33 +206,39 @@ def _editor_prompt() -> str | None:
         )
         safe_run([editor, path])
         return Path(path).read_text().strip()
-    except Exception as e:  # pragma: no cover - depends on editor
+    except Exception as e:  # pragma: no cover
         _log.error("editor prompt failed: %s", e)
         return None
 
 
 def get_variables(
-    placeholders: List[Dict], initial: Optional[Dict[str, Any]] = None
+    placeholders: List[Dict], initial: Optional[Dict[str, Any]] = None, template_id: int | None = None, globals_map: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
-    """Return dict of placeholder values using GUI/editor/CLI fallbacks.
+    """Return dict of placeholder values.
 
-    ``initial`` allows pre-filled values (e.g. from a GUI) to be provided.
-    Any placeholders missing from ``initial`` will fall back to the usual
-    prompt mechanisms.
+    Added: persistent file placeholder handling with skip logic.
     """
-
     values: Dict[str, Any] = dict(initial or {})
+    globals_map = globals_map or {}
+
     for ph in placeholders:
         name = ph["name"]
         ptype = ph.get("type")
-        if name in values and (values[name] not in ("", None) or ptype == "file"):
+
+        if ptype == "file" and template_id is not None:
+            # Use extended resolution (template is source of truth)
+            path_val = _resolve_file_placeholder(ph, template_id, globals_map)
+            values[name] = path_val
+            continue
+
+        if name in values and values[name] not in ("", None):
             val: Any = values[name]
         else:
             label = ph.get("label", name)
             opts = ph.get("options")
             multiline = ph.get("multiline", False) or ptype == "list"
             val = None
-            if ptype == "file":
+            if ptype == "file":  # fallback when no template id
                 val = _gui_file_prompt(label)
             else:
                 val = _gui_prompt(label, opts, multiline)
@@ -169,7 +286,7 @@ def get_variables(
                 else:
                     val = input(f"{label}: ")
 
-        if ptype == "file" and isinstance(val, str):
+        if ptype == "file" and isinstance(val, str) and val and template_id is None:
             while val:
                 path = Path(val).expanduser()
                 if path.exists():
@@ -192,4 +309,15 @@ def get_variables(
             val = [l for l in val.splitlines() if l]
         values[name] = val
     return values
+
+
+def reset_file_overrides() -> bool:
+    """Delete persistent file/skip overrides. Returns True if removed."""
+    try:
+        if _PERSIST_FILE.exists():
+            _PERSIST_FILE.unlink()
+            return True
+    except Exception as e:
+        _log.error("failed to reset overrides: %s", e)
+    return False
 
