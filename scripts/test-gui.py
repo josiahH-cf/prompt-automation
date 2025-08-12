@@ -27,7 +27,9 @@ def test_imports():
     
     try:
         import prompt_automation.gui
+        from prompt_automation.gui.controller import PromptGUI
         print("✓ prompt_automation.gui imported successfully")
+        print("✓ PromptGUI imported successfully")
     except ImportError as e:
         print(f"✗ prompt_automation.gui import failed: {e}")
         return False

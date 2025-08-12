@@ -18,7 +18,8 @@ from ..variables import (
 
 from .dependencies import check_dependencies, dependency_status
 from .template_select import select_template_cli, pick_prompt_cli
-from .render import render_template_cli, _append_to_files
+from .render import render_template_cli
+from ..gui.file_append import _append_to_files
 from .update import perform_update
 
 
