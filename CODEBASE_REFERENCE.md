@@ -17,8 +17,11 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── cli.py            # Command-line entry point and dependency checks
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
 │       ├── gui/             # Optional Tkinter interface for choosing templates
-│       │   ├── controller.py       # Orchestrates workflow via PromptGUI
-│       │   ├── template_selector.py
+│       │   ├── controller.py       # High-level GUI workflow (uses selector)
+│       │   ├── selector/           # Modular template selector (model + controller)
+│       │   │   ├── model.py        # BrowserState, recursive index & search
+│       │   │   └── controller.py   # Hierarchical UI, multi-select, preview, search
+│       │   ├── template_selector.py # Backwards-compat thin wrapper
 │       │   ├── variable_collector.py
 │       │   ├── review_window.py
 │       │   ├── file_append.py      # Shared append-to-file logic
@@ -49,8 +52,9 @@ This document provides a machine-readable and human-readable overview of the `pr
    - `hotkeys.ensure_hotkey_dependencies()` checks for required platform dependencies (AutoHotkey, espanso)
    - Platform-specific functions generate scripts with GUI-first, terminal fallback execution chains
 3. **Template Selection**
-   - `menus.list_styles()` and `menus.list_prompts()` locate available JSON templates under `prompts/styles/` (now recursive – nested subfolders inside each style are supported and discovered automatically).
-   - `menus.pick_style()` and `menus.pick_prompt()` present fzf or text-based menus.
+   - GUI: `gui/selector/model.py` builds a hierarchical listing and a one-time recursive content index (path, title, placeholders, body lines) for fast AND-token search.
+   - GUI: `gui/selector/controller.py` provides: recursive search (default), optional non-recursive filter, multi-select with synthetic combined template, preview window (Ctrl+P), quick search focus (`s`), backspace up-navigation, initial focus on search entry.
+   - CLI: `menus.list_styles()` and `menus.list_prompts()` (recursive) then `menus.pick_style()` / `menus.pick_prompt()` (fzf or text fallback).
 4. **Rendering**
    - Selected templates are loaded with `renderer.load_template()` and placeholders are filled via `variables.get_variables()`.
    - The final text is produced by `renderer.fill_placeholders()`.
@@ -93,7 +97,7 @@ The hotkey system provides cross-platform global hotkey support with robust fall
   - Final fallback shows error message box
 
 - **Linux**: Uses espanso text expansion with shell commands
-  - Configuration in `~/.config/espanso/match/prompt-automation.yml`
+   - Configuration in `~/.config/espanso/match/prompt-automation.yml`
   - Uses shell OR operator (`||`) for GUI-to-terminal fallback
   - Automatically restarts espanso service after configuration
 
@@ -108,6 +112,21 @@ The hotkey system provides cross-platform global hotkey support with robust fall
 - Environment configuration in `~/.prompt-automation/environment`
 - GUI mode enabled by default for hotkey usage
 - Dependency checking with installation guidance
+
+## GUI Selector Feature Matrix (Quick Reference)
+
+| Feature | Implementation | Shortcut |
+|---------|----------------|----------|
+| Recursive search (default) | BrowserState.search index | (on by default) |
+| Non-recursive filter | In-memory filter of current dir | Toggle checkbox |
+| Focus search | Tk bindings | `s` |
+| Navigate | Listbox + search entry bindings | Arrow keys |
+| Select/Open | open_or_select | Enter / Double-click |
+| Up one directory | BrowserState.enter(up) | Backspace |
+| Preview window | Toplevel (read-only) | Button / Ctrl+P |
+| Multi-select toggle | UI checkbox | (mouse/space) |
+| Mark template | Prefix `*` | Enter in multi-select |
+| Finish multi | Synthetic merged template | Finish Multi button |
 
 ## Working With This File
 

@@ -42,12 +42,36 @@ After installation restart your terminal so `pipx` is on your `PATH`.
 
 ## Usage
 
-Press **Ctrl+Shift+J** to launch the GUI. Select the basic template and fill in
-any required values. After entering values an editable review window appears.
+Press **Ctrl+Shift+J** to launch the GUI. A hierarchical template browser opens at `prompts/styles/`.
+
+### GUI Selector Features (New)
+
+Navigation & Selection:
+- Arrow Up/Down: move selection
+- Enter / Double‑Click: open folder or select template
+- Backspace: go up one directory
+- `s`: focus search box
+- Ctrl+P: toggle preview window for highlighted template
+- Multi-select checkbox: enable multi selection (prefix `*`) then Enter to mark/unmark items, Finish Multi to combine
+- Finish Multi: builds a synthetic combined template (id -1) concatenating selected template bodies in order selected
+
+Search:
+- Recursive search is ON by default (searches all templates: path, title, placeholders, body)
+- Toggle "Non-recursive" to restrict to current directory only
+- Typing in the search box instantly filters results; Up/Down + Enter work while cursor remains in the box
+
+Preview:
+- Select a template and use the Preview button or Ctrl+P to open / close a read‑only preview window.
+
+Breadcrumb & Focus:
+- Breadcrumb line shows current path within styles
+- Initial keyboard focus lands in search box so you can type immediately after pressing the global hotkey
+
+After selecting a template and filling placeholders an editable review window appears.
 Press **Ctrl+Enter** to finish (copies and closes) or **Ctrl+Shift+C** to copy
 without closing. To skip a placeholder leave it blank and submit with
 **Ctrl+Enter** – the entire line is removed from the final prompt. The rendered
-text is copied to your clipboard but not pasted automatically.
+text is copied to your clipboard (not auto‑pasted unless your platform hotkey script adds it).
 
 The hotkey system automatically:
 - Tries to launch the GUI first
@@ -71,7 +95,7 @@ prompt-automation --update
 [Hotkey] -> [Template] -> [Fill] -> [Copy]
 ```
 
-Templates live under `prompts/styles/`. Only `basic/01_basic.json` is bundled for now, but you can add your own templates in the same directory structure.
+Templates live under `prompts/styles/`. Nested subfolders are supported (e.g. `prompts/styles/Code/Troubleshoot/`). Only a small starter set is bundled; add your own freely.
 
 ### Reference / Context File Placeholders
 
@@ -87,8 +111,8 @@ The legacy global "reference_file_skip" flag has been removed—skipping is now 
 
 ## Managing Templates
 
-Template files are plain JSON documents in `prompts/styles/<Style>/`. You can organize them in nested subfolders (e.g. `prompts/styles/Code/Advanced/`) and they will still be discovered.
-This repository currently includes a single example: `basic/01_basic.json`.
+Template files are plain JSON documents in `prompts/styles/<Style>/`. You can organize them in nested subfolders (e.g. `prompts/styles/Code/Advanced/`) and they will still be discovered recursively (GUI & CLI).
+Examples included: `basic/01_basic.json`, and troubleshooting / code oriented samples.
 A minimal example:
 
 ```json
@@ -178,6 +202,9 @@ If **Ctrl+Shift+J** is not working:
 **Where is usage stored?** In `$HOME/.prompt-automation/usage.db`. Clear it with `--reset-log`.
 
 **How do I use my own templates?** Set the `PROMPT_AUTOMATION_PROMPTS` environment variable or pass `--prompt-dir` when launching.
+**How do I multi‑select templates?** Check the Multi-select box, mark templates (they get `*` prefix), click Finish Multi. A synthetic template (id -1) concatenates the chosen bodies.
+**How do I search across all templates?** Just type in search (recursive by default). To restrict scope, tick Non-recursive.
+**Why do some templates show a preview but not others?** All valid JSON templates can be previewed; invalid templates are filtered out by validation.
 
 ## Troubleshooting
 
@@ -236,6 +263,42 @@ project/
 ```
 
 Enjoy!
+
+## Quick Command Cheat Sheet (New)
+
+Common one-liners:
+
+```bash
+# Run GUI directly
+prompt-automation --gui
+
+# Run terminal picker (fzf fallback)
+prompt-automation --terminal
+
+# List templates (CLI)
+prompt-automation --list
+
+# Rebuild / refresh hotkey scripts
+prompt-automation --update
+
+# Assign a new global hotkey
+prompt-automation --assign-hotkey
+
+# Show file override entries
+prompt-automation --list-overrides
+
+# Reset all file overrides (show those prompts again)
+prompt-automation --reset-file-overrides
+
+# Reset a single override (template id 12, placeholder reference_file)
+prompt-automation --reset-one-override 12 reference_file
+
+# Force manifest update (if PROMPT_AUTOMATION_UPDATE_URL is set)
+prompt-automation --update --force
+
+# Disable auto PyPI self-update
+export PROMPT_AUTOMATION_AUTO_UPDATE=0
+```
 
 ## Automatic Updates
 

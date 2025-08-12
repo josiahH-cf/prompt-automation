@@ -45,3 +45,23 @@ application, install from Windows using `install\install.ps1` and copy the
 repository with `\wsl.localhost` paths as described in the README.
 
 After installation, press **Ctrl+Shift+J** to activate the launcher. If the hotkey fails, rerun the installer or consult your platform's hotkey settings.
+
+## GUI Selector Keyboard Cheat Sheet (Hotkey Flow)
+
+When launched via the global hotkey the GUI opens focused on the search box:
+
+| Key / Action | Result |
+|--------------|--------|
+| `s` | Focus search box & select text |
+| Type text | Live recursive search (path/title/placeholders/body) |
+| Toggle Non-recursive | Restrict search/filter to current folder |
+| Up / Down | Move selection |
+| Enter / Double-click | Open folder or select template |
+| Backspace | Go up one level |
+| Ctrl+P | Toggle preview window for highlighted template |
+| Multi-select checkbox | Enable marking multiple templates |
+| Enter (in multi mode) | Toggle mark (adds/removes `*` prefix) |
+| Finish Multi | Build synthetic combined template (id -1) |
+| Esc | Cancel/close selector |
+
+After template selection you proceed to variable collection (file placeholders, multi-line, enums, lists) and then review window (Ctrl+Enter to confirm, Ctrl+Shift+C copy without close).
