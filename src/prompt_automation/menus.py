@@ -144,27 +144,41 @@ def pick_prompt(style: str) -> Optional[Dict[str, Any]]:
     return load_template(path)
 
 
-def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) -> str:
+def render_template(
+    tmpl: Dict[str, Any],
+    values: Dict[str, Any] | None = None,
+    *,
+    return_vars: bool = False,
+) -> str | tuple[str, Dict[str, Any]]:
     """Render ``tmpl`` using provided ``values`` for placeholders.
 
     If ``values`` is ``None`` any missing variables will be collected via
     :func:`variables.get_variables` which falls back to GUI/CLI prompts. When
     ``values`` is supplied it is used as-is, allowing ``None`` entries to skip
     placeholders.
+
+    When ``return_vars`` is ``True`` the function returns a tuple of the final
+    rendered text and the raw variable map collected prior to any file content
+    substitutions. This allows callers to inspect file paths (e.g. for
+    append-to-file behaviour) while preserving existing rendering behaviour.
     """
 
     placeholders = tmpl.get("placeholders", [])
     template_id = tmpl.get("id")
     globals_map = tmpl.get("global_placeholders", {})
     if values is None:
-        vars = get_variables(placeholders, template_id=template_id, globals_map=globals_map)
+        raw_vars = get_variables(
+            placeholders, template_id=template_id, globals_map=globals_map
+        )
     else:
-        vars = dict(values)
+        raw_vars = dict(values)
+
+    vars = dict(raw_vars)
 
     for ph in placeholders:
         if ph.get("type") == "file":
             name = ph["name"]
-            path = vars.get(name)
+            path = raw_vars.get(name)
             if name == "reference_file" or name.endswith("reference_file"):
                 # Populate companion content placeholder if present
                 if path:
@@ -180,7 +194,11 @@ def render_template(tmpl: Dict[str, Any], values: Dict[str, Any] | None = None) 
                 else:
                     vars[name] = ""
 
-    return fill_placeholders(tmpl["template"], vars)
+    rendered = fill_placeholders(tmpl["template"], vars)
+
+    if return_vars:
+        return rendered, raw_vars
+    return rendered
 
 
 def _slug(text: str) -> str:

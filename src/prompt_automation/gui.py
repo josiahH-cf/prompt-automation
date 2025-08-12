@@ -25,6 +25,20 @@ _log = get_logger(__name__)
 CANCELLED = object()
 
 
+def _append_to_files(var_map: dict[str, str], text: str) -> None:
+    """Append ``text`` to any paths provided by append_file placeholders."""
+    for key, path in var_map.items():
+        if key == "append_file" or key.endswith("_append_file"):
+            if not path:
+                continue
+            try:
+                p = Path(path).expanduser()
+                with p.open("a", encoding="utf-8") as fh:
+                    fh.write(text + "\n")
+            except Exception as e:
+                _log.warning("failed to append to %s: %s", path, e)
+
+
 def run() -> None:
     """Launch the GUI using Tkinter. Falls back to CLI if GUI fails."""
     # Perform background silent pipx upgrade (non-blocking) then existing
@@ -63,9 +77,10 @@ def run() -> None:
                     len(template.get("placeholders", [])),
                 )
                 # Render and review the output
-                final_text = review_output_gui(template, variables)
+                final_text, var_map = review_output_gui(template, variables)
                 if final_text is not None:
                     _log.info("Final text confirmed, length: %d", len(final_text))
+                    _append_to_files(var_map, final_text)
                     logger.log_usage(template, len(final_text))
                     _log.info("Workflow completed successfully")
                 else:
@@ -594,12 +609,19 @@ def collect_single_variable(name, label, ptype, options, multiline):
 
 
 def review_output_gui(template, variables):
-    """Review and edit the rendered output."""
+    """Review and edit the rendered output.
+
+    Returns a tuple ``(final_text, var_map)`` where ``final_text`` is ``None``
+    if the user cancels. ``var_map`` contains the raw variable inputs collected
+    for the template, enabling append-to-file behaviour after confirmation.
+    """
     import tkinter as tk
     from tkinter import messagebox
     
     # Render the template
-    rendered_text = menus.render_template(template, variables)
+    rendered_text, var_map = menus.render_template(
+        template, variables, return_vars=True
+    )
     
     root = tk.Tk()
     root.title("Review Output - Prompt Automation")
@@ -724,5 +746,5 @@ def review_output_gui(template, variables):
     root.bind('<Escape>', on_cancel)
     
     root.mainloop()
-    return result
+    return result, var_map
 
