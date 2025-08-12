@@ -133,6 +133,19 @@ def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> No
         template_id,
         _PERSIST_FILE,
     )
+    try:
+        import tkinter as tk  # type: ignore
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showinfo(
+            "Reference file skipped",
+            f"Reference file ‘{name}’ skipped. You can reset this later.",
+        )
+        root.destroy()
+    except Exception:
+        print(f"Reference file ‘{name}’ skipped. You can reset this later.")
     _save_overrides(data)
 
 
