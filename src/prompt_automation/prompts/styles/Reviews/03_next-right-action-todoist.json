@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": 40,
-  "title": "Summarize Book",
-  "style": "Summaries",
+  "id": 3,
+  "title": "Next Right Action Todoist",
+  "style": "Reviews",
   "role": "{{role}}",
   "template": [
     "## Objective",
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Summaries/summarize-book.json",
+    "path": "Reviews/next-right-action-todoist.json",
     "tags": [],
     "version": 1,
     "render": "markdown"

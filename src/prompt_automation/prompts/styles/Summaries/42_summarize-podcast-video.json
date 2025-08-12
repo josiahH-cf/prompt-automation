@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": 2,
-  "title": "Next Right Action Todoist",
-  "style": "Reviews",
+  "id": 42,
+  "title": "Summarize Podcast Video",
+  "style": "Summaries",
   "role": "{{role}}",
   "template": [
     "## Objective",
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Reviews/next-right-action-todoist.json",
+    "path": "Summaries/summarize-podcast-video.json",
     "tags": [],
     "version": 1,
     "render": "markdown"

@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": 41,
-  "title": "Summarize Podcast Video",
-  "style": "Summaries",
+  "id": 4,
+  "title": "Objectives Vs Outcomes Tracker",
+  "style": "Reviews",
   "role": "{{role}}",
   "template": [
     "## Objective",
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Summaries/summarize-podcast-video.json",
+    "path": "Reviews/objectives-vs-outcomes-tracker.json",
     "tags": [],
     "version": 1,
     "render": "markdown"

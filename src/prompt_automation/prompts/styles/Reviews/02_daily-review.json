@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "id": 4,
-  "title": "Decision Track Log",
+  "id": 2,
+  "title": "Daily Review",
   "style": "Reviews",
   "role": "{{role}}",
   "template": [
-    "## Objective",
+    "## Objectives - changed file",
     "{{objective}}",
     "",
     "## Context",
@@ -76,7 +76,7 @@
       "name": "output_format",
       "label": "Output Format",
       "multiline": true,
-      "required": true,
+      "required": false,
       "default": ""
     },
     {
@@ -92,39 +92,10 @@
       "multiline": true,
       "required": false,
       "default": ""
-    },
-    {
-      "name": "importance",
-      "label": "Importance (Hallucination Guard Level)",
-      "multiline": false,
-      "required": false,
-      "default": "normal",
-      "description": "How important is correctness? Suggested: low | normal | high | critical."
-    },
-    {
-      "name": "think_deeply",
-      "label": "Think Deeply (Use Sparingly)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. Reminder: you only have so many deep-think invocations."
-    },
-    {
-      "name": "two_parter",
-      "label": "Two-Parter Flow (Paste + Follow Up)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. If yes, expect a second pass after initial paste."
     }
   ],
-  "global_placeholders": {
-    "importance": "normal",
-    "think_deeply": "no",
-    "two_parter": "no"
-  },
   "metadata": {
-    "path": "Reviews/decision-track-log.json",
+    "path": "Reviews/daily-review.json",
     "tags": [],
     "version": 1,
     "render": "markdown"

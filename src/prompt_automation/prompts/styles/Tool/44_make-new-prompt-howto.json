@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": 42,
+  "id": 44,
   "title": "Make New Prompt Howto",
   "style": "Tool",
   "role": "{{role}}",

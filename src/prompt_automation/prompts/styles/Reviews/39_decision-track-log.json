@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "id": 39,
-  "title": "Summarize Text Article",
-  "style": "Summaries",
+  "title": "Decision Track Log",
+  "style": "Reviews",
   "role": "{{role}}",
   "template": [
     "## Objective",
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Summaries/summarize-text-article.json",
+    "path": "Reviews/decision-track-log.json",
     "tags": [],
     "version": 1,
     "render": "markdown"

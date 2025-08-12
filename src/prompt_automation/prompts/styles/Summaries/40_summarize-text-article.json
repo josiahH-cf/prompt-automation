@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": 3,
-  "title": "Objectives Vs Outcomes Tracker",
-  "style": "Reviews",
+  "id": 40,
+  "title": "Summarize Text Article",
+  "style": "Summaries",
   "role": "{{role}}",
   "template": [
     "## Objective",
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Reviews/objectives-vs-outcomes-tracker.json",
+    "path": "Summaries/summarize-text-article.json",
     "tags": [],
     "version": 1,
     "render": "markdown"
