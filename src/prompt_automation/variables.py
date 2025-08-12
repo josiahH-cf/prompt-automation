@@ -10,37 +10,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import json
 
+from .config import HOME_DIR, PROMPTS_DIR
 from .errorlog import get_logger
 
 
 _log = get_logger(__name__)
 
 # Persistence for file placeholders & skip flags
-_PERSIST_DIR = Path.home() / ".prompt-automation"
+_PERSIST_DIR = HOME_DIR
 _PERSIST_FILE = _PERSIST_DIR / "placeholder-overrides.json"
 
 # Settings file (lives alongside templates so it can be edited via GUI / under VCS if desired)
-def _locate_prompts_root() -> Path:
-    """Best-effort discovery of the prompts/styles directory.
-
-    We intentionally avoid importing ``menus`` here to prevent circular imports.
-    Order of resolution:
-      1. PROMPT_AUTOMATION_PROMPTS env var
-      2. Package relative path (installed)
-      3. Development relative path
-    """
-    env = os.environ.get("PROMPT_AUTOMATION_PROMPTS")
-    if env:
-        p = Path(env).expanduser()
-        if p.exists():
-            return p
-    pkg_local = Path(__file__).resolve().parent / "prompts" / "styles"
-    if pkg_local.exists():
-        return pkg_local
-    dev_local = Path(__file__).resolve().parent.parent.parent / "prompts" / "styles"
-    return dev_local
-
-_SETTINGS_DIR = _locate_prompts_root() / "Settings"
+_SETTINGS_DIR = PROMPTS_DIR / "Settings"
 _SETTINGS_FILE = _SETTINGS_DIR / "settings.json"
 
 def _load_settings_payload() -> Dict[str, Any]:

@@ -3,57 +3,19 @@ from __future__ import annotations
 
 import json
 from .utils import safe_run
-import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import logger
-from .renderer import fill_placeholders, load_template, validate_template, read_file_safe
+from .config import PROMPTS_DIR, PROMPTS_SEARCH_PATHS
+from .renderer import (
+    fill_placeholders,
+    load_template,
+    validate_template,
+    read_file_safe,
+)
 from .variables import get_variables
-
-# Try to find prompts directory in multiple locations
-def _find_prompts_dir():
-    # Environment variable override
-    env_path = os.environ.get("PROMPT_AUTOMATION_PROMPTS")
-    if env_path:
-        env_prompts = Path(env_path)
-        if env_prompts.exists():
-            return env_prompts
-    
-    # List of potential locations in order of preference
-    locations = [
-        # Development structure (3 levels up from this file)
-        Path(__file__).resolve().parent.parent.parent / "prompts" / "styles",
-        
-        # Packaged installation - data files location
-        Path(__file__).resolve().parent / "prompts" / "styles",
-        
-        # Alternative package location (in site-packages)
-        Path(__file__).resolve().parent.parent / "prompts" / "styles",
-        
-        # pipx virtual environment location
-        Path(__file__).resolve().parent.parent.parent / "Lib" / "prompts" / "styles",
-        
-        # User's home directory
-        Path.home() / ".prompt-automation" / "prompts" / "styles",
-        Path.home() / ".local" / "share" / "prompt-automation" / "prompts" / "styles",
-        
-        # System-wide locations
-        Path("/usr/local/share/prompt-automation/prompts/styles"),
-        Path("C:/ProgramData/prompt-automation/prompts/styles"),  # Windows system-wide
-    ]
-    
-    # Try each location
-    for location in locations:
-        if location.exists() and location.is_dir():
-            return location
-    
-    # If none exist, return the development location as fallback
-    return locations[0]
-
-DEFAULT_PROMPTS_DIR = _find_prompts_dir()
-PROMPTS_DIR = Path(os.environ.get("PROMPT_AUTOMATION_PROMPTS", DEFAULT_PROMPTS_DIR))
 
 
 def _run_picker(items: List[str], title: str) -> Optional[str]:
@@ -89,12 +51,7 @@ def list_styles() -> List[str]:
         if not PROMPTS_DIR.exists():
             print(f"Warning: Prompts directory not found at {PROMPTS_DIR}")
             print("Available search locations were:")
-            for i, location in enumerate([
-                Path(__file__).resolve().parent.parent.parent / "prompts" / "styles",
-                Path(__file__).resolve().parent / "prompts" / "styles",
-                Path(__file__).resolve().parent.parent / "prompts" / "styles",
-                Path.home() / ".prompt-automation" / "prompts" / "styles",
-            ], 1):
+            for i, location in enumerate(PROMPTS_SEARCH_PATHS, 1):
                 exists = "✓" if location.exists() else "✗"
                 print(f"  {i}. {exists} {location}")
             return []

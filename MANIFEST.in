@@ -8,3 +8,4 @@ global-exclude *.pyc
 global-exclude __pycache__
 recursive-include src/prompt_automation/resources *
 recursive-include src/prompt_automation/hotkey *
+include src/prompt_automation/config.py
