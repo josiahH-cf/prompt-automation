@@ -315,6 +315,14 @@ After tagging/publishing push:
 git push && git push --tags
 ```
 
+### Manual Build
+
+To build the package without the release script, run:
+
+```bash
+python -m build
+```
+
 ### Continuous Auto-Release (GitHub Actions)
 
 An automated workflow (`.github/workflows/auto-release.yml`) bumps the patch version and publishes to PyPI on every push to `main` (excluding pure docs / workflow changes). To request a larger bump include a marker in any recent commit message:

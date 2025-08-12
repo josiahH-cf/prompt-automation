@@ -35,14 +35,13 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── resources/        # Static assets like banner.txt
 │       ├── utils.py          # Safe subprocess execution helpers
 │       └── variables.py      # Collect values for placeholders via GUI/editor/CLI; manages per-template file path/skip overrides
-├── tasks.py                  # Invoke tasks for building distributions
 └── ...                       # Root configuration files (pyproject.toml, README.md, etc.)
 ```
 
 ## Component Interaction
 
 1. **Entry Points**
-   - `cli.main()` runs when the command-line tool is invoked. It performs dependency checks and launches either the terminal picker or the GUI.
+   - `cli.main()` runs when the command-line tool starts. It performs dependency checks and launches either the terminal picker or the GUI.
    - `gui.gui.run()` provides a graphical front-end when `--gui` is supplied.
 2. **Hotkey System**
    - `hotkeys.assign_hotkey()` captures user input and configures platform-specific global hotkeys
@@ -64,7 +63,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 ## Scripts and Utilities
 
  - `install/install.sh`, `install/install.ps1`, and related scripts automate installation on Linux/macOS/Windows.
- - `tasks.py` defines an Invoke task for building distributable packages (`invoke build`).
+ - Build distributions with `python -m build`.
 
 ## Prompt Templates
 
