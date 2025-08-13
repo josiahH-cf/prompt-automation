@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "id": 45,
+  "title": "Create or Modify Project Structure",
+  "style": "Tool",
+  "role": "{{role}}",
+  "template": [
+    "## Goal",
+    "{{goal}}",
+    "",
+    "## Operation Type",
+    "{{operation_type}}",
+    "",
+    "## Target Path (relative or absolute)",
+    "{{target_path}}",
+    "",
+    "## New Name / File (if creating or renaming)",
+    "{{new_name}}",
+    "",
+    "## File / Directory Content (only for new or updated file)",
+    "{{content_block}}",
+    "",
+    "## Additional Paths (batch operations)",
+    "{{additional_paths}}",
+    "",
+    "## Rationale",
+    "{{rationale}}",
+    "",
+    "## Constraints",
+    "{{constraints}}",
+    "",
+    "## Sharing Preference",
+    "Share openly? {{share_preference}} (yes => place in prompts/styles; no => prompts/local; metadata flag set accordingly)",
+    "",
+    "## Output Instructions",
+    "Return ONLY a fenced block with a stepwise plan then a second fenced block \nwith the proposed file/folder tree diff (using + added, - removed, ~ modified) followed by any new file contents. Do NOT execute anything.",
+    "",
+    "## Safety Checks",
+    "{{safety_checks}}",
+    "",
+    "## Follow-ups",
+    "{{follow_ups}}"
+  ],
+  "placeholders": [
+    {
+      "name": "role",
+      "label": "Role",
+      "multiline": false,
+      "required": true,
+      "default": "assistant"
+    },
+    {
+      "name": "goal",
+      "label": "Goal / High-level Objective",
+      "multiline": false,
+      "required": true,
+      "default": "Add or modify project structure"
+    },
+    {
+      "name": "operation_type",
+      "label": "Operation Type (create_file|create_folder|rename|move|delete|modify)",
+      "multiline": false,
+      "required": true,
+      "default": "create_file"
+    },
+    {
+      "name": "target_path",
+      "label": "Primary Target Path",
+      "multiline": false,
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "new_name",
+      "label": "New Name (for create/rename)",
+      "multiline": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "content_block",
+      "label": "New / Updated File Content",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "additional_paths",
+      "label": "Additional Paths (one per line)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "rationale",
+      "label": "Rationale / Intent",
+      "multiline": true,
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "constraints",
+      "label": "Constraints (naming, style, patterns)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "share_preference",
+      "label": "Share Openly (yes|no)",
+      "multiline": false,
+      "required": false,
+      "default": "yes"
+    },
+    {
+      "name": "safety_checks",
+      "label": "Safety Checks (e.g., avoid overwriting critical files)",
+      "multiline": true,
+      "required": false,
+      "default": "Ensure no destructive overwrite of unrelated files"
+    },
+    {
+      "name": "follow_ups",
+      "label": "Follow-ups",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "importance",
+      "label": "Importance (Hallucination Guard Level)",
+      "multiline": false,
+      "required": false,
+      "default": "normal"
+    },
+    {
+      "name": "think_deeply",
+      "label": "Think Deeply (Use Sparingly)",
+      "multiline": false,
+      "required": false,
+      "default": "no"
+    },
+    {
+      "name": "two_parter",
+      "label": "Two-Parter Flow (Paste + Follow Up)",
+      "multiline": false,
+      "required": false,
+      "default": "no"
+    }
+  ],
+  "global_placeholders": {
+    "importance": "normal",
+    "think_deeply": "no",
+    "two_parter": "no"
+  },
+  "metadata": {
+    "path": "Tool/create-or-modify-project-structure.json",
+    "tags": [
+      "filesystem",
+      "structure"
+    ],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

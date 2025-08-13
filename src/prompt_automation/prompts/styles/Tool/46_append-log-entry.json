@@ -1,5 +1,5 @@
 {
-  "id": 45,
+  "id": 46,
   "title": "Append log entry",
   "style": "Tool",
   "template": [
@@ -16,5 +16,8 @@
       "label": "Log file",
       "type": "file"
     }
-  ]
+  ],
+  "metadata": {
+    "share_this_file_openly": true
+  }
 }

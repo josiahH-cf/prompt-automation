@@ -1,4 +1,16 @@
-"""Menu system with fzf and prompt_toolkit fallback."""
+"""Menu system with fzf and prompt_toolkit fallback.
+
+Feature additions:
+    - Feature A (Default fallback): When rendering, if a placeholder has a
+        non-empty default string and the collected value is empty / whitespace /
+        empty list, we substitute the default at assembly time (leaving raw_vars
+        untouched for audit).
+    - Feature B (Global reminders): If a top-level ``globals.json`` defines
+        ``global_placeholders.reminders`` (string or list) and the template (or its
+        own ``global_placeholders``) does not already override ``reminders`` then the
+        value is merged in. After rendering, any reminders are appended as a
+        blockquote list at the end of the composed prompt.
+"""
 from __future__ import annotations
 
 import json
@@ -10,12 +22,17 @@ from typing import Any, Dict, List, Optional
 from . import logger
 from .config import PROMPTS_DIR, PROMPTS_SEARCH_PATHS
 from .renderer import (
-    fill_placeholders,
-    load_template,
-    validate_template,
-    read_file_safe,
+        fill_placeholders,
+        load_template,
+        validate_template,
+        read_file_safe,
+        is_shareable,
 )
-from .variables import get_variables
+from .variables import (
+    get_variables,
+    ensure_template_global_snapshot,
+    apply_template_global_overrides,
+)
 
 
 def _run_picker(items: List[str], title: str) -> Optional[str]:
@@ -61,7 +78,7 @@ def list_styles() -> List[str]:
         return []
 
 
-def list_prompts(style: str) -> List[Path]:
+def list_prompts(style: str, *, shared_only: bool = False) -> List[Path]:
     """Return all ``.json`` prompt templates under a style folder recursively.
 
     Previously only files directly inside the style directory were returned, so
@@ -71,7 +88,18 @@ def list_prompts(style: str) -> List[Path]:
     base = PROMPTS_DIR / style
     if not base.exists():
         return []
-    return sorted(base.rglob("*.json"))
+    paths = sorted(base.rglob("*.json"))
+    if not shared_only:
+        return paths
+    filtered: List[Path] = []
+    for p in paths:
+        try:
+            data = load_template(p)
+            if is_shareable(data, p):
+                filtered.append(p)
+        except Exception:
+            continue
+    return filtered
 
 
 def pick_style() -> Optional[Dict[str, Any]]:
@@ -127,7 +155,45 @@ def render_template(
 
     placeholders = tmpl.get("placeholders", [])
     template_id = tmpl.get("id")
-    globals_map = tmpl.get("global_placeholders", {})
+
+    # Merge global placeholders from root globals.json.
+    # Previous behaviour only merged 'reminders'. We now merge *all* keys, letting
+    # template-level global_placeholders override root. This powers auto-injection
+    # (e.g. {{think_deeply}}, {{hallucinate}}) without needing each template to
+    # repeat static values. Reminders keep prior semantics (template override wins).
+    try:  # non-fatal best-effort
+        globals_file = PROMPTS_DIR / "globals.json"
+        if globals_file.exists():
+            gdata = json.loads(globals_file.read_text())
+            gph_all = gdata.get("global_placeholders", {}) or {}
+            if gph_all:
+                tgt = tmpl.setdefault("global_placeholders", {})
+                for k, v in gph_all.items():
+                    if k not in tgt:  # template overrides win
+                        tgt[k] = v
+        else:
+            # No globals file in active PROMPTS_DIR; do not fall back to any other location.
+            pass
+    except Exception:
+        pass
+    # Template globals after merging root globals (above)
+    globals_map = tmpl.get("global_placeholders", {}) or {}
+    # Create a one-time snapshot for this template so repeated runs stay stable
+    if isinstance(template_id, int):
+        # Create snapshot only if one doesn't exist; then merge (snapshot only supplies
+        # keys that did not already appear in template's current globals_map).
+        ensure_template_global_snapshot(template_id, globals_map)
+        snap_merged = apply_template_global_overrides(template_id, {})
+        # Only fill missing keys to avoid overriding updated root/test-provided globals.
+        # Additionally: do NOT resurrect a 'reminders' key from an older snapshot if the
+        # current merged globals (root + template) do not define it. This prevents cross-
+        # test leakage where a prior run captured reminders, and a later run (without
+        # reminders defined) would unexpectedly append them.
+        for k, v in snap_merged.items():
+            if k == "reminders" and k not in globals_map:
+                continue
+            globals_map.setdefault(k, v)
+        tmpl["global_placeholders"] = globals_map
     if values is None:
         raw_vars = get_variables(
             placeholders, template_id=template_id, globals_map=globals_map
@@ -151,22 +217,104 @@ def render_template(
         if ph.get("type") == "file":
             name = ph["name"]
             path = raw_vars.get(name)
-            if name == "reference_file" or name.endswith("reference_file"):
-                # Populate companion content placeholder if present
+            if name == "reference_file":
+                # Always populate synthetic content var if token present OR placeholder exists.
                 if path:
                     content = read_file_safe(path)
                 else:
                     content = ""
-                # find content placeholder
-                if "reference_file_content" in vars:
-                    vars["reference_file_content"] = content
+                # Provide content regardless; unused var is harmless
+                vars["reference_file_content"] = content
             else:
                 if path:
                     vars[name] = read_file_safe(path)
                 else:
                     vars[name] = ""
 
+    # Feature A: default fallback for effectively empty user input
+    for ph in placeholders:
+        name = ph.get("name")
+        if not name:
+            continue
+        default_val = ph.get("default")
+        if isinstance(default_val, str) and default_val.strip():
+            cur = raw_vars.get(name)
+            is_empty = (
+                cur is None
+                or (isinstance(cur, str) and not cur.strip())
+                or (isinstance(cur, (list, tuple)) and not any(str(x).strip() for x in cur))
+            )
+            if is_empty:
+                vars[name] = default_val
+
+    # Auto-inject global placeholder values if referenced in template body but
+    # not already collected. This avoids having to list them in 'placeholders'.
+    gph_all = tmpl.get("global_placeholders", {}) or {}
+    if gph_all:
+        # Build set of tokens in template once for efficiency
+        template_lines = tmpl.get("template", [])
+        tmpl_text = "\n".join(template_lines)
+        for gk, gv in gph_all.items():
+            if gk in vars:
+                continue  # user / placeholder value has precedence
+            token = f"{{{{{gk}}}}}"
+            if token in tmpl_text:
+                # Basic heuristics: blank global value => treat as None so line removed
+                if isinstance(gv, str) and not gv.strip():
+                    vars[gk] = None  # line removed by fill_placeholders
+                else:
+                    vars[gk] = gv
+
     rendered = fill_placeholders(tmpl["template"], vars)
+
+    # Reminders block (blockquote markdown) + optional think_deeply append after block
+    try:
+        gph = globals_map or {}
+        # Only act on reminders if key explicitly present and truthy; prevents
+        # unrelated globals (importance etc.) from causing default repo reminders.
+        if "reminders" in gph:
+            raw_rem = gph.get("reminders")
+        else:
+            raw_rem = None
+        reminders: list[str] = []
+        if isinstance(raw_rem, str):
+            raw_list = [raw_rem]
+        elif isinstance(raw_rem, (list, tuple)):
+            raw_list = list(raw_rem)
+        else:
+            raw_list = []
+        for item in raw_list:
+            if not isinstance(item, str):
+                continue
+            cleaned = item.strip()
+            if not cleaned:
+                continue
+            if len(cleaned) > 500:
+                cleaned = cleaned[:500].rstrip() + "…"
+            reminders.append(cleaned)
+        appended_reminders = False
+        if reminders:
+            block_lines = ["> Reminders:"] + [f"> - {r}" for r in reminders]
+            if not rendered.endswith("\n"):
+                rendered += "\n"
+            if not rendered.endswith("\n\n"):
+                rendered += "\n"
+            rendered += "\n".join(block_lines)
+            appended_reminders = True
+        # Append think_deeply directive if not explicitly tokenized or already present.
+        td_val = gph.get("think_deeply") if isinstance(gph, dict) else None
+        if isinstance(td_val, str) and td_val.strip():
+            token = "{{think_deeply}}"
+            # Only add if token absent from original template AND value not already in rendered
+            if token not in "\n".join(tmpl.get("template", [])) and td_val.strip() not in rendered:
+                if not rendered.endswith("\n"):
+                    rendered += "\n"
+                # Separate from reminders block with an extra newline if reminders just added
+                if appended_reminders:
+                    rendered += "\n"
+                rendered += td_val.strip()
+    except Exception:
+        pass
 
     if return_vars:
         return rendered, raw_vars
@@ -339,7 +487,7 @@ def create_new_template() -> None:
     style = input("Style: ") or "Misc"
     dir_path = PROMPTS_DIR / style
     dir_path.mkdir(parents=True, exist_ok=True)
-    used = {json.loads(p.read_text())["id"] for p in dir_path.glob("*.json")}
+    used = {json.loads(p.read_text())['id'] for p in dir_path.glob("*.json")}
     pid = input("Two digit ID (01-98): ")
     while not pid.isdigit() or not (1 <= int(pid) <= 98) or int(pid) in used:
         pid = input("ID taken or invalid, choose another: ")

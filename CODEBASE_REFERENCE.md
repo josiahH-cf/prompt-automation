@@ -30,6 +30,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── hotkeys/         # Interactive hotkey assignment, dependency checking, and system integration
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
+│       ├── shortcuts.py      # Numeric shortcut mapping & renumbering utilities
 │       ├── updater.py        # Lightweight PyPI version check + pipx upgrade (rate-limited, silent)
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
 │       ├── prompts/          # Packaged prompt templates (styles/basic/01_basic.json)
@@ -53,7 +54,7 @@ This document provides a machine-readable and human-readable overview of the `pr
    - Platform-specific functions generate scripts with GUI-first, terminal fallback execution chains
 3. **Template Selection**
    - GUI: `gui/selector/model.py` builds a hierarchical listing and a one-time recursive content index (path, title, placeholders, body lines) for fast AND-token search.
-   - GUI: `gui/selector/controller.py` provides: recursive search (default), optional non-recursive filter, multi-select with synthetic combined template, preview window (Ctrl+P), quick search focus (`s`), backspace up-navigation, initial focus on search entry.
+   - GUI: `gui/selector/controller.py` provides: recursive search (default), optional non-recursive filter, multi-select with synthetic combined template, preview window (Ctrl+P), quick search focus (`s`), numeric shortcut activation (0-9), backspace up-navigation, initial focus on search entry, shortcut manager & template wizard access.
    - CLI: `menus.list_styles()` and `menus.list_prompts()` (recursive) then `menus.pick_style()` / `menus.pick_prompt()` (fzf or text fallback).
 4. **Rendering**
    - Selected templates are loaded with `renderer.load_template()` and placeholders are filled via `variables.get_variables()`.
@@ -120,6 +121,7 @@ The hotkey system provides cross-platform global hotkey support with robust fall
 | Recursive search (default) | BrowserState.search index | (on by default) |
 | Non-recursive filter | In-memory filter of current dir | Toggle checkbox |
 | Focus search | Tk bindings | `s` |
+| Numeric shortcut open | shortcuts.load_shortcuts + key bind | Digits 0-9 |
 | Navigate | Listbox + search entry bindings | Arrow keys |
 | Select/Open | open_or_select | Enter / Double-click |
 | Up one directory | BrowserState.enter(up) | Backspace |
@@ -127,10 +129,45 @@ The hotkey system provides cross-platform global hotkey support with robust fall
 | Multi-select toggle | UI checkbox | (mouse/space) |
 | Mark template | Prefix `*` | Enter in multi-select |
 | Finish multi | Synthetic merged template | Finish Multi button |
+| Manage shortcuts / renumber | _manage_shortcuts dialog | Menu / Ctrl+Shift+S |
+| New template wizard | open_new_template_wizard | Menu |
 
 ## Working With This File
 
 - When adding or modifying modules, scripts, or directories, update the relevant section here.
 - Refer AI coding partners to this guide in initial instructions so they can quickly locate the appropriate components.
+
+## Numeric Shortcuts & Renumbering
+
+Module: `shortcuts.py`
+
+Responsibilities:
+- Maintain `prompts/styles/Settings/template-shortcuts.json` mapping digit -> relative template path.
+- Provide `renumber_templates()` to sync on-disk template `id` + filename prefix with chosen shortcut digits (1-98 range used; digit 0 allowed for mapping but not forced renumber if out of range logic is retained).
+
+Renumber Process:
+1. Build map of desired digit -> template path from mapping file.
+2. For each desired numeric key, if current holder differs and digit occupied, the occupant is reassigned to the next free ID.
+3. Update template JSON `id` and rename file to `NN_slug.json` (preserving rest of filename).
+4. Update shortcut mapping paths if filenames changed.
+5. Persist mapping atomically.
+
+Collision Safety: Reassignment searches sequentially for the next unused ID (1-98). Exhaustion raises `ValueError`.
+
+GUI Integration: Options -> Manage shortcuts / renumber dialog lists templates, allows double-click key assignment, clearing keys, and triggering the renumber routine. Selector binds digits 0-9 for instant opening.
+
+Test: `tests/test_shortcuts.py` validates core renumber logic.
+
+## Default Value Hint & Global Reminders
+
+Default Hint (Feature A):
+- `gui/variable_collector.collect_single_variable()` displays a grey panel summarizing the placeholder's default (truncates >160 chars, `[view]` opens a modal to inspect full text). Input pre-filled with default; if cleared by user the raw value is empty.
+- `menus.render_template()` substitutes defaults for placeholders whose collected values are effectively empty (None, blank string, empty list) without mutating the raw captured values.
+
+Global Reminders (Feature B):
+- At render time `menus.render_template()` merges a `reminders` value (string or list) from root `globals.json` into the template's `global_placeholders` when not already defined.
+- Appends a markdown blockquote list `> Reminders:` with each reminder truncated to 500 chars.
+
+Tests: `tests/test_defaults_and_reminders.py` covers fallback substitution and reminder block rendering.
 
 

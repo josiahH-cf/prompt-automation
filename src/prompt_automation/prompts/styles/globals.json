@@ -2,16 +2,22 @@
   "schema": 1,
   "type": "globals",
   "global_placeholders": {
-    "importance": "normal",
-    "think_deeply": "no",
-    "two_parter": "no",
-    "reference_file_default": ""
+    "hallucinate": "",
+    "think_deeply": "",
+    "reference_file_default": "",
+    "reminders": [
+      ""
+    ]
   },
   "notes": {
-    "importance": "How important is this prompt to get right? Use low | normal | high | critical. Higher values should enable stronger grounding and anti-hallucination controls.",
-    "think_deeply": "yes | no. 'yes' adds a 'think deeply about this' directive. Use sparingly; limited budget.",
-    "two_parter": "yes | no. 'yes' signals a two-stage flow: initial paste, then follow-up refinement.",
-    "reference_file_default": "Optional absolute path used as initial default for reference file placeholders (will copy per template on first use)."
+  "hallucinate": "low|normal|high|critical – influences downstream logic you can extend (e.g. add safety checks).",
+  "think_deeply": "Directive appended or injected when token {{think_deeply}} appears and value non-empty.",
+  "reference_file_default": "Seed path used as initial default for reference_file placeholders (future extension).",
+  "reminders": "List appended as markdown blockquote unless template overrides or sets empty reminders."
   },
-  "version": 1
+  "version": 1,
+  
+  "metadata": {
+    "share_this_file_openly": true
+  }
 }

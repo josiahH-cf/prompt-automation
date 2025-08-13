@@ -10,10 +10,15 @@ from ..variables import (
     _print_one_time_skip_reminder,
     _save_overrides,
     _set_template_entry,
+    load_template_value_memory,
+    persist_template_values,
 )
 
 # sentinel object to signal user cancellation during input collection
 CANCELLED = object()
+
+# Internal mapping used to convey default values into collect_single_variable
+CURRENT_DEFAULTS: dict[str, str] = {}
 
 
 def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: dict):
@@ -43,8 +48,9 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
     root = tk.Tk()
     root.title(f"File: {label}")
-    root.geometry("500x150")
-    root.resizable(False, False)
+    # Larger default & allow resize/maximize
+    root.geometry("640x180")
+    root.resizable(True, True)
     root.lift()
     root.focus_force()
     root.attributes("-topmost", True)
@@ -351,7 +357,11 @@ def show_reference_file_content(path: str) -> None:
 
 
 def collect_variables_gui(template):
-    """Collect variables for template placeholders - fully keyboard driven."""
+    """Collect variables for template placeholders (GUI) with persistence.
+
+    Mirrors CLI variable collection enhancements: persistent simple values, global note labels,
+    and friendly hallucinate dropdown.
+    """
     placeholders = template.get("placeholders", [])
     if not placeholders:
         return {}
@@ -360,12 +370,46 @@ def collect_variables_gui(template):
     template_id = template.get("id", 0)
     globals_map = template.get("global_placeholders", {})
 
+    # Load persisted simple values (non-file) & global notes for labels
+    persisted_simple = load_template_value_memory(template_id) if template_id else {}
+    globals_notes = {}
+    try:
+        search_base = Path(template.get("metadata", {}).get("path", "")).parent if template.get("metadata", {}) else None
+        candidates = []
+        if search_base:
+            candidates.append(search_base / "globals.json")
+            candidates.append(Path(search_base).parent / "globals.json")
+        for cand in candidates:
+            if cand and cand.exists():
+                try:
+                    globals_notes = (globals_notes or {}).copy()
+                    globals_notes.update((__import__('json').loads(cand.read_text()).get('notes', {}) or {}))
+                    break
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     for placeholder in placeholders:
         name = placeholder["name"]
-        label = placeholder.get("label", name)
+        if "label" in placeholder:
+            label = placeholder["label"]
+        elif name in globals_notes:
+            note_text = globals_notes.get(name, "")
+            if " – " in note_text:
+                _, desc_part = note_text.split(" – ", 1)
+                label = desc_part.strip() or name
+            else:
+                label = note_text.strip() or name
+        else:
+            label = name
         ptype = placeholder.get("type", "text")
         options = placeholder.get("options", [])
         multiline = placeholder.get("multiline", False) or ptype == "list"
+
+        # Pre-populate with persisted value if available
+        if name not in variables and name in persisted_simple:
+            variables[name] = persisted_simple[name]
 
         if name == "reference_file_content":
             path = variables.get("reference_file")
@@ -389,10 +433,40 @@ def collect_variables_gui(template):
         if ptype == "file":
             value = collect_file_variable_gui(template_id, placeholder, globals_map)
         else:
-            value = collect_single_variable(name, label, ptype, options, multiline)
-        if value is CANCELLED:  # User cancelled entire workflow
+            default_val = placeholder.get("default") if isinstance(placeholder, dict) else None
+            if isinstance(default_val, str):
+                CURRENT_DEFAULTS[name] = default_val
+            try:
+                if name == "hallucinate" and not options:
+                    options = [
+                        "Absolutely no hallucination (low)",
+                        "Balanced correctness & breadth (normal)",
+                        "Allow some creative inference (high)",
+                        "Maximum creative exploration (critical)",
+                    ]
+                value = collect_single_variable(name, label, ptype, options, multiline)
+            finally:
+                CURRENT_DEFAULTS.pop(name, None)
+        if value is CANCELLED:
             return None
+        if name == "hallucinate" and isinstance(value, str):
+            low = value.lower()
+            if "low" in low:
+                value = "low"
+            elif "normal" in low:
+                value = "normal"
+            elif "critical" in low:
+                value = "critical"
+            elif "high" in low:
+                value = "high"
         variables[name] = value
+
+    # Persist simple values (non-file, scalar/list) for future sessions
+    try:
+        if template_id:
+            persist_template_values(template_id, placeholders, variables)
+    except Exception:
+        pass
 
     return variables
 
@@ -404,8 +478,26 @@ def collect_single_variable(name, label, ptype, options, multiline):
 
     root = tk.Tk()
     root.title(f"Input: {label}")
-    root.geometry("500x300" if multiline else "500x150")
-    root.resizable(False, False)
+    # Dynamic sizing: larger defaults & adapt height to expected content
+    def _initial_geometry():
+        # Heuristics: multiline/list get big window; single-line moderate
+        if multiline or ptype == "list":
+            # Base width/height
+            width = 900
+            # Estimate height from default length
+            default_len = len(CURRENT_DEFAULTS.get(name, "") or "")
+            if default_len <= 200:
+                height = 540
+            elif default_len <= 800:
+                height = 620
+            else:
+                height = 720
+        else:
+            width = 700
+            height = 230
+        return f"{width}x{height}"
+    root.geometry(_initial_geometry())
+    root.resizable(True, True)
 
     # Bring to foreground and focus
     root.lift()
@@ -425,6 +517,14 @@ def collect_single_variable(name, label, ptype, options, multiline):
 
     # Input widget based on type
     input_widget = None
+
+    # Determine default from options/placeholder global? (Feature A)
+    # For GUI collection we expect caller to supply placeholder meta separately; in this
+    # function we cannot access the placeholder dict directly, so we look for a
+    # convention: an option string starting with 'DEFAULT::' is NOT used. Instead we rely
+    # on a hidden attribute attached by caller. Simpler: we allow the caller to set a
+    # global dict _CURRENT_PLACEHOLDER_DEFAULT prior to invocation. Fallback: no default.
+    default_val = CURRENT_DEFAULTS.get(name)
 
     if options:
         # Dropdown for options
@@ -477,6 +577,51 @@ def collect_single_variable(name, label, ptype, options, multiline):
         input_widget.pack(fill="x", pady=(0, 10))
         input_widget.focus_set()
 
+    # Default hint footer (Feature A) - only if non-empty string default
+    hint_frame = None
+    if isinstance(default_val, str) and default_val.strip():
+        full_default = default_val
+        truncated = False
+        display_val = full_default
+        if len(display_val) > 160 or "\n" in display_val:
+            display_val = (display_val.replace("\n", " "))[:160].rstrip() + "…"
+            truncated = True
+        hint_frame = tk.Frame(main_frame, bg="#f2f2f2", padx=8, pady=4, highlightthickness=1, highlightbackground="#ddd")
+        hint_frame.pack(fill="x", pady=(0, 10))
+        hint_label = tk.Label(
+            hint_frame,
+            text=f"Default: {display_val}",
+            anchor="w",
+            justify="left",
+            font=("Arial", 9),
+            fg="#333",
+            bg="#f2f2f2",
+            wraplength=440,
+        )
+        hint_label.pack(side="left", fill="x", expand=True)
+        if truncated:
+            def show_full():
+                top = tk.Toplevel(root)
+                top.title(f"Default value – {label}")
+                top.geometry("600x400")
+                txt = tk.Text(top, wrap="word", font=("Consolas", 10))
+                txt.pack(fill="both", expand=True)
+                txt.insert("1.0", full_default)
+                txt.config(state="disabled")
+                btn = tk.Button(top, text="Close", command=top.destroy)
+                btn.pack(pady=6)
+                top.transient(root); top.grab_set()
+            view_btn = tk.Button(hint_frame, text="[view]", command=show_full, bd=0, fg="#555", bg="#f2f2f2", font=("Arial", 9, "underline"))
+            view_btn.pack(side="right")
+
+        # Pre-fill input with default (existing behaviour) only if currently blank
+        if isinstance(input_widget, tk.Text):
+            if not input_widget.get("1.0", "end-1c").strip():
+                input_widget.insert("1.0", full_default)
+        else:
+            if not input_widget.get().strip():
+                input_widget.insert(0, full_default)
+
     # Button frame
     button_frame = tk.Frame(main_frame)
     button_frame.pack(fill="x")
@@ -485,14 +630,16 @@ def collect_single_variable(name, label, ptype, options, multiline):
         nonlocal result
         if skip:
             result = None
-        elif isinstance(input_widget, tk.Text):
-            value = input_widget.get("1.0", "end-1c")
-            if ptype == "list":
-                result = [line.strip() for line in value.splitlines() if line.strip()]
-            else:
-                result = value
         else:
-            result = input_widget.get()
+            if isinstance(input_widget, tk.Text):
+                value = input_widget.get("1.0", "end-1c")
+                if ptype == "list":
+                    result = [line.strip() for line in value.splitlines() if line.strip()]
+                else:
+                    result = value
+            else:
+                result = input_widget.get()
+        # Keep raw empty string if user cleared it; fallback applied later
         root.destroy()
 
     def on_cancel():

@@ -2,6 +2,52 @@
 
 **prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and copy the result to your clipboard for manual pasting.
 
+Recent feature highlights:
+- Default value helper: input dialogs show a truncated hint of each placeholder's default (with a [view] popup for long defaults) and empty submissions now fall back to that default at render time.
+- Global reminders: define `global_placeholders.reminders` (string or list) in `globals.json` and they'll be appended as a markdown blockquote to every template that doesn't override them.
+- New Template Wizard: GUI tool (Options -> New template wizard) to create styles/subfolders and scaffold a template with suggested structured sections.
+- Numeric shortcuts & renumbering: Assign single‑digit keys to favorite templates (Options -> Manage shortcuts / renumber) and optionally renumber files/IDs to match those digits. Press the digit in the selector for instant open.
+
+### Default Value Hints & Fallback (Feature A)
+
+Placeholder dialogs now display a grey "Default:" box showing the (possibly truncated) default value. Long defaults provide a `[view]` button to inspect the full text. If you submit an empty value (or for list placeholders, only blank lines) the default is injected automatically at render time.
+
+### Global Reminders (Feature B)
+
+Add a `reminders` entry (string or list of strings) under `global_placeholders` inside your top-level `globals.json` to have them appended as a markdown blockquote at the end of each rendered prompt. Individual templates can override by defining their own `global_placeholders.reminders`.
+
+Example `globals.json` fragment:
+
+```jsonc
+{
+   "global_placeholders": {
+      "reminders": [
+         "Verify numerical assumptions",
+         "List uncertainties explicitly"
+      ]
+   }
+}
+```
+
+Rendered tail (Markdown):
+
+```
+> Reminders:
+> - Verify numerical assumptions
+> - List uncertainties explicitly
+```
+
+### New Template Wizard
+
+From the selector choose Options -> New template wizard to interactively:
+1. Pick or create a style & nested subfolders.
+2. Enter a title.
+3. Accept or edit a suggested placeholder list (role, objective, context, etc.).
+4. Choose to auto-generate a structured body (section headings with placeholder insertions) or provide a custom body.
+5. Mark the template private (stored under `prompts/local/`) or shared.
+
+The wizard allocates the next free ID (01–98) in that style and writes a JSON skeleton with defaults (role defaults to `assistant`).
+
 
 For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md). AI coding partners should consult it before making changes.
 ---
@@ -127,6 +173,50 @@ A minimal example:
 ```
 
 Global defaults for common placeholders live in `prompts/styles/globals.json`.
+
+## Sharing & Private Templates
+
+By default every template JSON is considered shareable/open and can be exported or included in any list you might publish. A new explicit metadata flag now controls this behavior:
+
+```
+"metadata": {
+   "share_this_file_openly": true
+}
+```
+
+Rules (precedence order):
+1. If `metadata.share_this_file_openly` is `false` the template is private/local-only.
+2. Else if the file path lives under `prompts/local/` (case-insensitive) it is private (implicit).
+3. Else it is shared.
+
+Defaults & backward compatibility:
+* Existing templates that lacked the flag are treated as shared (`true`). A migration script (see below) adds the explicit key so future tooling can rely on its presence.
+* Missing `metadata` objects are created at load time. Malformed / non-boolean values are coerced (truthy -> `true`, falsy -> `false`) with a warning.
+
+Local-only directory:
+* Create `src/prompt_automation/prompts/local/` for templates you never want committed or shared. This path is `.gitignore`d. Any JSON here is automatically private even if it omits the flag or sets it `true` (path rule wins only when flag is absent or `true`; an explicit `false` already makes it private).
+
+Why keep the explicit flag if directories can imply privacy?
+* Future export / sync tooling can operate on paths outside `prompts/local/` and still distinguish deliberate private templates.
+* Makes intent obvious when reading a file and enables one-off private files inside normal style folders.
+
+FAQ:
+* Q: What if I delete the flag?  A: Loader injects it as `true` (unless under `prompts/local/`).
+* Q: Can I add comments?  A: JSON has no comments; you can use an `_comment` key or extend the `metadata` object (e.g. `"_comment": "internal draft"`).
+* Q: How do I batch add the flag?  A: Use the provided migration script or the `jq` one-liner below.
+
+Migration script (idempotent):
+```
+python scripts/add_share_flag.py
+```
+
+`jq` one-liner alternative (Linux/macOS):
+```
+find src/prompt_automation/prompts/styles -name '*.json' -print -exec \
+   sh -c 'tmp="$(mktemp)" && jq \'(.metadata // {path:null}| .share_this_file_openly? // true | .) as $f | if (.metadata.share_this_file_openly? ) then . else (.metadata.share_this_file_openly=true) end' "$1" > "$tmp" && mv "$tmp" "$1"' _ {} \;
+```
+Adjust as needed; the Python migration script is simpler and safer.
+
 Templates can omit these entries to use the defaults or override them by
 defining placeholders with the same names.
 

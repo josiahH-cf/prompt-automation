@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": 12,
+  "id": 1,
   "title": "Track Bug",
   "style": "Code",
   "role": "{{role}}",
@@ -127,6 +127,7 @@
     "path": "Code/track-bug.json",
     "tags": [],
     "version": 1,
-    "render": "markdown"
+    "render": "markdown",
+    "share_this_file_openly": true
   }
 }

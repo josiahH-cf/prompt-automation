@@ -155,7 +155,7 @@ def _gui_file_prompt(label: str) -> str | None:
 # ----------------- Persistence helpers -----------------
 
 def _load_overrides() -> dict:
-    base = {"templates": {}, "reminders": {}}
+    base = {"templates": {}, "reminders": {}, "template_globals": {}, "template_values": {}}
     if _PERSIST_FILE.exists():
         try:
             base = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
@@ -188,6 +188,55 @@ def _get_template_entry(data: dict, template_id: int, name: str) -> dict | None:
 
 def _set_template_entry(data: dict, template_id: int, name: str, payload: dict) -> None:
     data.setdefault("templates", {}).setdefault(str(template_id), {})[name] = payload
+
+# ----------------- Global overrides (per-template snapshot of global_placeholders) ----
+
+def get_template_global_overrides(template_id: int) -> dict:
+    data = _load_overrides()
+    return data.get("template_globals", {}).get(str(template_id), {})
+
+def ensure_template_global_snapshot(template_id: int, gph: dict) -> None:
+    """If no snapshot exists for this template, persist current global placeholders.
+
+    This allows later renders to remain stable even if globals.json changes, while
+    still letting the user manually edit the snapshot file or settings.
+    """
+    if not isinstance(template_id, int):
+        return
+    data = _load_overrides()
+    tgl = data.setdefault("template_globals", {})
+    key = str(template_id)
+    if key not in tgl:
+        # Store only scalar/string or list values (shallow copy)
+        snap = {}
+        for k, v in (gph or {}).items():
+            if isinstance(v, (str, int, float)) or v is None:
+                snap[k] = v
+            elif isinstance(v, list):
+                snap[k] = [x for x in v]
+        tgl[key] = snap
+        _save_overrides(data)
+
+def apply_template_global_overrides(template_id: int, gph: dict) -> dict:
+    """Return merged globals (snapshot overrides > template-defined > original globals)."""
+    merged = dict(gph or {})
+    overrides = get_template_global_overrides(template_id)
+    if overrides:
+        merged.update(overrides)
+    return merged
+
+__all__ = [
+    # existing exports trimmed for brevity...
+    "get_template_global_overrides",
+    "ensure_template_global_snapshot",
+    "apply_template_global_overrides",
+    # new helpers
+    "load_template_value_memory",
+    "persist_template_values",
+    "list_template_value_overrides",
+    "reset_template_value_override",
+    "reset_all_template_value_overrides",
+]
 
 
 def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> None:
@@ -295,9 +344,46 @@ def get_variables(
     values: Dict[str, Any] = dict(initial or {})
     globals_map = globals_map or {}
 
+    # Load global notes to auto-label global-driven placeholders
+    globals_notes: Dict[str, str] = {}
+    try:
+        gfile = PROMPTS_DIR / "globals.json"
+        if gfile.exists():
+            gdata = json.loads(gfile.read_text(encoding="utf-8"))
+            globals_notes = gdata.get("notes", {}) or {}
+    except Exception:
+        pass
+
+    # Load previously persisted simple values for this template
+    persisted_values: Dict[str, Any] = {}
+    try:
+        if template_id is not None:
+            persisted_values = (
+                _load_overrides().get("template_values", {}).get(str(template_id), {}) or {}
+            )
+    except Exception:
+        pass
+
     for ph in placeholders:
         name = ph["name"]
         ptype = ph.get("type")
+
+        # Pre-fill with persisted value if user didn't supply initial value
+        if name not in values and name in persisted_values:
+            values[name] = persisted_values[name]
+
+        # Augment label from globals notes if available and no explicit label
+        if "label" not in ph and name in globals_notes:
+            note_text = globals_notes.get(name, "")
+            # If we have option spec followed by an en dash style description
+            if " – " in note_text:
+                opt_part, desc_part = note_text.split(" – ", 1)
+                # Capture option hint for hallucinate; used to inform choices
+                if name == "hallucinate" and "|" in opt_part:
+                    ph.setdefault("_option_hint_raw", opt_part)
+                ph["label"] = desc_part.strip() or note_text.strip()
+            else:
+                ph["label"] = note_text.strip() or name
 
         if ptype == "file" and template_id is not None:
             # Use extended resolution (template is source of truth)
@@ -310,6 +396,15 @@ def get_variables(
         else:
             label = ph.get("label", name)
             opts = ph.get("options")
+            # Provide friendly dropdown for hallucinate if not already specified
+            if name == "hallucinate" and not opts:
+                opts = [
+                    "Absolutely no hallucination (low)",
+                    "Balanced correctness & breadth (normal)",
+                    "Allow some creative inference (high)",
+                    "Maximum creative exploration (critical)",
+                ]
+                ph["_mapped_options"] = True
             multiline = ph.get("multiline", False) or ptype == "list"
             val = None
             if ptype == "file":  # fallback when no template id
@@ -381,8 +476,56 @@ def get_variables(
                 val = "0"
         if ptype == "list" and isinstance(val, str):
             val = [l for l in val.splitlines() if l]
+        # Map hallucinate friendly phrase to canonical token
+        if name == "hallucinate" and ph.get("_mapped_options") and isinstance(val, str):
+            lower = val.lower()
+            if "low" in lower:
+                val = "low"
+            elif "normal" in lower:
+                val = "normal"
+            elif "critical" in lower:
+                val = "critical"
+            elif "high" in lower:
+                val = "high"
         values[name] = val
+    # Persist simple values for future defaulting
+    if template_id is not None:
+        try:
+            persist_template_values(template_id, placeholders, values)
+        except Exception as e:  # pragma: no cover
+            _log.error("failed to persist template values: %s", e)
     return values
+
+
+# ----------------- Simple value persistence (non-file placeholders) -----------------
+def load_template_value_memory(template_id: int) -> Dict[str, Any]:
+    """Return previously persisted simple values for template or empty dict."""
+    try:
+        data = _load_overrides()
+        return data.get("template_values", {}).get(str(template_id), {}) or {}
+    except Exception:
+        return {}
+
+
+def persist_template_values(template_id: int, placeholders: List[Dict[str, Any]], values: Dict[str, Any]) -> None:
+    """Store scalar/list placeholder values (excluding files) for the template."""
+    overrides_data = _load_overrides()
+    tvals = overrides_data.setdefault("template_values", {}).setdefault(str(template_id), {})
+    for ph in placeholders:
+        nm = ph.get("name")
+        if not nm or ph.get("type") == "file":
+            continue
+        v = values.get(nm)
+        if isinstance(v, (str, int, float)):
+            if str(v).strip():
+                tvals[nm] = v
+        elif isinstance(v, list):
+            cleaned = [str(x) for x in v if str(x).strip()]
+            if cleaned:
+                if len(cleaned) > 200:
+                    cleaned = cleaned[:200]
+                tvals[nm] = cleaned
+    _save_overrides(overrides_data)
 
 
 def reset_file_overrides() -> bool:
@@ -441,4 +584,59 @@ def list_file_overrides() -> List[Tuple[str, str, Dict[str, Any]]]:
         for name, info in entries.items():
             out.append((tid, name, info))
     return out
+
+
+# ----------------- Template value overrides (simple non-file persistence) ---------
+
+def list_template_value_overrides() -> List[Tuple[str, str, Any]]:
+    """Return list of (template_id, name, value) for persisted simple values."""
+    data = _load_overrides()
+    out: List[Tuple[str, str, Any]] = []  # type: ignore[name-defined]
+    for tid, entries in data.get("template_values", {}).items():
+        if not isinstance(entries, dict):
+            continue
+        for name, val in entries.items():
+            out.append((tid, name, val))
+    return out
+
+
+def reset_template_value_override(template_id: int, name: str) -> bool:
+    """Remove a single persisted simple value for a template. Returns True if removed."""
+    changed = False
+    raw = _load_overrides()
+    tvals = raw.get("template_values", {}).get(str(template_id)) or {}
+    if name in tvals:
+        # mutate underlying file structure directly
+        if _PERSIST_FILE.exists():
+            try:
+                raw_file = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                raw_file = {}
+        else:
+            raw_file = {}
+        rv_tvals = raw_file.setdefault("template_values", {}).get(str(template_id), {})
+        if name in rv_tvals:
+            rv_tvals.pop(name, None)
+            # prune empty maps
+            if not rv_tvals:
+                raw_file.get("template_values", {}).pop(str(template_id), None)
+            _save_overrides(raw_file)
+            changed = True
+    return changed
+
+
+def reset_all_template_value_overrides(template_id: int) -> bool:
+    """Remove all persisted simple values for a given template id."""
+    if not _PERSIST_FILE.exists():
+        return False
+    try:
+        raw_file = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    tv_map = raw_file.get("template_values", {})
+    if str(template_id) in tv_map:
+        tv_map.pop(str(template_id), None)
+        _save_overrides(raw_file)
+        return True
+    return False
 

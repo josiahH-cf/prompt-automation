@@ -127,6 +127,7 @@
     "path": "LLM-Techniques/Follow-Up/make-prompt-from-good-outcome.json",
     "tags": [],
     "version": 1,
-    "render": "markdown"
+    "render": "markdown",
+    "share_this_file_openly": true
   }
 }

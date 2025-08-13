@@ -21,6 +21,8 @@ from ...variables import (
     list_file_overrides,
     reset_single_file_override,
 )
+from ..new_template_wizard import open_new_template_wizard
+from ...shortcuts import load_shortcuts, save_shortcuts, renumber_templates, SHORTCUT_FILE
 from ...errorlog import get_logger
 
 _log = get_logger(__name__)
@@ -104,8 +106,15 @@ def open_template_selector() -> Optional[dict]:
             messagebox.showinfo("Reset", "No overrides found.")
     opt.add_command(label="Reset reference files", command=do_reset_refs, accelerator="Ctrl+Shift+R")
     opt.add_command(label="Manage overrides", command=lambda: _manage_overrides(root))
+    opt.add_separator()
+    opt.add_command(label="New template wizard", command=lambda: open_new_template_wizard())
+    opt.add_separator()
+    def _open_shortcuts_manager():
+        _manage_shortcuts(root)
+    opt.add_command(label="Manage shortcuts / renumber", command=_open_shortcuts_manager)
     menubar.add_cascade(label="Options", menu=opt)
     root.bind("<Control-Shift-R>", lambda e: (do_reset_refs(), "break"))
+    root.bind("<Control-Shift-S>", lambda e: (_open_shortcuts_manager(), "break"))
 
     # Top controls: search box & multi-select toggle
     top = tk.Frame(root, padx=10, pady=6); top.pack(fill="x")
@@ -227,6 +236,39 @@ def open_template_selector() -> Optional[dict]:
             else:
                 selected_template = item.template.data
                 root.destroy()
+
+    # --- Shortcut key handling (numeric keys mapped to specific templates) ---
+    _shortcut_mapping = load_shortcuts()  # key -> relative path from PROMPTS_DIR/style? actually store relative to PROMPTS_DIR root
+
+    def _resolve_shortcut(key: str):
+        rel = _shortcut_mapping.get(key)
+        if not rel:
+            return None
+        # Path may include style folder already
+        try:
+            from ...config import PROMPTS_DIR as _PD
+            p = _PD / rel
+            if p.exists():
+                from ...renderer import load_template as _LT
+                return _LT(p)
+        except Exception:
+            return None
+        return None
+
+    def _on_digit(event):
+        if event.char and event.char.isdigit():
+            tmpl = _resolve_shortcut(event.char)
+            if tmpl:
+                nonlocal selected_template
+                selected_template = tmpl
+                root.destroy()
+                return "break"
+        return None
+    # Bind 0-9 keys globally (without modifiers) when focus is in list or search
+    for d in "0123456789":
+        root.bind(d, _on_digit)
+        listbox.bind(d, _on_digit)
+        search_entry.bind(d, _on_digit)
 
     def on_preview():
         item = get_selected_item()
@@ -355,5 +397,109 @@ def open_template_selector() -> Optional[dict]:
 
     root.mainloop()
     return selected_template
+
+# --- Shortcuts manager dialog ----------------------------------------------
+
+def _manage_shortcuts(root: tk.Tk):  # pragma: no cover - GUI only
+    win = tk.Toplevel(root)
+    win.title("Manage Template Shortcuts")
+    win.geometry("700x420")
+    win.resizable(True, True)
+    frame = tk.Frame(win, padx=12, pady=12); frame.pack(fill="both", expand=True)
+    hint = tk.Label(frame, text="Assign single-digit keys to frequently used templates. Double-click a row to set/edit key. Use Renumber to rename files so IDs match chosen digits.", wraplength=660, justify="left", fg="#444")
+    hint.pack(anchor="w", pady=(0,8))
+    cols = ("key","rel","title","id")
+    tree = ttk.Treeview(frame, columns=cols, show="headings")
+    widths = {"key":60, "rel":300, "title":200, "id":60}
+    for c in cols:
+        tree.heading(c, text=c.upper())
+        tree.column(c, width=widths[c], anchor="w")
+    vsb = tk.Scrollbar(frame, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=vsb.set)
+    tree.pack(side="left", fill="both", expand=True); vsb.pack(side="right", fill="y")
+
+    mapping = load_shortcuts()  # key -> rel path
+
+    # Gather templates for listing
+    from ...config import PROMPTS_DIR as _PD
+    from ...renderer import load_template as _LT
+    templates: list[tuple[str, Path, dict]] = []  # (rel, path, data)
+    for p in sorted(_PD.rglob("*.json")):
+        try:
+            data = _LT(p)
+            if "template" in data:
+                rel = str(p.relative_to(_PD))
+                templates.append((rel, p, data))
+        except Exception:
+            continue
+
+    def _refresh_tree():
+        tree.delete(*tree.get_children())
+        for rel, path, data in templates:
+            key = next((k for k,v in mapping.items() if v == rel), "")
+            tree.insert("", "end", values=(key, rel, data.get("title",""), data.get("id","")))
+    _refresh_tree()
+
+    def _edit_key(event=None):
+        sel = tree.selection()
+        if not sel: return
+        item = tree.item(sel[0])
+        cur_key, rel, *_ = item["values"]
+        def _apply(new_key: str):
+            new_key = new_key.strip()
+            # Remove existing mapping for this rel or key
+            for k in list(mapping.keys()):
+                if mapping[k] == rel or k == new_key:
+                    mapping.pop(k, None)
+            if new_key:
+                mapping[new_key] = rel
+            save_shortcuts(mapping)
+            _refresh_tree()
+        # Simple prompt dialog
+        dlg = tk.Toplevel(win); dlg.title("Set Key")
+        tk.Label(dlg, text=f"Template: {rel}\nCurrent key: {cur_key or '(none)'}\nEnter new single-digit key (blank to clear):").pack(padx=12,pady=12)
+        var = tk.StringVar(value=cur_key)
+        ent = tk.Entry(dlg, textvariable=var); ent.pack(padx=12, pady=(0,12))
+        def _ok():
+            val = var.get()
+            if val and (len(val)!=1 or not val.isdigit()):
+                messagebox.showerror("Validation", "Key must be a single digit 0-9 or blank")
+                return
+            _apply(val)
+            dlg.destroy()
+        tk.Button(dlg, text="OK", command=_ok).pack(side="left", padx=12, pady=8)
+        tk.Button(dlg, text="Cancel", command=dlg.destroy).pack(side="left", padx=4, pady=8)
+        ent.focus_set(); ent.select_range(0,'end')
+        dlg.bind('<Return>', lambda e: (_ok(), 'break'))
+        dlg.bind('<Escape>', lambda e: (dlg.destroy(), 'break'))
+        dlg.transient(win); dlg.grab_set()
+
+    tree.bind('<Double-1>', _edit_key)
+
+    btns = tk.Frame(frame); btns.pack(fill="x", pady=8)
+    def _do_delete():
+        sel = tree.selection();
+        if not sel: return
+        item = tree.item(sel[0]); cur_key, rel, *_ = item['values']
+        # remove mapping
+        for k in list(mapping.keys()):
+            if mapping[k] == rel:
+                mapping.pop(k, None)
+        save_shortcuts(mapping); _refresh_tree()
+    def _do_renumber():
+        # Apply renumbering according to numeric shortcut keys
+        try:
+            renumber_templates(mapping)
+            messagebox.showinfo("Renumber", "Renumbering complete. Close and reopen selector to see changes.")
+        except Exception as e:
+            messagebox.showerror("Renumber", f"Failed: {e}")
+    tk.Button(btns, text="Edit Key", command=_edit_key).pack(side="left", padx=4)
+    tk.Button(btns, text="Clear Key", command=_do_delete).pack(side="left", padx=4)
+    tk.Button(btns, text="Renumber", command=_do_renumber).pack(side="left", padx=10)
+    tk.Button(btns, text="Close", command=win.destroy).pack(side="right", padx=4)
+
+    win.bind('<Escape>', lambda e: (win.destroy(), 'break'))
+    win.transient(root); win.grab_set()
+    win.focus_set()
 
 __all__ = ["open_template_selector"]

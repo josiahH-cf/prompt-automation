@@ -25,14 +25,6 @@
       "description": "Select once; path stored per template. Will re-prompt if missing."
     },
     {
-      "name": "reference_file_content",
-      "label": "(internal) Reference File Content (auto-filled)",
-      "multiline": true,
-      "required": false,
-      "default": "",
-      "description": "Populated automatically with file contents if reference_file is set."
-    },
-    {
       "name": "role",
       "label": "Role",
       "multiline": false,
@@ -64,6 +56,7 @@
     "path": "Code/Troubleshoot/troubleshoot-reminders.json",
     "tags": [],
     "version": 2,
-    "render": "text"
+    "render": "text",
+    "share_this_file_openly": true
   }
 }
