@@ -399,10 +399,9 @@ def get_variables(
             # Provide friendly dropdown for hallucinate if not already specified
             if name == "hallucinate" and not opts:
                 opts = [
-                    "Absolutely no hallucination (low)",
-                    "Balanced correctness & breadth (normal)",
-                    "Allow some creative inference (high)",
-                    "Maximum creative exploration (critical)",
+                    "Absolutely no hallucination (critical)",
+                    "Balanced correctness & breadth (empty)",
+                    "Allow some creative inference (low)",
                 ]
                 ph["_mapped_options"] = True
             multiline = ph.get("multiline", False) or ptype == "list"

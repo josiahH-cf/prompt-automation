@@ -27,7 +27,10 @@
     "",
     "## Quality Checks",
     "{{quality_checks}}",
-    ""
+    "",
+    "{{hallucinate}}",
+    "",
+    "{{reminders}}"
   ],
   "placeholders": [
     {
@@ -72,6 +75,16 @@
     },
     {
       "name": "follow_ups",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "hallucinate",
+      "multiline": false,
+      "default": "Balanced correctness & breadth (empty)"
+    },
+    {
+      "name": "reminders",
       "multiline": true,
       "default": ""
     }
