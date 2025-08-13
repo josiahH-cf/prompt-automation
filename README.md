@@ -37,6 +37,143 @@ Rendered tail (Markdown):
 > - List uncertainties explicitly
 ```
 
+### Placeholder & Global Variable Reference
+
+This section explains every variable type you will encounter, how values are collected (or auto‑injected), how persistence works, and how to fully control **global** variables (define once, reuse forever, or exclude per template).
+
+#### 1. Placeholder Basics
+
+Each template has a `placeholders` array. Every entry minimally declares `{ "name": "variable_name" }` and can include:
+
+| Key | Meaning | Common Values |
+|-----|---------|---------------|
+| `name` | Identifier referenced as `{{name}}` in the template body. | e.g. `objective` |
+| `type` | Input mode override. One of `file`, `list`, `number`, or omitted (text). | `file` |
+| `multiline` | If true, opens a large text area (multi‑paragraph). | `true` / `false` |
+| `default` | Fallback text/list used only when user input is blank. | Any string |
+| `options` | Fixed choices (GUI combobox / CLI menu). | `["A","B"]` |
+| `label` | Friendly prompt label; if omitted we derive one from global notes. | `"Context (high-level)"` |
+
+Rules:
+* Empty submission (blank text, or list with zero non‑blank lines) → default substituted at render time (raw stored value remains empty for audit).
+* A placeholder that resolves to an empty string or `None` removes the *entire line* containing its token.
+
+#### 2. Supported Placeholder Types
+
+| Type / Flag | Input UI | Stored Form | Render Behavior |
+|-------------|----------|-------------|-----------------|
+| (omitted) / text | Single line | `str` | Direct substitution (default fill if empty) |
+| `multiline: true` | Multi-line text box | `str` | Preserves newlines |
+| `type: "list"` | Multi-line (one item per line) | `list[str]` | Joined with `\n`; empty ⇒ default |
+| `type: "file"` | File chooser dialog | path (string) | File read at render; content inserted (or separate `reference_file_content`) |
+| `type: "number"` | Single line | stringified number | Validated; invalid → `0` |
+| `options: [...]` | Dropdown / selection | selected string | Value used verbatim (mapped for some special names) |
+
+#### 3. Special Placeholder Names
+
+| Name | Purpose | Notes |
+|------|---------|-------|
+| `context` | Free-form or file‑loaded context block. | File load copies contents into the text area. Path tracked separately for re‑read. |
+| `reference_file` | Capture path to a key document. | Skip once → never reprompt until reset. |
+| `reference_file_content` | Synthetic content of `reference_file`. | Auto-filled; include token to inject content. |
+| `hallucinate` | Creativity / inference policy line. | Dropdown auto-generated if no `options`; canonical tokens: `critical`, `normal`, `high`, `low`, or omitted. `(omit)` removes the line. |
+| `think_deeply` | Reflective reasoning directive. | Usually supplied globally; auto-appends if token absent. |
+| `reminders` | Safety/quality reminders list. | Appended as blockquote list at end. |
+
+#### 4. Persistence (Per Template)
+
+Stored in `~/.prompt-automation/placeholder-overrides.json`:
+* `template_values` – last non-empty simple/list values for each template ID → auto pre-fill → GUI skips re-prompt unless you clear them.
+* `templates` – file placeholder paths + skip flags.
+* `template_globals` – snapshot of global values (see below) at the *first* run of a template.
+
+Manage via GUI: Options → Manage overrides (edit or remove), or CLI flags.
+
+#### 5. Global Variables (Define Once, Reuse Everywhere)
+
+Create / edit `globals.json` at your prompts root (`prompts/styles/globals.json`):
+
+```jsonc
+{
+   "schema": 1,
+   "type": "globals",
+   "global_placeholders": {
+      "hallucinate": "Absolutely no hallucination (critical)",
+      "think_deeply": "Reflect step-by-step; verify factual claims.",
+      "reminders": [
+         "Cite sources when possible",
+         "Flag uncertainties",
+         "Prefer concise, actionable structure"
+      ],
+      "company_name": "Acme Corp"
+   },
+   "notes": {
+      "hallucinate": "hallucinate – Creativity policy (omit / critical / normal / high / low).",
+      "think_deeply": "think_deeply – Appended reflective directive if token absent.",
+      "reminders": "reminders – Safety / quality bullet list appended at end.",
+      "company_name": "company_name – Injected brand identifier."
+   }
+}
+```
+
+How it works:
+1. On each render we merge `global_placeholders` into the template’s own `global_placeholders` (template wins on conflicts).
+2. The first time a given template ID renders we take a **snapshot** (stored under `template_globals`). Future runs reuse the snapshot even if `globals.json` changes (stable reproducibility).
+3. Auto-injection: If a global key’s token (e.g. `{{company_name}}`) appears in the template body and you did not explicitly prompt for it, its global value fills the slot without prompting.
+4. Special behaviors:
+    * `reminders`: appended as a blockquote section if present and not excluded.
+    * `think_deeply`: appended at end (if present globally), only if token not already placed and directive text not already present.
+    * `hallucinate`: treat like any normal token; if omitted or set to `(omit)` the line is removed when empty.
+
+Update a global for all templates:
+* Edit `globals.json`.
+* Delete snapshot entries (remove the template ID under `template_globals` in overrides) to force re-snapshot on next run.
+
+#### 6. Excluding Specific Globals per Template
+
+Add to template metadata:
+
+```json
+"metadata": {
+   "exclude_globals": ["reminders", "think_deeply"]
+}
+```
+* Excluded keys are removed **before** snapshot & auto-injection.
+* They stay suppressed until you edit the metadata.
+* You can edit this list via GUI: Options → Edit global exclusions.
+
+#### 7. “Prompt Once Then Make Global” Workflow
+
+1. Leave a variable (e.g. `hallucinate`) as a normal placeholder → collect your preferred policy.
+2. Copy chosen value into `globals.json.global_placeholders.hallucinate`.
+3. Remove the placeholder from templates (leave the token in body if you still want the line) or add `(omit)` semantics.
+4. Run template again → snapshot includes new policy; you will not be prompted for it anymore.
+
+#### 8. Reset / Maintenance Cheat Sheet
+
+| Task | Action |
+|------|--------|
+| Clear one file override | Options → Manage overrides → remove row (kind=file) |
+| Clear one simple value | Same dialog (kind=value) |
+| Reset all file overrides | Options → Reset reference files (or CLI flag) |
+| Refresh global values for one template | Delete its entry under `template_globals` in overrides file |
+| Suppress a global for one template | Add it to `metadata.exclude_globals` |
+| Re-enable a suppressed global | Remove from `exclude_globals` & delete snapshot if you want latest root value |
+
+#### 9. Hallucination Policy Levels
+
+| Canonical | Friendly Label (GUI) | Intent |
+|-----------|----------------------|--------|
+| (omit) | (omit) | No explicit policy line (token removed) |
+| critical | Absolutely no hallucination (critical) | Strict factual fidelity | 
+| normal | Balanced correctness & breadth (normal) | Balanced creativity |
+| high | Some creative inference allowed (high) | Moderate exploration |
+| low | Maximum creative exploration (low) | Max creativity; correctness secondary |
+
+To change default policy globally: edit `globals.json`, remove snapshots (optional), rerun templates.
+
+---
+
 ### New Template Wizard
 
 From the selector choose Options -> New template wizard to interactively:
