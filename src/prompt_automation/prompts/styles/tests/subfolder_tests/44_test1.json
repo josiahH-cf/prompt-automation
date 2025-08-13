@@ -74,21 +74,6 @@
       "name": "follow_ups",
       "multiline": true,
       "default": ""
-    },
-    {
-      "name": "hallucinate",
-      "multiline": false,
-      "default": ""
-    },
-    {
-      "name": "think_deeply",
-      "multiline": false,
-      "default": ""
-    },
-    {
-      "name": "reminders",
-      "multiline": true,
-      "default": ""
     }
   ],
   "global_placeholders": {},
