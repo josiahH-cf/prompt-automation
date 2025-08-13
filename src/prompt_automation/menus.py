@@ -156,6 +156,18 @@ def render_template(
     placeholders = tmpl.get("placeholders", [])
     template_id = tmpl.get("id")
 
+    # Read exclusion list for global placeholders from metadata.exclude_globals
+    meta = tmpl.get("metadata") if isinstance(tmpl.get("metadata"), dict) else {}
+    exclude_globals: set[str] = set()
+    try:  # robust parsing (list or comma-separated string)
+        raw_ex = meta.get("exclude_globals")
+        if isinstance(raw_ex, (list, tuple)):
+            exclude_globals = {str(x).strip() for x in raw_ex if str(x).strip()}
+        elif isinstance(raw_ex, str):
+            exclude_globals = {s.strip() for s in raw_ex.split(",") if s.strip()}
+    except Exception:
+        exclude_globals = set()
+
     # Merge global placeholders from root globals.json.
     # Previous behaviour only merged 'reminders'. We now merge *all* keys, letting
     # template-level global_placeholders override root. This powers auto-injection
@@ -178,6 +190,11 @@ def render_template(
         pass
     # Template globals after merging root globals (above)
     globals_map = tmpl.get("global_placeholders", {}) or {}
+    # Remove excluded keys pre-snapshot so they never persist
+    if exclude_globals:
+        for k in list(globals_map.keys()):
+            if k in exclude_globals:
+                globals_map.pop(k, None)
     # Create a one-time snapshot for this template so repeated runs stay stable
     if isinstance(template_id, int):
         # Create snapshot only if one doesn't exist; then merge (snapshot only supplies
@@ -190,6 +207,8 @@ def render_template(
         # test leakage where a prior run captured reminders, and a later run (without
         # reminders defined) would unexpectedly append them.
         for k, v in snap_merged.items():
+            if k in exclude_globals:
+                continue
             if k == "reminders" and k not in globals_map:
                 continue
             globals_map.setdefault(k, v)
@@ -255,6 +274,8 @@ def render_template(
         template_lines = tmpl.get("template", [])
         tmpl_text = "\n".join(template_lines)
         for gk, gv in gph_all.items():
+            if gk in exclude_globals:
+                continue
             if gk in vars:
                 continue  # user / placeholder value has precedence
             token = f"{{{{{gk}}}}}"
@@ -272,7 +293,7 @@ def render_template(
         gph = globals_map or {}
         # Only act on reminders if key explicitly present and truthy; prevents
         # unrelated globals (importance etc.) from causing default repo reminders.
-        if "reminders" in gph:
+        if "reminders" in gph and "reminders" not in exclude_globals:
             raw_rem = gph.get("reminders")
         else:
             raw_rem = None
@@ -307,12 +328,12 @@ def render_template(
             token = "{{think_deeply}}"
             # Only add if token absent from original template AND value not already in rendered
             if token not in "\n".join(tmpl.get("template", [])) and td_val.strip() not in rendered:
-                if not rendered.endswith("\n"):
-                    rendered += "\n"
-                # Separate from reminders block with an extra newline if reminders just added
-                if appended_reminders:
-                    rendered += "\n"
-                rendered += td_val.strip()
+                if "think_deeply" not in exclude_globals:
+                    if not rendered.endswith("\n"):
+                        rendered += "\n"
+                    if appended_reminders:
+                        rendered += "\n"
+                    rendered += td_val.strip()
     except Exception:
         pass
 

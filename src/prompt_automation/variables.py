@@ -236,6 +236,7 @@ __all__ = [
     "list_template_value_overrides",
     "reset_template_value_override",
     "reset_all_template_value_overrides",
+    "set_template_value_override",
 ]
 
 
@@ -398,10 +399,18 @@ def get_variables(
             opts = ph.get("options")
             # Provide friendly dropdown for hallucinate if not already specified
             if name == "hallucinate" and not opts:
+                # New ordering + semantics (user request):
+                # critical -> Absolutely no hallucination (strict correctness)
+                # normal  -> Balanced correctness & breadth
+                # high    -> Some creative inference allowed
+                # low     -> Maximum creative / ignore correctness (very permissive)
+                # First option '(omit)' means do not include token at all (line removed)
                 opts = [
+                    "(omit)",
                     "Absolutely no hallucination (critical)",
-                    "Balanced correctness & breadth (empty)",
-                    "Allow some creative inference (low)",
+                    "Balanced correctness & breadth (normal)",
+                    "Some creative inference allowed (high)",
+                    "Maximum creative exploration (low)",
                 ]
                 ph["_mapped_options"] = True
             multiline = ph.get("multiline", False) or ptype == "list"
@@ -476,16 +485,21 @@ def get_variables(
         if ptype == "list" and isinstance(val, str):
             val = [l for l in val.splitlines() if l]
         # Map hallucinate friendly phrase to canonical token
-        if name == "hallucinate" and ph.get("_mapped_options") and isinstance(val, str):
-            lower = val.lower()
-            if "low" in lower:
-                val = "low"
-            elif "normal" in lower:
-                val = "normal"
-            elif "critical" in lower:
-                val = "critical"
-            elif "high" in lower:
-                val = "high"
+        if name == "hallucinate":
+            if isinstance(val, str):
+                lower = val.lower()
+                if "omit" in lower or not lower.strip():
+                    val = None  # remove line entirely
+                elif "critical" in lower:
+                    val = "critical"
+                elif "normal" in lower:
+                    val = "normal"
+                elif "high" in lower:
+                    val = "high"
+                elif "low" in lower:
+                    val = "low"
+            elif val is None:
+                val = None
         values[name] = val
     # Persist simple values for future defaulting
     if template_id is not None:
@@ -638,4 +652,24 @@ def reset_all_template_value_overrides(template_id: int) -> bool:
         _save_overrides(raw_file)
         return True
     return False
+
+
+def set_template_value_override(template_id: int, name: str, value: Any) -> None:
+    """Programmatically set/update a simple (non-file) placeholder value override.
+
+    Creates parent structures as needed and persists immediately. Used by GUI
+    override editor to allow direct editing of persisted values.
+    """
+    try:
+        raw = _load_overrides()
+        tvals = raw.setdefault("template_values", {}).setdefault(str(template_id), {})
+        if value is None:
+            # Remove if explicitly set to None
+            if name in tvals:
+                tvals.pop(name, None)
+        else:
+            tvals[name] = value
+        _save_overrides(raw)
+    except Exception as e:  # pragma: no cover - defensive
+        _log.error("failed setting template value override %s/%s: %s", template_id, name, e)
 

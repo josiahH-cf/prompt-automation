@@ -439,10 +439,11 @@ def collect_variables_gui(template):
             try:
                 if name == "hallucinate" and not options:
                     options = [
-                        "Absolutely no hallucination (low)",
+                        "(omit)",
+                        "Absolutely no hallucination (critical)",
                         "Balanced correctness & breadth (normal)",
-                        "Allow some creative inference (high)",
-                        "Maximum creative exploration (critical)",
+                        "Some creative inference allowed (high)",
+                        "Maximum creative exploration (low)",
                     ]
                 value = collect_single_variable(name, label, ptype, options, multiline)
             finally:
@@ -451,14 +452,16 @@ def collect_variables_gui(template):
             return None
         if name == "hallucinate" and isinstance(value, str):
             low = value.lower()
-            if "low" in low:
-                value = "low"
-            elif "normal" in low:
-                value = "normal"
+            if "omit" in low or not low.strip():
+                value = None
             elif "critical" in low:
                 value = "critical"
+            elif "normal" in low:
+                value = "normal"
             elif "high" in low:
                 value = "high"
+            elif "low" in low:
+                value = "low"
         variables[name] = value
 
     # Persist simple values (non-file, scalar/list) for future sessions

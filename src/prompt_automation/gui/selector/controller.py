@@ -20,6 +20,9 @@ from ...variables import (
     reset_file_overrides,
     list_file_overrides,
     reset_single_file_override,
+    list_template_value_overrides,
+    reset_template_value_override,
+    set_template_value_override,
 )
 from ..new_template_wizard import open_new_template_wizard
 from ...shortcuts import load_shortcuts, save_shortcuts, renumber_templates, SHORTCUT_FILE
@@ -49,37 +52,79 @@ def _open_preview(parent: tk.Tk, entry: TemplateEntry) -> None:
 # --- Manage overrides dialog ----------------------------------------------
 
 def _manage_overrides(root: tk.Tk):
+    """Unified manager for file & simple value overrides with inline editing."""
     win = tk.Toplevel(root)
     win.title("Manage Overrides")
-    win.geometry("580x340")
+    win.geometry("760x420")
     frame = tk.Frame(win, padx=12, pady=12)
     frame.pack(fill="both", expand=True)
     hint = tk.Label(
         frame,
-        text="Remove an override to re-enable prompting.",
-        wraplength=520,
+        text="Double‑click a row to edit value (simple overrides). Delete removes. File overrides show path/skip.",
+        wraplength=720,
         justify="left",
         fg="#555",
     )
     hint.pack(anchor="w", pady=(0, 6))
-    tree = ttk.Treeview(frame, columns=("tid", "name", "data"), show="headings")
-    for col, w in ("tid",80), ("name",140), ("data",300):
-        tree.heading(col, text=col.capitalize())
-        tree.column(col, width=w, anchor="w")
+    cols = ("kind","tid","name","data")
+    tree = ttk.Treeview(frame, columns=cols, show="headings")
+    widths = {"kind":80, "tid":60, "name":160, "data":360}
+    for c in cols:
+        tree.heading(c, text=c.capitalize())
+        tree.column(c, width=widths[c], anchor="w")
     sb = tk.Scrollbar(frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=sb.set)
     tree.pack(side="left", fill="both", expand=True)
     sb.pack(side="right", fill="y")
-    for tid, name, info in list_file_overrides():
-        import json
-        tree.insert("", "end", values=(tid, name, json.dumps(info)))
+
+    import json
+    def _refresh():
+        tree.delete(*tree.get_children())
+        for tid, name, info in list_file_overrides():
+            tree.insert("", "end", values=("file", tid, name, json.dumps(info)))
+        for tid, name, val in list_template_value_overrides():
+            # show scalar/list succinctly
+            if isinstance(val, list):
+                display = ", ".join(str(v) for v in val[:5]) + (" …" if len(val) > 5 else "")
+            else:
+                display = str(val)
+            tree.insert("", "end", values=("value", tid, name, display))
+    _refresh()
+
+    def _edit(event=None):
+        sel = tree.selection()
+        if not sel: return
+        item = tree.item(sel[0]); kind, tid, name, data = item['values']
+        if kind != 'value':
+            return  # only simple values editable
+        dlg = tk.Toplevel(win)
+        dlg.title(f"Edit Override: {tid}/{name}")
+        tk.Label(dlg, text=f"Template {tid} – {name}").pack(padx=10,pady=(10,4))
+        txt = tk.Text(dlg, width=60, height=6, wrap='word')
+        txt.pack(padx=10, pady=4)
+        txt.insert('1.0', data)
+        def _ok():
+            val = txt.get('1.0','end-1c').strip()
+            set_template_value_override(int(tid), name, val)
+            _refresh(); dlg.destroy()
+        tk.Button(dlg, text='Save', command=_ok).pack(side='left', padx=10, pady=8)
+        tk.Button(dlg, text='Cancel', command=dlg.destroy).pack(side='left', padx=4, pady=8)
+        dlg.transient(win); dlg.grab_set(); txt.focus_set()
+        dlg.bind('<Escape>', lambda e: (dlg.destroy(),'break'))
+        dlg.bind('<Return>', lambda e: (_ok(),'break'))
+    tree.bind('<Double-1>', _edit)
+
     btns = tk.Frame(win); btns.pack(pady=8)
     def do_remove():
         sel = tree.selection()
         if not sel: return
-        item = tree.item(sel[0])
-        tid, name, _ = item['values']
-        if reset_single_file_override(int(tid), name):
+        item = tree.item(sel[0]); kind, tid, name, _ = item['values']
+        removed = False
+        if kind == 'file':
+            removed = reset_single_file_override(int(tid), name)
+        else:
+            removed = reset_template_value_override(int(tid), name)
+        if removed:
             tree.delete(sel[0])
     tk.Button(btns, text="Remove Selected", command=do_remove).pack(side="left", padx=4)
     tk.Button(btns, text="Close", command=win.destroy).pack(side="left", padx=4)
@@ -106,6 +151,86 @@ def open_template_selector() -> Optional[dict]:
             messagebox.showinfo("Reset", "No overrides found.")
     opt.add_command(label="Reset reference files", command=do_reset_refs, accelerator="Ctrl+Shift+R")
     opt.add_command(label="Manage overrides", command=lambda: _manage_overrides(root))
+    def _edit_exclusions():
+        try:
+            import json
+            from ...config import PROMPTS_DIR as _PD
+        except Exception:
+            return
+        dlg = tk.Toplevel(root)
+        dlg.title("Edit Global Exclusions (exclude_globals)")
+        dlg.geometry("640x400")
+        tk.Label(dlg, text="Enter template ID (numeric) or browse to load its metadata.").pack(anchor='w', padx=10, pady=(10,4))
+        topf = tk.Frame(dlg); topf.pack(fill='x', padx=10)
+        id_var = tk.StringVar()
+        tk.Entry(topf, textvariable=id_var, width=10).pack(side='left')
+        status_var = tk.StringVar(value="")
+        tk.Label(dlg, textvariable=status_var, fg="#555").pack(anchor='w', padx=10, pady=(4,4))
+        txt = tk.Text(dlg, wrap='word')
+        txt.pack(fill='both', expand=True, padx=10, pady=6)
+        txt.insert('1.0', "# Enter one global key per line to exclude for this template\n")
+        current_path: list[Path] = []
+        def _load():
+            tid = id_var.get().strip()
+            if not tid.isdigit():
+                status_var.set("Template id must be numeric")
+                return
+            # search for file with matching id
+            target = None
+            for p in _PD.rglob("*.json"):
+                try:
+                    data = json.loads(p.read_text())
+                except Exception:
+                    continue
+                if data.get('id') == int(tid):
+                    target = (p, data); break
+            if not target:
+                status_var.set("Template not found")
+                return
+            p, data = target
+            current_path.clear(); current_path.append(p)
+            meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
+            raw_ex = meta.get('exclude_globals')
+            lines = []
+            if isinstance(raw_ex, (list, tuple)):
+                lines = [str(x) for x in raw_ex]
+            elif isinstance(raw_ex, str):
+                if ',' in raw_ex:
+                    lines = [s.strip() for s in raw_ex.split(',') if s.strip()]
+                elif raw_ex.strip():
+                    lines = [raw_ex.strip()]
+            txt.delete('1.0','end')
+            if lines:
+                txt.insert('1.0', "\n".join(lines))
+            status_var.set(f"Loaded {p.name}")
+        def _save():
+            if not current_path:
+                status_var.set("Load a template first")
+                return
+            p = current_path[0]
+            try:
+                data = json.loads(p.read_text())
+            except Exception as e:
+                status_var.set(f"Read error: {e}")
+                return
+            meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
+            if not isinstance(meta, dict):
+                meta = {}; data['metadata'] = meta
+            raw = [l.strip() for l in txt.get('1.0','end-1c').splitlines() if l.strip() and not l.strip().startswith('#')]
+            if raw:
+                meta['exclude_globals'] = raw
+            else:
+                meta.pop('exclude_globals', None)
+            try:
+                p.write_text(json.dumps(data, indent=2))
+                status_var.set("Saved")
+            except Exception as e:
+                status_var.set(f"Write error: {e}")
+        tk.Button(topf, text="Load", command=_load).pack(side='left', padx=6)
+        tk.Button(topf, text="Save", command=_save).pack(side='left')
+        tk.Button(topf, text="Close", command=dlg.destroy).pack(side='right')
+        dlg.transient(root); dlg.grab_set(); dlg.focus_set()
+    opt.add_command(label="Edit global exclusions", command=_edit_exclusions)
     opt.add_separator()
     opt.add_command(label="New template wizard", command=lambda: open_new_template_wizard())
     opt.add_separator()
