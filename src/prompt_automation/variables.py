@@ -291,27 +291,32 @@ def _print_one_time_skip_reminder(data: dict, template_id: int, name: str) -> No
 
 def _resolve_file_placeholder(ph: Dict[str, Any], template_id: int, globals_map: Dict[str, Any]) -> str:
     name = ph["name"]
+    # Opt-in override persistence: only persist/read if placeholder sets override=true
+    persist_override = bool(ph.get("override") is True)
+    if not persist_override:
+        # Simple one-off selection without persistence
+        label = ph.get("label", name)
+        chosen = _gui_file_prompt(label) or input(f"File for {label} (leave blank to skip): ").strip()
+        if chosen and Path(chosen).expanduser().exists():
+            return str(Path(chosen).expanduser())
+        return ""
+
     overrides = _load_overrides()
     entry = _get_template_entry(overrides, template_id, name) or {}
 
-    # Persisted skip takes precedence (GUI/CLI user action only)
     if entry.get("skip"):
         _print_one_time_skip_reminder(overrides, template_id, name)
         return ""
 
-    # If path stored and exists, return
     path_str = entry.get("path")
     if path_str:
         p = Path(path_str).expanduser()
         if p.exists():
             return str(p)
-        # if missing ask again
 
-    # Offer selection or skip permanently
     label = ph.get("label", name)
     chosen = _gui_file_prompt(label)
     if not chosen:
-        # Ask via CLI fallback for skip/permanent skip
         while True:
             choice = input(f"No file selected for {label}. (c)hoose again, (s)kip, (p)ermanent skip: ").lower().strip() or "c"
             if choice in {"c", "choose"}:
@@ -327,7 +332,7 @@ def _resolve_file_placeholder(ph: Dict[str, Any], template_id: int, globals_map:
                 _save_overrides(overrides)
                 _print_one_time_skip_reminder(overrides, template_id, name)
                 return ""
-        # fallthrough with chosen
+        # fallthrough
     if chosen and Path(chosen).expanduser().exists():
         _set_template_entry(overrides, template_id, name, {"path": str(Path(chosen).expanduser()), "skip": False})
         _save_overrides(overrides)

@@ -130,39 +130,72 @@ def validate_template(data: Dict) -> bool:
 def fill_placeholders(
     lines: Iterable[str], vars: Dict[str, Union[str, Sequence[str], None]]
 ) -> str:
-    """Replace ``{{name}}`` placeholders with values.
+    """Replace ``{{name}}`` placeholders with values with indentation-aware expansion.
 
-    ``vars`` may contain either strings or sequences of strings. Sequence
-    values (used for dynamic list placeholders) are joined with newlines before
-    replacement. ``None`` or empty string values cause the entire line containing
-    the placeholder to be removed.
+    Behaviour improvements:
+      - Multi-line replacements maintain the indentation level of the original
+        placeholder line (when the placeholder token was the only non-whitespace
+        content on that line). Subsequent lines are prefixed with the same indent.
+      - Sequence values are joined by newlines (unchanged from prior behaviour).
+      - Empty / None values remove the entire line containing the placeholder.
     """
 
     out: List[str] = []
     for line in lines:
-        skip_line = False
-        for k, v in vars.items():
-            placeholder = f"{{{{{k}}}}}"
-            if placeholder not in line:
-                continue
+        original_line = line
+        placeholders_in_line: List[str] = []
+        replacement_map: Dict[str, str] = {}
+        empty_tokens: set[str] = set()
 
+        # First pass: detect tokens present
+        for k in vars.keys():
+            token = f"{{{{{k}}}}}"
+            if token in line:
+                placeholders_in_line.append(token)
+
+        if not placeholders_in_line:
+            out.append(line)
+            continue
+
+        # Gather replacements
+        for token in placeholders_in_line:
+            key = token[2:-2]
+            v = vars.get(key)
             if v is None:
-                skip_line = True
-                break
+                empty_tokens.add(token)
+                replacement_map[token] = ""
+                continue
             if isinstance(v, (list, tuple)):
                 repl = "\n".join(str(item) for item in v)
-                if not repl.strip():
-                    skip_line = True
-                    break
             else:
                 repl = str(v)
-                if not repl.strip():
-                    skip_line = True
-                    break
-            line = line.replace(placeholder, repl)
+            if not repl.strip():
+                empty_tokens.add(token)
+                repl = ""
+            # Indentation handling if token alone on its line
+            if original_line.strip() == token and repl and "\n" in repl:
+                indent = original_line[: len(original_line) - len(original_line.lstrip())]
+                parts = repl.split("\n")
+                if parts:
+                    first = parts[0]
+                    rest = [indent + p if p.strip() else indent + p for p in parts[1:]]
+                    repl = first + ("\n" + "\n".join(rest) if rest else "")
+            replacement_map[token] = repl
 
-        if not skip_line:
-            out.append(line)
+        # Decide skipping: skip only if all placeholders empty AND removing them leaves no other visible text
+        non_empty_tokens = [t for t in placeholders_in_line if t not in empty_tokens]
+        if not non_empty_tokens:
+            # Remove tokens to inspect residual text
+            residual = original_line
+            for t in placeholders_in_line:
+                residual = residual.replace(t, "")
+            if not residual.strip():
+                # Entire line was just empty placeholders
+                continue
+        # Apply replacements (including empty strings) sequentially
+        for token, repl in replacement_map.items():
+            line = line.replace(token, repl)
+        out.append(line)
     return "\n".join(out)
 
 

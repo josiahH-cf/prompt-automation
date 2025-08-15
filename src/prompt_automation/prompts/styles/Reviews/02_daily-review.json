@@ -3,101 +3,91 @@
   "id": 2,
   "title": "Daily Review",
   "style": "Reviews",
-  "role": "{{role}}",
-  "template": [
-    "## Objectives - changed file",
-    "{{objective}}",
-    "",
-    "## Context",
-    "{{context}}",
-    "",
-    "## Instructions",
-    "{{instructions}}",
-    "",
-    "## Inputs",
-    "{{inputs}}",
-    "",
-    "## Constraints",
-    "{{constraints}}",
-    "",
-    "## Output Format",
-    "{{output_format}}",
-    "",
-    "## Quality Checks",
-    "{{quality_checks}}",
-    "",
-    "## Follow-ups",
-    "{{follow_ups}}"
-  ],
   "placeholders": [
     {
-      "name": "role",
-      "label": "Role",
-      "multiline": false,
-      "required": true,
-      "default": "assistant"
-    },
-    {
-      "name": "objective",
-      "label": "Objective",
-      "multiline": false,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "context",
-      "label": "Context",
+      "name": "morning",
+      "label": "Morning (DEEP WORK) - What is your plan for deep work this morning?",
       "multiline": true,
       "required": false,
       "default": ""
     },
     {
-      "name": "instructions",
-      "label": "Instructions",
+      "name": "automation",
+      "label": "AI Automation (Can anything be automated by AI today? What's the plan?)",
       "multiline": true,
-      "required": true,
+      "format": "checklist",
+      "required": false,
       "default": ""
     },
     {
-      "name": "inputs",
-      "label": "Inputs",
+      "name": "work",
+      "label": "Work (What is your plan for work today?)",
       "multiline": true,
-      "required": true,
+      "format": "bullet",
+      "required": false,
       "default": ""
     },
     {
-      "name": "constraints",
-      "label": "Constraints",
+      "name": "meetings",
+      "label": "Shallow Work / Meetings (What meetings or shallow work do you have to prepare for today?)",
       "multiline": true,
       "required": false,
       "default": ""
     },
     {
-      "name": "output_format",
-      "label": "Output Format",
+      "name": "evenings",
+      "label": "Evenings (What is your plan for your evenings today?)",
       "multiline": true,
       "required": false,
       "default": ""
     },
     {
-      "name": "quality_checks",
-      "label": "Quality Checks",
+      "name": "outcomes",
+      "label": "Outcomes (What specific outcomes will you produce?)",
       "multiline": true,
       "required": false,
       "default": ""
     },
     {
-      "name": "follow_ups",
-      "label": "Follow-ups",
+      "name": "habits",
+      "label": "Habits (Plan for positive / avoiding habits today)",
       "multiline": true,
       "required": false,
       "default": ""
     }
   ],
+  "template": [
+    "- Morning (DEEP WORK)",
+    "  {{morning}}",
+    "",
+    "- AI Automation Opportunities (Can anything be automated by AI today? What's the plan?)",
+    "  {{automation}}",
+    "",
+    "- Work",
+    "  {{work}}",
+    "",
+    "- Shallow Work / Meetings",
+    "  {{meetings}}",
+    "",
+    "- Evenings",
+    "  {{evenings}}",
+    "",
+    "- Outcomes: What specific outcomes will you produce?",
+    "  {{outcomes}}",
+    "",
+    "- Habits - go through the specific plan for your habits today (positive or avoiding) and ensure that you have an actionable plan for the habits you're focusing on today",
+    "  {{habits}}"
+  ],
   "metadata": {
     "path": "Reviews/daily-review.json",
-    "tags": [],
-    "version": 1,
+    "tags": [
+      "review",
+      "daily",
+      "reflection",
+      "planning",
+      "habits"
+    ],
+    "version": 3,
     "render": "markdown",
     "share_this_file_openly": true
   }

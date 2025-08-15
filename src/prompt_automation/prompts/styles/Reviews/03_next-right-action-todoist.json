@@ -3,130 +3,78 @@
   "id": 3,
   "title": "Next Right Action Todoist",
   "style": "Reviews",
-  "role": "{{role}}",
-  "template": [
-    "## Objective",
-    "{{objective}}",
-    "",
-    "## Context",
-    "{{context}}",
-    "",
-    "## Instructions",
-    "{{instructions}}",
-    "",
-    "## Inputs",
-    "{{inputs}}",
-    "",
-    "## Constraints",
-    "{{constraints}}",
-    "",
-    "## Output Format",
-    "{{output_format}}",
-    "",
-    "## Quality Checks",
-    "{{quality_checks}}",
-    "",
-    "## Follow-ups",
-    "{{follow_ups}}"
-  ],
   "placeholders": [
     {
-      "name": "role",
-      "label": "Role",
+      "name": "next_action",
+      "label": "Next Action (What will you concretely do next?)",
+      "multiline": true,
+      "default": "",
+      "format": "list",
+      "remove_if_empty": [
+        "I will",
+        "Next Action",
+        "- Next Action"
+      ]
+    },
+    {
+      "name": "why",
+      "label": "Purpose / End State (Why & what end state will this move toward?)",
+      "multiline": true,
+      "default": "",
+      "remove_if_empty": [
+        "so that",
+        "Purpose / End State",
+        "- Purpose / End State"
+      ]
+    },
+    {
+      "name": "approach",
+      "label": "Approach (How will you execute? Steps / strategy)",
+      "multiline": true,
+      "default": "",
+      "format": "list",
+      "remove_if_empty": [
+        "Approach",
+        "- Approach",
+        "I will take the following approach"
+      ]
+    },
+    {
+      "name": "time_estimate",
+      "label": "Time Estimate (e.g. 30m, 2h, 1 pomodoro)",
       "multiline": false,
-      "required": true,
-      "default": "assistant"
+      "default": "",
+      "remove_if_empty": [
+        "It will take",
+        "Time Estimate",
+        "- Time Estimate"
+      ]
     },
     {
-      "name": "objective",
-      "label": "Objective",
-      "multiline": false,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "context",
-      "label": "Context",
+      "name": "risks",
+      "label": "Risks / Constraints (Optional)",
       "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "instructions",
-      "label": "Instructions",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "inputs",
-      "label": "Inputs",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "constraints",
-      "label": "Constraints",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "output_format",
-      "label": "Output Format",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "quality_checks",
-      "label": "Quality Checks",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "follow_ups",
-      "label": "Follow-ups",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "importance",
-      "label": "Importance (Hallucination Guard Level)",
-      "multiline": false,
-      "required": false,
-      "default": "normal",
-      "description": "How important is correctness? Suggested: low | normal | high | critical."
-    },
-    {
-      "name": "think_deeply",
-      "label": "Think Deeply (Use Sparingly)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. Reminder: you only have so many deep-think invocations."
-    },
-    {
-      "name": "two_parter",
-      "label": "Two-Parter Flow (Paste + Follow Up)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. If yes, expect a second pass after initial paste."
+      "default": "",
+      "format": "list",
+      "remove_if_empty": [
+        "Risks / Constraints",
+        "- Risks / Constraints"
+      ]
     }
   ],
-  "global_placeholders": {
-    "importance": "normal",
-    "think_deeply": "no",
-    "two_parter": "no"
-  },
+  "template": [
+    "I will {{next_action}} so that {{why}}. I will take the following approach {{approach}}. It will take {{time_estimate}}. {{risks}}"
+  ],
   "metadata": {
     "path": "Reviews/next-right-action-todoist.json",
-    "tags": [],
-    "version": 1,
+    "tags": [
+      "todoist",
+      "next-action",
+      "planning",
+      "focus"
+    ],
+    "version": 4,
+    "trim_blanks": true,
     "render": "markdown",
     "share_this_file_openly": true
   }

@@ -14,6 +14,7 @@ Feature additions:
 from __future__ import annotations
 
 import json
+import re
 from .utils import safe_run
 import shutil
 from pathlib import Path
@@ -286,7 +287,132 @@ def render_template(
                 else:
                     vars[gk] = gv
 
+    # Pre-format variables based on optional formatting hints.
+    # A placeholder may supply a 'format' or 'as' key with values:
+    #   - 'list': treat multi-line user input or sequence as bullet list (- item)
+    #   - 'checklist': bullet list with unchecked markdown checkboxes (- [ ] item)
+    #   - 'auto': if every non-empty line looks like a task prefix (*,-,number,[ ]) leave as-is, else convert to bullets
+    fmt_map: dict[str, str] = {}
+    for ph in placeholders:
+        name = ph.get("name")
+        if not name:
+            continue
+        fmt = ph.get("format") or ph.get("as")  # allow alias 'as'
+        if isinstance(fmt, str):
+            fmt_map[name] = fmt.lower().strip()
+
+    def _normalize_lines(val: Union[str, Sequence[str]]) -> list[str]:
+        if isinstance(val, (list, tuple)):
+            lines: list[str] = []
+            for item in val:
+                lines.extend(str(item).splitlines())
+            return lines
+        else:
+            return str(val).splitlines()
+
+    for name, fmt in fmt_map.items():
+        raw_val = vars.get(name)
+        if not raw_val:
+            continue
+        lines = _normalize_lines(raw_val)
+        # Strip trailing/leading blank lines logically
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if not lines:
+            continue
+        def to_bullets(lines: list[str], prefix: str) -> list[str]:
+            out: list[str] = []
+            for ln in lines:
+                if not ln.strip():
+                    continue
+                if ln.lstrip().startswith(prefix.strip()) and '[' in prefix:  # already checkbox maybe
+                    out.append(ln)
+                else:
+                    out.append(f"{prefix}{ln.strip()}")
+            return out
+        if fmt == "list":
+            new_lines = to_bullets(lines, "- ")
+        elif fmt == "checklist":
+            new_lines = to_bullets(lines, "- [ ] ")
+        elif fmt == "auto":
+            # Heuristic: if all lines already start with bullet/list token keep; else bulletize
+            tokens = ("- ", "* ", "+ ", "- [", "* [")
+            if all(any(ln.lstrip().startswith(t) for t in tokens) for ln in lines if ln.strip()):
+                new_lines = lines
+            else:
+                new_lines = to_bullets(lines, "- ")
+        else:
+            continue
+        vars[name] = "\n".join(new_lines)
+
     rendered = fill_placeholders(tmpl["template"], vars)
+
+    # Post-render cleanup: phrase removal for empty placeholders + whitespace trimming
+    try:
+        # Remove inline phrases tied to empty placeholders
+        for ph in placeholders:
+            name = ph.get("name")
+            if not name:
+                continue
+            val = vars.get(name)
+            if val is not None and str(val).strip():
+                continue  # has content
+            phrases = ph.get("remove_if_empty") or ph.get("remove_if_empty_phrases")
+            if not phrases:
+                continue
+            if isinstance(phrases, str):
+                phrases = [phrases]
+            for phrase in phrases:
+                if not isinstance(phrase, str) or not phrase.strip():
+                    continue
+                # Pattern: optional leading space/start, phrase, optional trailing space before punctuation
+                pattern = re.compile(rf"(\s|^){re.escape(phrase.strip())}(?=\s*[.,;:!?])", re.IGNORECASE)
+                rendered = pattern.sub(lambda m: m.group(1) if m.group(1).isspace() else "", rendered)
+                # Also remove occurrences not followed by punctuation but trailing spaces
+                pattern2 = re.compile(rf"(\s|^){re.escape(phrase.strip())}\s+", re.IGNORECASE)
+                rendered = pattern2.sub(lambda m: m.group(1) if m.group(1).isspace() else "", rendered)
+
+        meta = tmpl.get("metadata", {}) if isinstance(tmpl.get("metadata"), dict) else {}
+        # Global trim_blanks resolution order: metadata > globals.json(render_settings/trim_blanks) > env var > default True
+        trim_blanks_flag = meta.get("trim_blanks")
+        if trim_blanks_flag is None:
+            try:
+                gfile = PROMPTS_DIR / "globals.json"
+                if gfile.exists():
+                    gdata = json.loads(gfile.read_text())
+                    # Accept several possible key locations
+                    trim_blanks_flag = (
+                        gdata.get("render_settings", {}).get("trim_blanks")
+                        or gdata.get("global_settings", {}).get("trim_blanks")
+                        or gdata.get("trim_blanks")
+                    )
+            except Exception:
+                trim_blanks_flag = None
+        if trim_blanks_flag is None:
+            env_val = os.environ.get("PROMPT_AUTOMATION_TRIM_BLANKS")
+            if env_val is not None:
+                if env_val.lower() in {"0","false","no","off"}:
+                    trim_blanks_flag = False
+                else:
+                    trim_blanks_flag = True
+        if trim_blanks_flag is None:
+            trim_blanks_flag = True
+
+        if trim_blanks_flag:
+            # Collapse multiple spaces
+            rendered = re.sub(r"[ \t]{2,}", " ", rendered)
+            # Remove spaces before punctuation
+            rendered = re.sub(r"\s+([.,;:!?])", r"\1", rendered)
+            # Collapse >2 blank lines to max 1
+            rendered = re.sub(r"\n{3,}", "\n\n", rendered)
+            # Strip trailing spaces per line
+            rendered = "\n".join(l.rstrip() for l in rendered.splitlines())
+            # Final trim newline
+            rendered = rendered.strip() + "\n"
+    except Exception:
+        pass
 
     # Reminders block (blockquote markdown) + optional think_deeply append after block
     try:
