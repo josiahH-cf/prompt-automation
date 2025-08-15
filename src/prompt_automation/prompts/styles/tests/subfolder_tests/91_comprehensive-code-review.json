@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": 91,
+  "title": "Comprehensive Code Review",
+  "style": "Code",
+  "role": "{{role}}",
+  "placeholders": [
+    {
+      "name": "role",
+      "default": "assistant"
+    },
+    {
+      "name": "objective",
+      "default": "Review the given code for correctness, efficiency, and style."
+    },
+    {
+      "name": "context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "instructions",
+      "multiline": true,
+      "default": "Provide constructive feedback and suggest improvements."
+    },
+    {
+      "name": "inputs",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "constraints",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "output_format",
+      "multiline": true,
+      "default": "Summary of issues found with suggestions for improvements."
+    },
+    {
+      "name": "quality_checks",
+      "multiline": true,
+      "default": "No critical bugs; follows coding standards; efficient algorithms."
+    }
+  ],
+  "template": [
+    "{{role}}",
+    "",
+    "## Code Review Objective",
+    "{{objective}}",
+    "",
+    "## Code Context",
+    "{{context}}",
+    "",
+    "## Instructions",
+    "{{instructions}}",
+    "",
+    "## Inputs",
+    "{{inputs}}",
+    "",
+    "## Constraints",
+    "{{constraints}}",
+    "",
+    "## Output Format",
+    "{{output_format}}",
+    "",
+    "## Quality Checks",
+    "{{quality_checks}}",
+    "",
+    "Creativity Policy: {{hallucinate}}",
+    "",
+    "{{company_name}}"
+  ],
+  "global_placeholders": {
+    "hallucinate": "normal"
+  },
+  "metadata": {
+    "path": "Code/91_code_review.json",
+    "tags": [],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

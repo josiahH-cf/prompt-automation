@@ -12,6 +12,8 @@ from ..variables import (
     _set_template_entry,
     load_template_value_memory,
     persist_template_values,
+    get_remembered_context,
+    set_remembered_context,
 )
 
 # sentinel object to signal user cancellation during input collection
@@ -119,7 +121,11 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
 
 def collect_context_variable_gui(label: str):
-    """Collect context text with optional file loading."""
+    """Collect context text with optional file loading and remember toggle.
+
+    Returns (value, selected_path, remember_flag). If user cancels, value is CANCELLED.
+    Submission uses Ctrl+Enter (Enter inserts newline) to match multiline convention.
+    """
     import tkinter as tk
     from tkinter import filedialog
 
@@ -134,6 +140,12 @@ def collect_context_variable_gui(label: str):
 
     result = CANCELLED
     selected_path = ""
+    remember_flag = False
+    # Fetch any previously remembered context
+    try:
+        remembered_context = get_remembered_context()
+    except Exception:
+        remembered_context = None
 
     main_frame = tk.Frame(root, padx=20, pady=20)
     main_frame.pack(fill="both", expand=True)
@@ -168,13 +180,38 @@ def collect_context_variable_gui(label: str):
     browse_btn.pack(side="right")
 
     button_frame = tk.Frame(main_frame)
-    button_frame.pack(pady=(10, 0))
+    button_frame.pack(pady=(10, 0), fill="x")
+
+    remember_var = tk.BooleanVar(value=bool(remembered_context))
+    remember_chk = tk.Checkbutton(button_frame, text="Remember for session", variable=remember_var)
+    remember_chk.pack(side="left", padx=(0, 12))
+
+    def clear_remembered():
+        nonlocal remembered_context
+        set_remembered_context(None)
+        remembered_context = None
+        remember_var.set(False)
+        # Only clear text if it exactly matches previous remembered value (avoid erasing user edits)
+        try:
+            current = text_widget.get("1.0", "end-1c")
+            if current.strip() == (remembered_context or "").strip():
+                text_widget.delete("1.0", "end")
+        except Exception:
+            pass
+        clear_btn.config(state="disabled")
+
+    clear_btn = tk.Button(button_frame, text="Clear Remembered", command=clear_remembered,
+                          font=("Arial", 9))
+    clear_btn.pack(side="left")
+    if not remembered_context:
+        clear_btn.config(state="disabled")
 
     def on_ok():
-        nonlocal result, selected_path
+        nonlocal result, selected_path, remember_flag
         result = text_widget.get("1.0", "end-1c")
         if path_var.get():
             selected_path = path_var.get()
+        remember_flag = bool(remember_var.get())
         root.destroy()
 
     def on_cancel():
@@ -182,7 +219,7 @@ def collect_context_variable_gui(label: str):
         result = CANCELLED
         root.destroy()
 
-    ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, font=("Arial", 10), padx=20)
+    ok_btn = tk.Button(button_frame, text="OK (Ctrl+Enter)", command=on_ok, font=("Arial", 10), padx=20)
     ok_btn.pack(side="left", padx=(0, 10))
 
     cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel, font=("Arial", 10), padx=20)
@@ -192,8 +229,12 @@ def collect_context_variable_gui(label: str):
     root.bind("<Control-KP_Enter>", lambda e: (on_ok(), "break"))
     root.bind("<Escape>", lambda e: (on_cancel(), "break"))
 
+    # Prefill with remembered context if present and editor is blank
+    if remembered_context and not text_widget.get("1.0", "end-1c").strip():
+        text_widget.insert("1.0", remembered_context)
+
     root.mainloop()
-    return result, selected_path
+    return result, selected_path, remember_flag
 
 
 def show_reference_file_content(path: str) -> None:
@@ -422,12 +463,20 @@ def collect_variables_gui(template):
             continue
 
         if name == "context":
-            value, ctx_path = collect_context_variable_gui(label)
+            # If there is a remembered context and user has not yet supplied one, prefill it
+            remembered = get_remembered_context()
+            value, ctx_path, remember_ctx = collect_context_variable_gui(label)
             if value is CANCELLED:
                 return None
             variables[name] = value
             if ctx_path:
                 variables["context_append_file"] = ctx_path
+            if remember_ctx:
+                variables["context_remembered"] = value
+                set_remembered_context(value)
+            elif remembered and not value.strip():
+                # If user left it blank but a remembered context exists, reuse remembered
+                variables[name] = remembered
             continue
 
         if ptype == "file":
@@ -650,7 +699,8 @@ def collect_single_variable(name, label, ptype, options, multiline):
         result = CANCELLED
         root.destroy()
 
-    ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, font=("Arial", 10), padx=20)
+    submit_label = "OK (Ctrl+Enter)" if isinstance(input_widget, tk.Text) else "OK (Enter)"
+    ok_btn = tk.Button(button_frame, text=submit_label, command=on_ok, font=("Arial", 10), padx=20)
     ok_btn.pack(side="left", padx=(0, 10))
 
     cancel_btn = tk.Button(

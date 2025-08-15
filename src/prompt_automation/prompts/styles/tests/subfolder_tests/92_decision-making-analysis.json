@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": 92,
+  "title": "Decision-Making Analysis",
+  "style": "Decision-Making",
+  "role": "{{role}}",
+  "placeholders": [
+    {
+      "name": "role",
+      "default": "assistant"
+    },
+    {
+      "name": "objective",
+      "default": "Evaluate options and recommend the best choice based on criteria."
+    },
+    {
+      "name": "context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "options",
+      "type": "list",
+      "default": ""
+    },
+    {
+      "name": "criteria",
+      "type": "list",
+      "default": ""
+    },
+    {
+      "name": "instructions",
+      "multiline": true,
+      "default": "Analyze each option against each criterion, weigh pros and cons, and provide a recommendation."
+    },
+    {
+      "name": "constraints",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "output_format",
+      "multiline": true,
+      "default": "A table comparing options versus criteria, followed by a recommendation paragraph."
+    },
+    {
+      "name": "quality_checks",
+      "multiline": true,
+      "default": "Clearly justify recommendation; consider all options; align with objectives."
+    }
+  ],
+  "template": [
+    "{{role}}",
+    "",
+    "## Decision Objective",
+    "{{objective}}",
+    "",
+    "## Context",
+    "{{context}}",
+    "",
+    "## Options",
+    "{{options}}",
+    "",
+    "## Criteria",
+    "{{criteria}}",
+    "",
+    "## Instructions",
+    "{{instructions}}",
+    "",
+    "## Constraints",
+    "{{constraints}}",
+    "",
+    "## Output Format",
+    "{{output_format}}",
+    "",
+    "## Quality Checks",
+    "{{quality_checks}}",
+    "",
+    "Creativity Policy: {{hallucinate}}",
+    "",
+    "{{company_name}}"
+  ],
+  "global_placeholders": {
+    "hallucinate": "normal"
+  },
+  "metadata": {
+    "path": "Decision-Making/92_decision_analysis.json",
+    "tags": [],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

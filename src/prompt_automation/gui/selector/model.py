@@ -29,14 +29,11 @@ class BrowserState:
 
     def build(self) -> None:
         self.items.clear()
-        if self.current != self.root:
-            self.items.append(ListingItem(type="up", display="[..]"))
-        # dirs
+        # First collect dirs and templates
         for child in sorted([p for p in self.current.iterdir() if p.is_dir()]):
             if child.name.lower() == "settings":
                 continue
             self.items.append(ListingItem(type="dir", path=child, display=child.name+"/"))
-        # templates
         for child in sorted([p for p in self.current.iterdir() if p.is_file() and p.suffix.lower()==".json"]):
             if child.name.lower()=="settings.json":
                 continue
@@ -47,6 +44,9 @@ class BrowserState:
                 self.items.append(ListingItem(type="template", path=child, template=TemplateEntry(child, data), display=child.name))
             except Exception:
                 continue
+        # Append navigation 'up' control at the bottom (requested UX)
+        if self.current != self.root:
+            self.items.append(ListingItem(type="up", display="[..]"))
         if not self.items:
             self.items.append(ListingItem(type="empty", display="<empty>"))
 

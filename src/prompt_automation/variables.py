@@ -155,7 +155,7 @@ def _gui_file_prompt(label: str) -> str | None:
 # ----------------- Persistence helpers -----------------
 
 def _load_overrides() -> dict:
-    base = {"templates": {}, "reminders": {}, "template_globals": {}, "template_values": {}}
+    base = {"templates": {}, "reminders": {}, "template_globals": {}, "template_values": {}, "session": {}}
     if _PERSIST_FILE.exists():
         try:
             base = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
@@ -188,6 +188,22 @@ def _get_template_entry(data: dict, template_id: int, name: str) -> dict | None:
 
 def _set_template_entry(data: dict, template_id: int, name: str, payload: dict) -> None:
     data.setdefault("templates", {}).setdefault(str(template_id), {})[name] = payload
+
+# ----------------- Session context memory -----------------
+
+def get_remembered_context() -> str | None:
+    """Return remembered context text if set this session (persisted in overrides)."""
+    data = _load_overrides()
+    return data.get("session", {}).get("remembered_context")
+
+def set_remembered_context(text: str | None) -> None:
+    data = _load_overrides()
+    sess = data.setdefault("session", {})
+    if text:
+        sess["remembered_context"] = text
+    else:
+        sess.pop("remembered_context", None)
+    _save_overrides(data)
 
 # ----------------- Global overrides (per-template snapshot of global_placeholders) ----
 

@@ -15,7 +15,7 @@ from tkinter import ttk, messagebox
 from pathlib import Path
 from typing import List, Optional
 
-from .model import create_browser_state, ListingItem, TemplateEntry
+from .model import create_browser_state, ListingItem, TemplateEntry, BrowserState
 from ...variables import (
     reset_file_overrides,
     list_file_overrides,
@@ -138,8 +138,20 @@ def open_template_selector() -> Optional[dict]:
     root.resizable(True, True)
     root.lift(); root.focus_force(); root.attributes("-topmost", True); root.after(120, lambda: root.attributes("-topmost", False))
 
+
+    # Build two browsers: one for shared (PROMPTS_DIR), and optionally one for local/private
     browser = create_browser_state()
     browser.build()
+    # Try to build local/private browser if exists
+    from ...config import PROMPTS_DIR as _PD
+    local_dir = _PD.parent / "local"
+    local_browser: Optional[BrowserState] = None
+    try:
+        if local_dir.exists() and local_dir.is_dir():
+            local_browser = BrowserState(local_dir)
+            local_browser.build()
+    except Exception:
+        local_browser = None
 
     # Menu
     menubar = tk.Menu(root); root.config(menu=menubar)
@@ -271,17 +283,67 @@ def open_template_selector() -> Optional[dict]:
     preview_win: Optional[tk.Toplevel] = None  # for toggle behaviour (Ctrl+P)
     multi_selected: List[dict] = []
 
+    # Track which domain is active ('shared' or 'local')
+    active_domain = 'shared'
+    # flat_items holds ListingItem objects (may include headers/back) for display
+    flat_items: List[ListingItem] = []
+
     def refresh(display_items: Optional[List[ListingItem]] = None):
-        nonlocal selected_template
-        items = display_items or browser.items
-        listbox.delete(0, "end")
-        for it in items:
-            listbox.insert("end", it.display)
-        if items:
-            listbox.selection_set(0)
+        """Rebuild listbox based on active domain.
+
+        Shared domain: show current shared directory. If at shared root and local exists,
+        append a header then the top-level local styles (only root of local domain).
+        Local domain: show only local browser items. Provide a '[..] Shared Root' back item
+        when at local root to return to shared domain.
+        """
+        nonlocal selected_template, flat_items, active_domain
+        listbox.delete(0, 'end')
+        flat_items = []
+        if active_domain == 'shared':
+            base_items = display_items if display_items is not None else browser.items
+            if base_items:
+                flat_items.extend(base_items)
+            if local_browser and browser.current == browser.root:
+                header = ListingItem(type='header', display='--- Local (Private) * ---')
+                flat_items.append(header)
+                for it in local_browser.items:
+                    if it.type == 'up':
+                        continue
+                    marker = ListingItem(type=it.type, path=it.path, template=it.template,
+                                         display=(f"* {it.display}" if it.type == 'template' else it.display))
+                    setattr(marker, 'origin', 'local')
+                    flat_items.append(marker)
+        else:  # local domain
+            if local_browser:
+                if local_browser.current == local_browser.root:
+                    back = ListingItem(type='back', display='[..] Shared Root')
+                    flat_items.append(back)
+                for it in local_browser.items:
+                    if local_browser.current == local_browser.root and it.type == 'up':
+                        continue
+                    marker = ListingItem(type=it.type, path=it.path, template=it.template,
+                                         display=(f"* {it.display}" if it.type == 'template' else it.display))
+                    setattr(marker, 'origin', 'local')
+                    flat_items.append(marker)
+        if not flat_items:
+            flat_items.append(ListingItem(type='empty', display='<empty>'))
+        for it in flat_items:
+            listbox.insert('end', it.display)
+        for idx, it in enumerate(flat_items):
+            if it.type not in {'header','empty'}:
+                listbox.selection_set(idx); listbox.see(idx); break
         selected_template = None
-        preview_btn.config(state="disabled")
-        breadcrumb_var.set(browser.breadcrumb())
+        preview_btn.config(state='disabled')
+        if active_domain == 'shared':
+            breadcrumb_var.set(browser.breadcrumb())
+        else:
+            if local_browser:
+                if local_browser.current == local_browser.root:
+                    breadcrumb_var.set('Local')
+                else:
+                    breadcrumb_var.set(f"Local/{local_browser.current.relative_to(local_browser.root)}")
+            else:
+                breadcrumb_var.set('Local')
 
     refresh()
 
@@ -300,10 +362,17 @@ def open_template_selector() -> Optional[dict]:
     root.after(200, _focus_initial)
 
     def current_items() -> List[ListingItem]:
+        """Return items for the active domain (without any headers/back)."""
         q = search_var.get().strip()
+        if active_domain == 'local' and local_browser:
+            if not q:
+                return local_browser.items
+            if non_recursive_var.get():
+                return local_browser.filter(q)
+            return local_browser.search(q)
+        # Shared domain
         if not q:
             return browser.items
-        # If non-recursive toggled, restrict to current directory listing
         if non_recursive_var.get():
             return browser.filter(q)
         return browser.search(q)
@@ -326,41 +395,70 @@ def open_template_selector() -> Optional[dict]:
         sel = listbox.curselection()
         if not sel:
             return None
-        items = current_items()
-        if sel[0] >= len(items):
+        idx = sel[0]
+        if idx < 0 or idx >= len(flat_items):
             return None
-        return items[sel[0]]
+        it = flat_items[idx]
+        if it.type in {'header','empty'}:
+            return None
+        return it
 
     def open_or_select():
-        nonlocal selected_template, multi_selected
+        nonlocal selected_template, multi_selected, active_domain
         item = get_selected_item()
         if not item:
             return
-        if item.type in {"up", "dir"}:
-            browser.enter(item)
-            refresh(current_items())
-            return
-        if item.type == "template" and item.template:
+        origin = getattr(item, 'origin', active_domain)
+        # Back navigation
+        if item.type == 'back':
+            active_domain = 'shared'
+            refresh(current_items()); return
+        if item.type in {'up','dir'}:
+            if origin == 'local' and local_browser:
+                # Switch to local domain if coming from shared root listing
+                if active_domain != 'local':
+                    active_domain = 'local'
+                # Navigate inside local
+                # Find corresponding listing item in local_browser to use enter logic
+                if item.type == 'up':
+                    for it2 in local_browser.items:
+                        if it2.type == 'up':
+                            local_browser.enter(it2); break
+                else:
+                    # directory
+                    for it2 in local_browser.items:
+                        if it2.path == item.path:
+                            local_browser.enter(it2); break
+                refresh(current_items()); return
+            else:
+                # Shared domain navigation
+                active_domain = 'shared'
+                # Similar search within browser items
+                if item.type == 'up':
+                    for it2 in browser.items:
+                        if it2.type == 'up':
+                            browser.enter(it2); break
+                else:
+                    for it2 in browser.items:
+                        if it2.path == item.path:
+                            browser.enter(it2); break
+                refresh(current_items()); return
+        if item.type == 'template' and item.template:
             if multi_var.get():
-                # Toggle selection in multi mode
                 tmpl_dict = item.template.data
                 if tmpl_dict in multi_selected:
                     multi_selected.remove(tmpl_dict)
                 else:
                     multi_selected.append(tmpl_dict)
-                # Visual hint (prefix with *)
                 idx = listbox.curselection()[0]
                 disp = item.display
-                if disp.startswith("* "):
+                if disp.startswith('* '):
                     disp = disp[2:]
                 else:
-                    disp = "* " + disp
-                listbox.delete(idx)
-                listbox.insert(idx, disp)
-                listbox.selection_set(idx)
+                    disp = '* ' + disp
+                listbox.delete(idx); listbox.insert(idx, disp); listbox.selection_set(idx)
             else:
-                selected_template = item.template.data
-                root.destroy()
+                selected_template = item.template.data; root.destroy()
 
     # --- Shortcut key handling (numeric keys mapped to specific templates) ---
     _shortcut_mapping = load_shortcuts()  # key -> relative path from PROMPTS_DIR/style? actually store relative to PROMPTS_DIR root
@@ -409,12 +507,20 @@ def open_template_selector() -> Optional[dict]:
     listbox.bind("<Double-Button-1>", on_select_event)
 
     def on_backspace(event):
+        nonlocal active_domain
+        if active_domain == 'local' and local_browser:
+            if local_browser.current != local_browser.root:
+                for it in local_browser.items:
+                    if it.type == 'up':
+                        local_browser.enter(it); refresh(current_items()); break
+                return 'break'
+            else:
+                active_domain = 'shared'; refresh(current_items()); return 'break'
         if browser.current != browser.root:
-            # simulate selecting up
             for it in browser.items:
                 if it.type == 'up':
                     browser.enter(it); refresh(current_items()); break
-            return "break"
+            return 'break'
         return None
     listbox.bind("<BackSpace>", on_backspace)
 
@@ -430,15 +536,20 @@ def open_template_selector() -> Optional[dict]:
 
     # --- Keyboard interaction while focus is in the search box -------------
     def _move_selection(delta: int):
-        items = current_items()
-        if not items:
+        size = len(flat_items)
+        if size == 0:
             return
         sel = listbox.curselection()
         if not sel:
-            idx = 0
+            idx = 0 if delta >= 0 else size - 1
         else:
             idx = sel[0] + delta
-        idx = max(0, min(len(items) - 1, idx))
+        idx = max(0, min(size - 1, idx))
+        # Skip headers
+        step = 1 if delta >= 0 else -1
+        while 0 <= idx < size and flat_items[idx].type == 'header':
+            idx += step
+        idx = max(0, min(size - 1, idx))
         listbox.selection_clear(0, 'end')
         listbox.selection_set(idx)
         listbox.see(idx)

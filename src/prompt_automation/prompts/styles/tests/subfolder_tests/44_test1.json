@@ -31,24 +31,60 @@
     "Creativity Policy: {{hallucinate}}",
     "",
     "{{company_name}}",
-   "// this is a comment (No explicit think_deeply or reminders tokens; they will append automatically.)"
+    "// this is a comment (No explicit think_deeply or reminders tokens; they will append automatically.)"
   ],
   "placeholders": [
-    { "name": "role", "default": "assistant" },
-    { "name": "objective", "multiline": false, "default": "" },
-    { "name": "context", "multiline": true, "default": "" },
-    { "name": "instructions", "multiline": true, "default": "" },
-    { "name": "inputs", "multiline": true, "default": "" },
-    { "name": "constraints", "multiline": true, "default": "" },
-    { "name": "output_format", "multiline": true, "default": "" },
-    { "name": "quality_checks", "multiline": true, "default": "" },
-    { "name": "follow_ups", "multiline": true, "default": " this is a comment // (hallucinate & reminders removed so they come only from globals)" }
+    {
+      "name": "role",
+      "default": "assistant"
+    },
+    {
+      "name": "objective",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "instructions",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "inputs",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "constraints",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "output_format",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "quality_checks",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "follow_ups",
+      "multiline": true,
+      "default": " this is a comment // (hallucinate & reminders removed so they come only from globals)"
+    }
   ],
   "global_placeholders": {
     "hallucinate": "normal",
     "think_deeply": "no",
     "reminders": "- Item 1\n- Item 2",
-    "company_name": " this is a comment // (hallucinate & reminders removed so they come only from globals)"},
+    "company_name": " this is a comment // (hallucinate & reminders removed so they come only from globals)"
+  },
   "metadata": {
     "path": "tests/test1.json",
     "tags": [],

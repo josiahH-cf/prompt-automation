@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": 93,
+  "title": "Prompt Troubleshooting",
+  "style": "Troubleshooting",
+  "role": "{{role}}",
+  "placeholders": [
+    {
+      "name": "role",
+      "default": "assistant"
+    },
+    {
+      "name": "objective",
+      "default": "Diagnose and resolve issues with a prompt that is producing unsatisfactory results."
+    },
+    {
+      "name": "context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "errors",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "instructions",
+      "multiline": true,
+      "default": "Identify the root causes of the issues, suggest modifications to the prompt structure or content, and propose remedies."
+    },
+    {
+      "name": "constraints",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "output_format",
+      "multiline": true,
+      "default": "A step-by-step analysis of the issue followed by recommended changes."
+    },
+    {
+      "name": "quality_checks",
+      "multiline": true,
+      "default": "Proposed fixes address the root causes; no introduction of hallucinations; maintain clarity and relevance."
+    }
+  ],
+  "template": [
+    "{{role}}",
+    "",
+    "## Troubleshooting Objective",
+    "{{objective}}",
+    "",
+    "## Problem Description",
+    "{{context}}",
+    "",
+    "## Observations / Error Messages",
+    "{{errors}}",
+    "",
+    "## Instructions",
+    "{{instructions}}",
+    "",
+    "## Constraints",
+    "{{constraints}}",
+    "",
+    "## Output Format",
+    "{{output_format}}",
+    "",
+    "## Quality Checks",
+    "{{quality_checks}}",
+    "",
+    "Creativity Policy: {{hallucinate}}",
+    "",
+    "{{company_name}}"
+  ],
+  "global_placeholders": {
+    "hallucinate": "normal"
+  },
+  "metadata": {
+    "path": "Troubleshooting/93_troubleshooting_prompt.json",
+    "tags": [],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

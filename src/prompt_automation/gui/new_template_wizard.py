@@ -163,6 +163,9 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
         sub_rel = subfolder_var.get().strip()
         final_dir = base_style_dir / sub_rel if sub_rel else base_style_dir
         try:
+            # Ensure the 'local' folder exists if private is checked
+            if private_var.get():
+                private_root.mkdir(parents=True, exist_ok=True)
             final_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create directory: {e}")
