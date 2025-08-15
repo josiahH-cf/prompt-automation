@@ -1,47 +1,72 @@
 {
   "schema": 1,
+  "_comment": [
+    "Template for Comprehensive Code Review.",
+    "Auto-refactored for standard placeholder structure."
+  ],
   "id": 91,
   "title": "Comprehensive Code Review",
   "style": "Code",
-  "role": "{{role}}",
   "placeholders": [
     {
-      "name": "role",
-      "default": "assistant"
+      "name": "company_name",
+      "label": "Company Name",
+      "multiline": false,
+      "default": ""
     },
     {
-      "name": "objective",
-      "default": "Review the given code for correctness, efficiency, and style."
+      "name": "constraints",
+      "label": "Constraints",
+      "multiline": true,
+      "default": ""
     },
     {
       "name": "context",
+      "label": "Context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "hallucinate",
+      "label": "Hallucinate",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "inputs",
+      "label": "Inputs",
       "multiline": true,
       "default": ""
     },
     {
       "name": "instructions",
-      "multiline": true,
-      "default": "Provide constructive feedback and suggest improvements."
-    },
-    {
-      "name": "inputs",
+      "label": "Instructions",
       "multiline": true,
       "default": ""
     },
     {
-      "name": "constraints",
-      "multiline": true,
+      "name": "objective",
+      "label": "Objective",
+      "multiline": false,
       "default": ""
     },
     {
       "name": "output_format",
+      "label": "Output Format",
       "multiline": true,
-      "default": "Summary of issues found with suggestions for improvements."
+      "default": ""
     },
     {
       "name": "quality_checks",
+      "label": "Quality Checks",
       "multiline": true,
-      "default": "No critical bugs; follows coding standards; efficient algorithms."
+      "default": ""
+    },
+    {
+      "name": "role",
+      "label": "Role",
+      "multiline": false,
+      "default": ""
     }
   ],
   "template": [
@@ -72,11 +97,8 @@
     "",
     "{{company_name}}"
   ],
-  "global_placeholders": {
-    "hallucinate": "normal"
-  },
   "metadata": {
-    "path": "Code/91_code_review.json",
+    "path": "tests/subfolder_tests/91_comprehensive-code-review.json",
     "tags": [],
     "version": 1,
     "render": "markdown",
