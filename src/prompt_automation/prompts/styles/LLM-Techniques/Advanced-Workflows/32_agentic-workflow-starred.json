@@ -1,9 +1,62 @@
 {
   "schema": 1,
+  "_comment": [
+    "Template for Agentic Workflow Starred.",
+    "Auto-refactored for standard placeholder structure."
+  ],
   "id": 32,
   "title": "Agentic Workflow Starred",
   "style": "LLM-Techniques",
-  "role": "{{role}}",
+  "placeholders": [
+    {
+      "name": "constraints",
+      "label": "Constraints",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "context",
+      "label": "Context",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "follow_ups",
+      "label": "Follow Ups",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "inputs",
+      "label": "Inputs",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "instructions",
+      "label": "Instructions",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "objective",
+      "label": "Objective",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "output_format",
+      "label": "Output Format",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "quality_checks",
+      "label": "Quality Checks",
+      "multiline": true,
+      "default": ""
+    }
+  ],
   "template": [
     "## Objective",
     "{{objective}}",
@@ -29,102 +82,8 @@
     "## Follow-ups",
     "{{follow_ups}}"
   ],
-  "placeholders": [
-    {
-      "name": "role",
-      "label": "Role",
-      "multiline": false,
-      "required": true,
-      "default": "assistant"
-    },
-    {
-      "name": "objective",
-      "label": "Objective",
-      "multiline": false,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "context",
-      "label": "Context",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "instructions",
-      "label": "Instructions",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "inputs",
-      "label": "Inputs",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "constraints",
-      "label": "Constraints",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "output_format",
-      "label": "Output Format",
-      "multiline": true,
-      "required": true,
-      "default": ""
-    },
-    {
-      "name": "quality_checks",
-      "label": "Quality Checks",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "follow_ups",
-      "label": "Follow-ups",
-      "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "importance",
-      "label": "Importance (Hallucination Guard Level)",
-      "multiline": false,
-      "required": false,
-      "default": "normal",
-      "description": "How important is correctness? Suggested: low | normal | high | critical."
-    },
-    {
-      "name": "think_deeply",
-      "label": "Think Deeply (Use Sparingly)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. Reminder: you only have so many deep-think invocations."
-    },
-    {
-      "name": "two_parter",
-      "label": "Two-Parter Flow (Paste + Follow Up)",
-      "multiline": false,
-      "required": false,
-      "default": "no",
-      "description": "yes | no. If yes, expect a second pass after initial paste."
-    }
-  ],
-  "global_placeholders": {
-    "importance": "normal",
-    "think_deeply": "no",
-    "two_parter": "no"
-  },
   "metadata": {
-    "path": "LLM-Techniques/Advanced-Workflows/agentic-workflow-starred.json",
+    "path": "LLM-Techniques/Advanced-Workflows/32_agentic-workflow-starred.json",
     "tags": [],
     "version": 1,
     "render": "markdown",

@@ -1,52 +1,78 @@
 {
   "schema": 1,
+  "_comment": [
+    "Template for Decision-Making Analysis.",
+    "Auto-refactored for standard placeholder structure."
+  ],
   "id": 92,
   "title": "Decision-Making Analysis",
   "style": "Decision-Making",
-  "role": "{{role}}",
   "placeholders": [
     {
-      "name": "role",
-      "default": "assistant"
+      "name": "company_name",
+      "label": "Company Name",
+      "multiline": false,
+      "default": ""
     },
     {
-      "name": "objective",
-      "default": "Evaluate options and recommend the best choice based on criteria."
-    },
-    {
-      "name": "context",
+      "name": "constraints",
+      "label": "Constraints",
       "multiline": true,
       "default": ""
     },
     {
-      "name": "options",
-      "type": "list",
+      "name": "context",
+      "label": "Context",
+      "multiline": true,
       "default": ""
     },
     {
       "name": "criteria",
-      "type": "list",
+      "label": "Criteria",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "hallucinate",
+      "label": "Hallucinate",
+      "multiline": false,
       "default": ""
     },
     {
       "name": "instructions",
-      "multiline": true,
-      "default": "Analyze each option against each criterion, weigh pros and cons, and provide a recommendation."
-    },
-    {
-      "name": "constraints",
+      "label": "Instructions",
       "multiline": true,
       "default": ""
     },
     {
+      "name": "objective",
+      "label": "Objective",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "options",
+      "label": "Options",
+      "multiline": false,
+      "default": ""
+    },
+    {
       "name": "output_format",
+      "label": "Output Format",
       "multiline": true,
-      "default": "A table comparing options versus criteria, followed by a recommendation paragraph."
+      "default": ""
     },
     {
       "name": "quality_checks",
+      "label": "Quality Checks",
       "multiline": true,
-      "default": "Clearly justify recommendation; consider all options; align with objectives."
+      "default": ""
+    },
+    {
+      "name": "role",
+      "label": "Role",
+      "multiline": false,
+      "default": ""
     }
   ],
   "template": [
@@ -80,11 +106,8 @@
     "",
     "{{company_name}}"
   ],
-  "global_placeholders": {
-    "hallucinate": "normal"
-  },
   "metadata": {
-    "path": "Decision-Making/92_decision_analysis.json",
+    "path": "tests/subfolder_tests/92_decision-making-analysis.json",
     "tags": [],
     "version": 1,
     "render": "markdown",
