@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": 16,
+  "title": "Nightly Review",
+  "style": "Reviews",
+  "placeholders": [
+    {
+      "name": "time_allocation",
+      "label": "Time Allocation: Estimate tomorrow's time: \nDeep Work (hrs), \nMeetings (hrs), \nShallow Work (hrs). List or bullet your planned allocation (with realistic timelines built in).",
+      "multiline": true,
+      "default": "- Deep Work: 3 hrs\n- Meetings: 2 hrs\n- Shallow Work: 1 hr\n\n Time Slots for Deep Work:",
+      "format": "bullet"
+    },
+    {
+      "name": "priority",
+      "label": "3 Priority 1 (P1) Tasks for Tomorrow: List the 3 most important outcome or task you'll start with.",
+      "multiline": true,
+      "default": "",
+      "format": "bullet"
+    },
+    {
+      "name": "automation",
+      "label": "Can anything be Automated, Delegated, or Rescheduled?",
+      "multiline": true,
+      "default": "",
+      "format": "checklist"
+    },
+    {
+      "name": "realism_check",
+      "label": "BEFORE MOVING ON - BASED ON YOUR TIME ALLOCATION + TASKS - IS IT REALISTIC? If not, adjust your time allocation or tasks.",
+      "multiline": true,
+      "default": "",
+      "format": "bullet"
+    },
+    {
+      "name": "next_actions",
+      "label": "Next Right Actions: For each major active project list ONLY the very next right action to ensure tomorrow is clear and frictionless to start.",
+      "multiline": true,
+      "default": "",
+      "format": "bullet"
+    },
+    {
+      "name": "outcomes",
+      "label": "Outcomes: If by end of tomorrow you produced these, you'd be satisfied.",
+      "multiline": true,
+      "default": "",
+      "format": "bullet"
+    }
+  ],
+  "template": [
+    "- 3 Priority 1 (P1) Tasks for Tomorrow",
+    "  {{priority}}",
+    "",
+    "- Time Allocation (Deep Work / Meetings / Shallow Work)",
+    "  {{time_allocation}}",
+    "",
+    "- Next Right Actions",
+    "  {{next_actions}}",
+    "",
+    "- Can anything be Automated, Delegated, or Rescheduled?",
+    "  {{automation}}",
+    "",
+    "- Happy Outcomes (If you achieve these tomorrow it's a win)",
+    "  {{outcomes}}"
+  ],
+  "metadata": {
+    "path": "Reviews/nightly-review.json",
+    "tags": [
+      "review",
+      "nightly",
+      "planning",
+      "focus",
+      "automation"
+    ],
+    "version": 4,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

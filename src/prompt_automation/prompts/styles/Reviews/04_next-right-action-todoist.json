@@ -6,10 +6,9 @@
   "placeholders": [
     {
       "name": "next_action",
-      "label": "Next Action (What will you concretely do next?)",
-      "multiline": true,
+      "label": "Next Action: (I will...)",
+      "multiline": false,
       "default": "",
-      "format": "list",
       "remove_if_empty": [
         "I will",
         "Next Action",
@@ -17,14 +16,14 @@
       ]
     },
     {
-      "name": "why",
-      "label": "Purpose / End State (Why & what end state will this move toward?)",
-      "multiline": true,
+      "name": "so_that",
+      "label": "Objective: (so that...)\nWhy is this important or How does it contribute to the desired result?",
+      "multiline": false,
       "default": "",
       "remove_if_empty": [
-        "so that",
-        "Purpose / End State",
-        "- Purpose / End State"
+        "So That",
+        "- So That",
+        "so that I can"
       ]
     },
     {
@@ -49,21 +48,10 @@
         "Time Estimate",
         "- Time Estimate"
       ]
-    },
-    {
-      "name": "risks",
-      "label": "Risks / Constraints (Optional)",
-      "multiline": true,
-      "default": "",
-      "format": "list",
-      "remove_if_empty": [
-        "Risks / Constraints",
-        "- Risks / Constraints"
-      ]
     }
   ],
   "template": [
-    "I will {{next_action}} so that {{why}}. I will take the following approach {{approach}}. It will take {{time_estimate}}. {{risks}}"
+    "I will {{next_action}} so that {{so_that}}. \nI focus on doing the following things: {{approach}}. \nIt will take {{time_estimate}}."
   ],
   "metadata": {
     "path": "Reviews/next-right-action-todoist.json",
