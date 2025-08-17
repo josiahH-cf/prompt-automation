@@ -22,7 +22,11 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       │   │   ├── model.py        # BrowserState, recursive index & search
 │       │   │   └── controller.py   # Hierarchical UI, multi-select, preview, search
 │       │   ├── template_selector.py # Backwards-compat thin wrapper
-│       │   ├── variable_collector.py
+│       │   ├── collector/          # Variable input collection helpers
+│       │   │   ├── __init__.py
+│       │   │   ├── prompts.py     # GUI prompt construction
+│       │   │   ├── overrides.py   # File override logic
+│       │   │   └── persistence.py # Session state & persistence
 │       │   ├── review_window.py
 │       │   ├── file_append.py      # Shared append-to-file logic
 │       │   └── gui.py              # Entry point launching PromptGUI
@@ -159,7 +163,7 @@ Test: `tests/test_shortcuts.py` validates core renumber logic.
 ## Default Value Hint & Global Reminders
 
 Default Hint (Feature A):
-- `gui/variable_collector.collect_single_variable()` displays a grey panel summarizing the placeholder's default (truncates >160 chars, `[view]` opens a modal to inspect full text). Input pre-filled with default; if cleared by user the raw value is empty.
+- `gui.collector.collect_single_variable()` displays a grey panel summarizing the placeholder's default (truncates >160 chars, `[view]` opens a modal to inspect full text). Input pre-filled with default; if cleared by user the raw value is empty.
 - `menus.render_template()` substitutes defaults for placeholders whose collected values are effectively empty (None, blank string, empty list) without mutating the raw captured values.
 
 Global Reminders (Feature B):
