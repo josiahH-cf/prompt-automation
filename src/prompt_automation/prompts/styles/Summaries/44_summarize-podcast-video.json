@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "_comment": [
-    "Template for Summarize Text Article.",
+    "Template for Summarize Podcast Video.",
     "Auto-refactored for standard placeholder structure."
   ],
-  "id": 40,
-  "title": "Summarize Text Article",
+  "id": 44,
+  "title": "Summarize Podcast Video",
   "style": "Summaries",
   "placeholders": [
     {
@@ -83,7 +83,7 @@
     "{{follow_ups}}"
   ],
   "metadata": {
-    "path": "Summaries/40_summarize-text-article.json",
+    "path": "Summaries/42_summarize-podcast-video.json",
     "tags": [],
     "version": 1,
     "render": "markdown",

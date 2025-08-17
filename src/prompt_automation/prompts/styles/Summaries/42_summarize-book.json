@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "_comment": [
-    "Template for Troubleshoot Specific Tool.",
+    "Template for Summarize Book.",
     "Auto-refactored for standard placeholder structure."
   ],
-  "id": 17,
-  "title": "Troubleshoot Specific Tool",
-  "style": "Code",
+  "id": 42,
+  "title": "Summarize Book",
+  "style": "Summaries",
   "placeholders": [
     {
       "name": "constraints",
@@ -83,7 +83,7 @@
     "{{follow_ups}}"
   ],
   "metadata": {
-    "path": "Code/Troubleshoot/17_troubleshoot-specific-tool.json",
+    "path": "Summaries/41_summarize-book.json",
     "tags": [],
     "version": 1,
     "render": "markdown",

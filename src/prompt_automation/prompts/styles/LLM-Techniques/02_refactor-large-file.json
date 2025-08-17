@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": 2,
+  "title": "refactor-large-file",
+  "style": "LLM-Techniques",
+  "template": [
+    "{{reference_file_content}}"
+  ],
+  "placeholders": [
+    {
+      "name": "reference_file",
+      "type": "file",
+      "label": "Reference File (goals, projects, etc.)",
+      "render": "markdown",
+      "default": ""
+    }
+  ],
+  "global_placeholders": {},
+  "metadata": {
+    "path": "LLM-Techniques/refactor-large-file.json",
+    "tags": [],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

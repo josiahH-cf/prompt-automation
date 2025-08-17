@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "id": 39,
-  "title": "Decision Track Log",
+  "id": 12,
+  "title": "Objectives Vs Outcomes Tracker",
   "style": "Reviews",
   "role": "{{role}}",
   "template": [
@@ -124,7 +124,7 @@
     "two_parter": "no"
   },
   "metadata": {
-    "path": "Reviews/decision-track-log.json",
+    "path": "Reviews/objectives-vs-outcomes-tracker.json",
     "tags": [],
     "version": 1,
     "render": "markdown",

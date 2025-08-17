@@ -1,13 +1,19 @@
 {
   "schema": 1,
   "_comment": [
-    "Template for Summarize Podcast Video.",
+    "Template for test1.",
     "Auto-refactored for standard placeholder structure."
   ],
-  "id": 42,
-  "title": "Summarize Podcast Video",
-  "style": "Summaries",
+  "id": 45,
+  "title": "test1",
+  "style": "tests",
   "placeholders": [
+    {
+      "name": "company_name",
+      "label": "Company Name",
+      "multiline": false,
+      "default": ""
+    },
     {
       "name": "constraints",
       "label": "Constraints",
@@ -21,9 +27,9 @@
       "default": ""
     },
     {
-      "name": "follow_ups",
-      "label": "Follow Ups",
-      "multiline": true,
+      "name": "hallucinate",
+      "label": "Hallucinate",
+      "multiline": false,
       "default": ""
     },
     {
@@ -55,9 +61,17 @@
       "label": "Quality Checks",
       "multiline": true,
       "default": ""
+    },
+    {
+      "name": "role",
+      "label": "Role",
+      "multiline": false,
+      "default": ""
     }
   ],
   "template": [
+    "{{role}}",
+    "",
     "## Objective",
     "{{objective}}",
     "",
@@ -79,11 +93,13 @@
     "## Quality Checks",
     "{{quality_checks}}",
     "",
-    "## Follow-ups",
-    "{{follow_ups}}"
+    "Creativity Policy: {{hallucinate}}",
+    "",
+    "{{company_name}}",
+    "// this is a comment (No explicit think_deeply or reminders tokens; they will append automatically.)"
   ],
   "metadata": {
-    "path": "Summaries/42_summarize-podcast-video.json",
+    "path": "tests/subfolder_tests/44_test1.json",
     "tags": [],
     "version": 1,
     "render": "markdown",
