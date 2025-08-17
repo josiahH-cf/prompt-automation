@@ -1,0 +1,171 @@
+"""Persistence of simple placeholder values and file overrides."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+from ..errorlog import get_logger
+
+from .storage import (
+    _PERSIST_FILE,
+    _SETTINGS_FILE,
+    _load_overrides,
+    _load_settings_payload,
+    _save_overrides,
+    _write_settings_payload,
+)
+
+
+_log = get_logger(__name__)
+
+
+def load_template_value_memory(template_id: int) -> Dict[str, Any]:
+    """Return previously persisted simple values for template or empty dict."""
+    try:
+        data = _load_overrides()
+        return data.get("template_values", {}).get(str(template_id), {}) or {}
+    except Exception:
+        return {}
+
+
+def persist_template_values(template_id: int, placeholders: List[Dict[str, Any]], values: Dict[str, Any]) -> None:
+    """Store scalar/list placeholder values (excluding files) for the template."""
+    overrides_data = _load_overrides()
+    tvals = overrides_data.setdefault("template_values", {}).setdefault(str(template_id), {})
+    for ph in placeholders:
+        nm = ph.get("name")
+        if not nm or ph.get("type") == "file" or nm == "reference_file_content":
+            continue
+        v = values.get(nm)
+        if isinstance(v, (str, int, float)):
+            if str(v).strip():
+                tvals[nm] = v
+        elif isinstance(v, list):
+            cleaned = [str(x) for x in v if str(x).strip()]
+            if cleaned:
+                if len(cleaned) > 200:
+                    cleaned = cleaned[:200]
+                tvals[nm] = cleaned
+    _save_overrides(overrides_data)
+
+
+def reset_file_overrides() -> bool:
+    """Delete persistent file/skip overrides. Returns True if removed."""
+    try:
+        if _PERSIST_FILE.exists():
+            _PERSIST_FILE.unlink()
+            if _SETTINGS_FILE.exists():
+                payload = _load_settings_payload()
+                if payload.get("file_overrides"):
+                    payload["file_overrides"]["templates"] = {}
+                    _write_settings_payload(payload)
+            return True
+    except Exception as e:
+        _log.error("failed to reset overrides: %s", e)
+    return False
+
+
+def reset_single_file_override(template_id: int, name: str) -> bool:
+    """Remove a single template/placeholder override (both local & settings).
+
+    Returns True if something was removed.
+    """
+    changed = False
+    data = _load_overrides()
+    tmap = data.get("templates", {}).get(str(template_id)) or {}
+    if name in tmap:
+        raw = {"templates": {}, "reminders": {}}
+        if _PERSIST_FILE.exists():
+            try:
+                raw = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        raw_tmap = raw.setdefault("templates", {}).get(str(template_id), {})
+        raw_tmap.pop(name, None)
+        _save_overrides(raw)
+        changed = True
+    if _SETTINGS_FILE.exists():
+        payload = _load_settings_payload()
+        st_tmap = payload.get("file_overrides", {}).get("templates", {}).get(str(template_id), {})
+        if name in st_tmap:
+            st_tmap.pop(name, None)
+            _write_settings_payload(payload)
+            changed = True
+    return changed
+
+
+def list_file_overrides() -> List[Tuple[str, str, Dict[str, Any]]]:
+    """Return list of (template_id, placeholder_name, data) for current overrides."""
+    data = _load_overrides()
+    out: List[Tuple[str, str, Dict[str, Any]]] = []
+    for tid, entries in data.get("templates", {}).items():
+        for name, info in entries.items():
+            out.append((tid, name, info))
+    return out
+
+
+def list_template_value_overrides() -> List[Tuple[str, str, Any]]:
+    """Return list of (template_id, name, value) for persisted simple values."""
+    data = _load_overrides()
+    out: List[Tuple[str, str, Any]] = []
+    for tid, entries in data.get("template_values", {}).items():
+        if not isinstance(entries, dict):
+            continue
+        for name, val in entries.items():
+            out.append((tid, name, val))
+    return out
+
+
+def reset_template_value_override(template_id: int, name: str) -> bool:
+    """Remove a single persisted simple value for a template. Returns True if removed."""
+    changed = False
+    raw = _load_overrides()
+    tvals = raw.get("template_values", {}).get(str(template_id)) or {}
+    if name in tvals:
+        if _PERSIST_FILE.exists():
+            try:
+                raw_file = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                raw_file = {}
+        else:
+            raw_file = {}
+        rv_tvals = raw_file.setdefault("template_values", {}).get(str(template_id), {})
+        if name in rv_tvals:
+            rv_tvals.pop(name, None)
+            if not rv_tvals:
+                raw_file.get("template_values", {}).pop(str(template_id), None)
+            _save_overrides(raw_file)
+            changed = True
+    return changed
+
+
+def reset_all_template_value_overrides(template_id: int) -> bool:
+    """Remove all persisted simple values for a given template id."""
+    if not _PERSIST_FILE.exists():
+        return False
+    try:
+        raw_file = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    tv_map = raw_file.get("template_values", {})
+    if str(template_id) in tv_map:
+        tv_map.pop(str(template_id), None)
+        _save_overrides(raw_file)
+        return True
+    return False
+
+
+def set_template_value_override(template_id: int, name: str, value: Any) -> None:
+    """Programmatically set/update a simple (non-file) placeholder value override."""
+    try:
+        raw = _load_overrides()
+        tvals = raw.setdefault("template_values", {}).setdefault(str(template_id), {})
+        if value is None:
+            if name in tvals:
+                tvals.pop(name, None)
+        else:
+            tvals[name] = value
+        _save_overrides(raw)
+    except Exception as e:  # pragma: no cover - defensive
+        _log.error("failed setting template value override %s/%s: %s", template_id, name, e)
