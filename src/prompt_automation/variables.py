@@ -82,6 +82,26 @@ def _merge_overrides_with_settings(overrides: Dict[str, Any]) -> Dict[str, Any]:
     return merged
 
 
+def _normalize_reference_path(path: str) -> str:
+    """Normalize reference file path for cross-platform consistency.
+
+    - Expands user (~)
+    - Converts Windows backslashes to forward slashes when running under WSL/Linux for consistent display
+    - Resolves redundant separators / up-level references when possible
+    """
+    try:
+        p = Path(path.strip().strip('"')).expanduser()
+        # If path looks like a Windows path (contains a drive letter), keep original separators on Windows
+        txt = str(p)
+        if os.name != 'nt':
+            # Under non-Windows, normalize backslashes to forward slashes for readability if drive pattern present
+            if ':' in txt and '\\' in txt:
+                txt = txt.replace('\\', '/')
+        return txt
+    except Exception:
+        return path
+
+
 # ----------------- GUI helpers (existing) -----------------
 def _gui_prompt(label: str, opts: List[str] | None, multiline: bool) -> str | None:
     """Try platform GUI for input; return ``None`` on failure."""
@@ -155,12 +175,65 @@ def _gui_file_prompt(label: str) -> str | None:
 # ----------------- Persistence helpers -----------------
 
 def _load_overrides() -> dict:
-    base = {"templates": {}, "reminders": {}, "template_globals": {}, "template_values": {}, "session": {}}
+    base = {"templates": {}, "reminders": {}, "template_globals": {}, "template_values": {}, "session": {}, "global_files": {}}
     if _PERSIST_FILE.exists():
         try:
             base = json.loads(_PERSIST_FILE.read_text(encoding="utf-8"))
         except Exception as e:
             _log.error("failed to load overrides: %s", e)
+    # Migration: consolidate legacy reference file keys to global_files.reference_file
+    try:
+        gfiles = base.setdefault("global_files", {})
+        if "reference_file" not in gfiles:
+            legacy = None
+            # scan template_values and template_globals for any legacy key value
+            for section in ("template_values", "template_globals"):
+                seg = base.get(section, {})
+                if not isinstance(seg, dict):
+                    continue
+                for _tid, data in seg.items():
+                    if not isinstance(data, dict):
+                        continue
+                    for k, v in data.items():
+                        if k in {"reference_file_default", "reference_file_content", "reference_file"} and isinstance(v, str) and v.strip():
+                            legacy = v.strip()
+                            break
+                    if legacy:
+                        break
+                if legacy:
+                    break
+            if legacy and Path(legacy).expanduser().exists():
+                gfiles["reference_file"] = legacy
+    except Exception:
+        pass
+    # Remove any persisted reference_file_content snapshots (we now always re-read live)
+    try:
+        tv = base.get("template_values", {})
+        if isinstance(tv, dict):
+            for tid, mapping in list(tv.items()):
+                if not isinstance(mapping, dict):
+                    continue
+                if "reference_file_content" in mapping:
+                    mapping.pop("reference_file_content", None)
+            # prune empties
+            for tid in [k for k,v in tv.items() if isinstance(v, dict) and not v]:
+                tv.pop(tid, None)
+    except Exception:
+        pass
+    # Normalize global reference file path (Windows path usable under WSL etc.)
+    try:
+        refp = base.get("global_files", {}).get("reference_file")
+        if isinstance(refp, str) and refp:
+            norm = _normalize_reference_path(refp)
+            if norm != refp:
+                base.setdefault("global_files", {})["reference_file"] = norm
+                # write back immediately so subsequent calls use normalized version
+                try:
+                    _save_overrides(base)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     # Merge with settings (settings override persist file values)
     merged = _merge_overrides_with_settings(base)
     return merged
@@ -407,8 +480,26 @@ def get_variables(
             else:
                 ph["label"] = note_text.strip() or name
 
+        # Global reference file (single variable across templates)
+        if name == "reference_file" and ptype == "file":
+            ov = _load_overrides()
+            gfiles = ov.setdefault("global_files", {})
+            existing = gfiles.get("reference_file")
+            if isinstance(existing, str) and existing and Path(existing).expanduser().exists():
+                values[name] = existing
+                continue
+            label = ph.get("label", name)
+            chosen = _gui_file_prompt(label) or input(f"File for {label} (leave blank to skip): ").strip()
+            if chosen and Path(chosen).expanduser().exists():
+                gfiles["reference_file"] = str(Path(chosen).expanduser())
+                _save_overrides(ov)
+                values[name] = gfiles["reference_file"]
+            else:
+                values[name] = ""
+            continue
+
         if ptype == "file" and template_id is not None:
-            # Use extended resolution (template is source of truth)
+            # Other per-template file placeholders
             path_val = _resolve_file_placeholder(ph, template_id, globals_map)
             values[name] = path_val
             continue
@@ -484,7 +575,7 @@ def get_variables(
                 else:
                     val = input(f"{label}: ")
 
-        if ptype == "file" and isinstance(val, str) and val and template_id is None:
+        if ptype == "file" and name != "reference_file" and isinstance(val, str) and val and template_id is None:
             while val:
                 path = Path(val).expanduser()
                 if path.exists():
@@ -531,6 +622,42 @@ def get_variables(
     return values
 
 
+# ----------------- Global reference file helpers -----------------
+def get_global_reference_file() -> str | None:
+    try:
+        data = _load_overrides()
+        path = data.get("global_files", {}).get("reference_file")
+        if path:
+            norm = _normalize_reference_path(path)
+            p = Path(norm).expanduser()
+            if p.exists():
+                if norm != path:  # persist normalization
+                    try:
+                        raw = _load_overrides()
+                        raw.setdefault("global_files", {})["reference_file"] = norm
+                        _save_overrides(raw)
+                    except Exception:
+                        pass
+                return str(p)
+    except Exception:
+        pass
+    return None
+
+def reset_global_reference_file() -> bool:
+    try:
+        data = _load_overrides()
+        gfiles = data.get("global_files", {})
+        if "reference_file" in gfiles:
+            gfiles.pop("reference_file", None)
+            _save_overrides(data)
+            return True
+    except Exception:
+        pass
+    return False
+
+__all__ += ["get_global_reference_file", "reset_global_reference_file"]
+
+
 # ----------------- Simple value persistence (non-file placeholders) -----------------
 def load_template_value_memory(template_id: int) -> Dict[str, Any]:
     """Return previously persisted simple values for template or empty dict."""
@@ -547,7 +674,7 @@ def persist_template_values(template_id: int, placeholders: List[Dict[str, Any]]
     tvals = overrides_data.setdefault("template_values", {}).setdefault(str(template_id), {})
     for ph in placeholders:
         nm = ph.get("name")
-        if not nm or ph.get("type") == "file":
+        if not nm or ph.get("type") == "file" or nm == "reference_file_content":
             continue
         v = values.get(nm)
         if isinstance(v, (str, int, float)):

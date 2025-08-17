@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import re
+import os
 from .utils import safe_run
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Sequence
 
 from . import logger
 from .config import PROMPTS_DIR, PROMPTS_SEARCH_PATHS
@@ -33,6 +34,7 @@ from .variables import (
     get_variables,
     ensure_template_global_snapshot,
     apply_template_global_overrides,
+    get_global_reference_file,
 )
 
 
@@ -233,23 +235,23 @@ def render_template(
         vars["context"] = read_file_safe(str(context_path))
         raw_vars["context_append_file"] = str(context_path)
 
+    # Handle file placeholders including consolidated global reference_file
+    ref_path_global = get_global_reference_file()
     for ph in placeholders:
-        if ph.get("type") == "file":
-            name = ph["name"]
-            path = raw_vars.get(name)
-            if name == "reference_file":
-                # Always populate synthetic content var if token present OR placeholder exists.
-                if path:
-                    content = read_file_safe(path)
-                else:
-                    content = ""
-                # Provide content regardless; unused var is harmless
-                vars["reference_file_content"] = content
-            else:
-                if path:
-                    vars[name] = read_file_safe(path)
-                else:
-                    vars[name] = ""
+        if ph.get("type") != "file":
+            continue
+        name = ph["name"]
+        path = raw_vars.get(name)
+        if name == "reference_file":
+            # Fallback to global persisted path if not supplied in raw_vars
+            if not path and ref_path_global:
+                path = ref_path_global
+                raw_vars[name] = path
+            content = read_file_safe(path) if path else ""
+            # Provide both legacy content var and direct injection if template uses {{reference_file_content}}
+            vars["reference_file_content"] = content
+        else:
+            vars[name] = read_file_safe(path) if path else ""
 
     # Feature A: default fallback for effectively empty user input
     for ph in placeholders:

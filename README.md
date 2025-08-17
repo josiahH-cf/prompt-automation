@@ -65,7 +65,7 @@ Rules:
 | (omitted) / text | Single line | `str` | Direct substitution (default fill if empty) |
 | `multiline: true` | Multi-line text box | `str` | Preserves newlines |
 | `type: "list"` | Multi-line (one item per line) | `list[str]` | Joined with `\n`; empty ⇒ default |
-| `type: "file"` | File chooser dialog | path (string) | File read at render; content inserted (or separate `reference_file_content`) |
+| `type: "file"` | File chooser dialog | path (string) | File read at render; for `reference_file` its content auto-injected / previewed |
 | `type: "number"` | Single line | stringified number | Validated; invalid → `0` |
 | `options: [...]` | Dropdown / selection | selected string | Value used verbatim (mapped for some special names) |
 
@@ -75,7 +75,7 @@ Rules:
 |------|---------|-------|
 | `context` | Free-form or file‑loaded context block. | File load copies contents into the text area. Path tracked separately for re‑read. |
 | `reference_file` | Capture path to a key document. | Skip once → never reprompt until reset. |
-| `reference_file_content` | Synthetic content of `reference_file`. | Auto-filled; include token to inject content. |
+| `reference_file_content` | (Legacy) Synthetic content of `reference_file` (still populated for backward compatibility). |
 | `hallucinate` | Creativity / inference policy line. | Dropdown auto-generated if no `options`; canonical tokens: `critical`, `normal`, `high`, `low`, or omitted. `(omit)` removes the line. |
 | `think_deeply` | Reflective reasoning directive. | Usually supplied globally; auto-appends if token absent. |
 | `reminders` | Safety/quality reminders list. | Appended as blockquote list at end. |
@@ -282,7 +282,7 @@ Templates live under `prompts/styles/`. Nested subfolders are supported (e.g. `p
 
 ### Reference / Context File Placeholders
 
-Add a placeholder with `"type": "file"` (e.g. `reference_file`) followed by a plain placeholder named `reference_file_content` to trigger a popup viewer of the selected file. Include `{{reference_file_content}}` in your template lines if you want the file content injected; omit it to only view the popup.
+Add a placeholder with `"name": "reference_file", "type": "file"` once. The first run prompts you to choose a file; the path persists globally and subsequent runs auto-load and (optionally) inject the content. Press **Ctrl+R** in the reference file dialog to reset/clear and immediately pick a new file. `{{reference_file_content}}` is kept for backward compatibility but no longer required—content is always available.
 
 Skipping a file: Press the `Skip` button in the file picker dialog. That choice is persisted per template (stored in `~/.prompt-automation/placeholder-overrides.json` and mirrored to `prompts/styles/Settings/settings.json`) and you will not be prompted again unless you reset it.
 

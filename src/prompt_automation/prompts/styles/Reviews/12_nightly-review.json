@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": 12,
+  "title": "Nightly Review",
+  "style": "Reviews",
+  "placeholders": [
+    {
+      "name": "morning",
+      "label": "Morning (DEEP WORK) - What is your plan for deep work this morning?",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "automation",
+      "label": "AI Automation (Can anything be automated by AI today? What's the plan?)",
+      "multiline": true,
+      "format": "checklist",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "work",
+      "label": "Work (What is your plan for work today?)",
+      "multiline": true,
+      "format": "bullet",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "meetings",
+      "label": "Shallow Work / Meetings (What meetings or shallow work do you have to prepare for today?)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "evenings",
+      "label": "Evenings (What is your plan for your evenings today?)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "outcomes",
+      "label": "Outcomes (What specific outcomes will you produce?)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "habits",
+      "label": "Habits (Plan for positive / avoiding habits today)",
+      "multiline": true,
+      "required": false,
+      "default": ""
+    }
+  ],
+  "template": [
+    "- Morning (DEEP WORK)",
+    "  {{morning}}",
+    "",
+    "- AI Automation Opportunities (Can anything be automated by AI today? What's the plan?)",
+    "  {{automation}}",
+    "",
+    "- Work",
+    "  {{work}}",
+    "",
+    "- Shallow Work / Meetings",
+    "  {{meetings}}",
+    "",
+    "- Evenings",
+    "  {{evenings}}",
+    "",
+    "- Outcomes: What specific outcomes will you produce?",
+    "  {{outcomes}}",
+    "",
+    "- Habits - go through the specific plan for your habits today (positive or avoiding) and ensure that you have an actionable plan for the habits you're focusing on today",
+    "  {{habits}}"
+  ],
+  "metadata": {
+    "path": "Reviews/daily-review.json",
+    "tags": [
+      "review",
+      "daily",
+      "reflection",
+      "planning",
+      "habits"
+    ],
+    "version": 3,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

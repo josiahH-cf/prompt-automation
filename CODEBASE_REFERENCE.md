@@ -76,9 +76,7 @@ Prompt JSON files live under `prompts/styles/<Style>/`. The repository bundles o
 
 ### File / Reference Placeholder Pattern
 To attach (and optionally inject) an external file:
-1. Add `{ "name": "reference_file", "type": "file" }` (collects path; persisted per template)
-2. Add `{ "name": "reference_file_content" }` (triggers popup; auto-filled with contents)
-3. Include `{{reference_file_content}}` in `template` lines to inline the file contents, or omit to just view it.
+1. Add `{ "name": "reference_file", "type": "file" }` once. First run prompts for a file and persists globally (not per template). Content is auto-loaded each run and available via `{{reference_file_content}}` for backward compatibility.
 
 Skipping the file via the GUI "Skip" button persists a `skip` flag; future runs won't prompt unless you reset it. Management:
 * GUI: Options → Manage overrides (remove an entry to re-enable prompting)

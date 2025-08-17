@@ -14,6 +14,8 @@ from ..variables import (
     persist_template_values,
     get_remembered_context,
     set_remembered_context,
+    get_global_reference_file,
+    reset_global_reference_file,
 )
 
 # sentinel object to signal user cancellation during input collection
@@ -118,6 +120,194 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
     root.mainloop()
     return result
+
+
+def collect_global_reference_file_gui(placeholder: dict):
+    """Interactive global reference file selector + viewer.
+
+    Flow:
+      - If no stored path: open file dialog, save selection, then open viewer.
+      - If stored path exists: open viewer directly.
+      - Viewer keybindings:
+          Ctrl+Enter -> accept / continue
+          Ctrl+R     -> reset (clear path, re-prompt picker, reopen viewer)
+          Esc / Close -> cancel (CANCELLED sentinel)
+      - Large files (>200KB) truncated with banner notice.
+    """
+    import tkinter as tk
+    from tkinter import filedialog, messagebox
+    from ..renderer import read_file_safe
+
+    label = placeholder.get("label", "Reference File")
+    SIZE_LIMIT = 200 * 1024  # 200 KB
+
+    def _clear_global_path():
+        reset_global_reference_file()
+        try:
+            ov = _load_overrides()
+            for tid, mapping in list(ov.get("templates", {}).items()):
+                if isinstance(mapping, dict) and "reference_file" in mapping:
+                    mapping.pop("reference_file", None)
+            _save_overrides(ov)
+        except Exception:
+            pass
+
+    def _persist_path(path: str):
+        ov = _load_overrides()
+        gfiles = ov.setdefault("global_files", {})
+        gfiles["reference_file"] = path
+        _save_overrides(ov)
+
+    def _pick_file(initial: str | None = None) -> str | None:
+        root = tk.Tk(); root.withdraw()
+        fname = filedialog.askopenfilename(title=label, initialfile=initial or "")
+        root.destroy()
+        if fname:
+            return fname
+        return None
+
+    def _show_viewer(path: str) -> str:
+        # returns 'accept' | 'reset' | 'cancel'
+        viewer = tk.Tk()
+        viewer.title(f"Reference File: {Path(path).name}")
+        viewer.geometry("900x680")
+        viewer.resizable(True, True)
+        viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
+
+        action = {"value": "cancel"}
+
+        # Toolbar/instructions
+        top = tk.Frame(viewer, padx=14, pady=8)
+        top.pack(fill="x")
+        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr.pack(side="left")
+
+        # Text area
+        text_frame = tk.Frame(viewer)
+        text_frame.pack(fill="both", expand=True)
+        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        text.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        # Markdown tag styles
+        text.tag_configure("h1", font=("Consolas", 16, "bold"))
+        text.tag_configure("h2", font=("Consolas", 14, "bold"))
+        text.tag_configure("h3", font=("Consolas", 12, "bold"))
+        text.tag_configure("bold", font=("Consolas", 10, "bold"))
+        text.tag_configure("codeblock", background="#f5f5f5", font=("Consolas", 10))
+        text.tag_configure("inlinecode", background="#eee")
+        text.tag_configure("hr", foreground="#666")
+
+        def _render(reload: bool = True):
+            # load & render content
+            try:
+                raw_bytes = Path(path).read_bytes() if reload else b""
+            except Exception:
+                raw_bytes = b""
+            truncated = len(raw_bytes) > SIZE_LIMIT
+            display_bytes = raw_bytes[:SIZE_LIMIT] if truncated else raw_bytes
+            try:
+                content = display_bytes.decode("utf-8", errors="replace")
+            except Exception:
+                content = read_file_safe(path)
+            banner = ""
+            if truncated:
+                banner = f"[Truncated to {SIZE_LIMIT//1024}KB of {len(raw_bytes)//1024}KB. Press Ctrl+R to pick a different file if needed.]\n\n"
+            render_flag = str(placeholder.get("render", "")).lower() in {"md", "markdown"}
+            is_markdown = render_flag or (Path(path).suffix.lower() in {".md", ".markdown"} or any(l.startswith("#") for l in content.splitlines()[:20]))
+            text.config(state="normal")
+            text.delete("1.0", "end")
+            if banner:
+                text.insert("1.0", banner)
+            if not is_markdown:
+                text.insert("end", content)
+                text.config(state="disabled")
+                return
+            import re as _re
+            in_code = False
+            for line in content.splitlines():
+                if line.strip().startswith("```"):
+                    if not in_code:
+                        in_code = True; text.insert("end", "\n")
+                    else:
+                        in_code = False
+                    continue
+                if in_code:
+                    start = text.index("end-1c"); text.insert("end", line + "\n"); text.tag_add("codeblock", start, text.index("end-1c")); continue
+                if _re.match(r"^---+$", line.strip()):
+                    start = text.index("end-1c"); text.insert("end", "\n" + line.strip() + "\n"); text.tag_add("hr", start, text.index("end-1c")); continue
+                m = _re.match(r"^(#{1,6})\s+(.*)$", line)
+                if m:
+                    hashes, content_line = m.groups(); lvl = min(len(hashes), 3)
+                    start = text.index("end-1c"); text.insert("end", content_line + "\n"); text.tag_add(f"h{lvl}", start, text.index("end-1c")); continue
+                pos_before = text.index("end-1c")
+                working = line; cursor = 0; bold_pattern = _re.compile(r"\*\*(.+?)\*\*")
+                while True:
+                    bm = bold_pattern.search(working, cursor)
+                    if not bm:
+                        text.insert("end", working[cursor:] + "\n"); break
+                    text.insert("end", working[cursor:bm.start()])
+                    bold_start = text.index("end-1c"); text.insert("end", bm.group(1)); bold_end = text.index("end-1c"); text.tag_add("bold", bold_start, bold_end)
+                    cursor = bm.end()
+                    if cursor >= len(working):
+                        text.insert("end", "\n"); break
+                # Inline code replacements
+                line_start_idx = pos_before; line_end_idx = text.index("end-2c lineend"); line_text = text.get(line_start_idx, line_end_idx)
+                for s, e in reversed([(m.start(), m.end()) for m in _re.finditer(r"`([^`]+)`", line_text)]):
+                    inner = _re.match(r"`([^`]+)`", line_text[s:e]).group(1)
+                    abs_start = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + s}"; abs_end = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + e}"
+                    text.delete(abs_start, abs_end); text.insert(abs_start, inner)
+                    new_end_idx = f"{line_start_idx.split('.')[0]}.{int(line_start_idx.split('.')[1]) + s + len(inner)}"; text.tag_add("inlinecode", abs_start, new_end_idx)
+            text.config(state="disabled")
+
+        _render()
+
+        def _refresh(event=None):
+            y = text.yview()
+            _render()
+            try: text.yview_moveto(y[0])
+            except Exception: pass
+            return "break"
+
+        def _accept(event=None):
+            action["value"] = "accept"; viewer.destroy(); return "break"
+        def _reset(event=None):
+            action["value"] = "reset"; viewer.destroy(); return "break"
+        def _cancel(event=None):
+            action["value"] = "cancel"; viewer.destroy(); return "break"
+
+        viewer.bind("<Control-Return>", _accept)
+        viewer.bind("<Control-KP_Enter>", _accept)
+        viewer.bind("<Escape>", _cancel)
+        viewer.bind("<Control-r>", _reset)
+        viewer.bind("<Control-u>", _refresh)
+        viewer.protocol("WM_DELETE_WINDOW", lambda: _cancel())
+        viewer.mainloop()
+        return action["value"]
+
+    # Main loop
+    current = get_global_reference_file()
+    if current and not Path(current).expanduser().exists():
+        _clear_global_path()
+        current = None
+
+    while True:
+        if not current:
+            picked = _pick_file()
+            if not picked:
+                return CANCELLED
+            current = str(Path(picked).expanduser())
+            _persist_path(current)
+        action = _show_viewer(current)
+        if action == "accept":
+            return current
+        if action == "reset":
+            _clear_global_path()
+            current = None
+            continue  # loop re-picks and reopens viewer
+        if action == "cancel":
+            return CANCELLED
 
 
 def collect_context_variable_gui(label: str):
@@ -453,7 +643,8 @@ def collect_variables_gui(template):
             variables[name] = persisted_simple[name]
 
         if name == "reference_file_content":
-            path = variables.get("reference_file")
+            # Backward compatibility: content auto-derived from global reference file
+            path = variables.get("reference_file") or get_global_reference_file()
             p = Path(path).expanduser() if path else None
             if p and p.exists():
                 show_reference_file_content(str(p))
@@ -480,7 +671,10 @@ def collect_variables_gui(template):
             continue
 
         if ptype == "file":
-            value = collect_file_variable_gui(template_id, placeholder, globals_map)
+            if name == "reference_file":
+                value = collect_global_reference_file_gui(placeholder)
+            else:
+                value = collect_file_variable_gui(template_id, placeholder, globals_map)
         else:
             default_val = placeholder.get("default") if isinstance(placeholder, dict) else None
             if isinstance(default_val, str):

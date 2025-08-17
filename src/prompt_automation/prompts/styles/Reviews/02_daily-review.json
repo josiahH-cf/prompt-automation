@@ -6,62 +6,64 @@
   "placeholders": [
     {
       "name": "morning",
-      "label": "Morning (DEEP WORK) - What is your plan for deep work this morning?",
+      "label": "Morning (DEEP WORK) - What is your plan for deep work this morning?\nWhat will you do and in what order?\nList the specific tasks you will do in order as a list.",
       "multiline": true,
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "automation",
-      "label": "AI Automation (Can anything be automated by AI today? What's the plan?)",
-      "multiline": true,
-      "format": "checklist",
-      "required": false,
-      "default": ""
+      "default": "",
+      "format": "bullet"
     },
     {
       "name": "work",
-      "label": "Work (What is your plan for work today?)",
+      "label": "Work (What is your plan for work today?)\nWhat will you do and in what order?\nList the specific tasks you will do in order as a list.",
       "multiline": true,
-      "format": "bullet",
-      "required": false,
-      "default": ""
+      "default": "",
+      "format": "bullet"
     },
     {
       "name": "meetings",
-      "label": "Shallow Work / Meetings (What meetings or shallow work do you have to prepare for today?)",
+      "label": "Shallow Work / Meetings (Is there any shallow work or meetings you have to prepare for today?)",
       "multiline": true,
-      "required": false,
-      "default": ""
+      "default": "",
+      "format": "checklist"
     },
     {
       "name": "evenings",
-      "label": "Evenings (What is your plan for your evenings today?)",
+      "label": "Evenings (What is your plan for the evening?)",
       "multiline": true,
-      "required": false,
+      "default": "",
+      "format": "bullet"
+    },
+    {
+      "name": "automation",
+      "label": "AI Automation (Can anything be automated by AI today? If so - how will you do this?)",
+      "multiline": true,
+      "format": "checklist",
+      "default": ""
+    },
+    {
+      "name": "reference_file",
+      "type": "file",
+      "label": "Reference File (goals, projects, etc.)",
+      "render": "markdown",
       "default": ""
     },
     {
       "name": "outcomes",
       "label": "Outcomes (What specific outcomes will you produce?)",
       "multiline": true,
-      "required": false,
-      "default": ""
+      "default": "",
+      "format": "bullet"
     },
     {
       "name": "habits",
       "label": "Habits (Plan for positive / avoiding habits today)",
       "multiline": true,
-      "required": false,
-      "default": ""
+      "default": "",
+      "format": "bullet"
     }
   ],
   "template": [
     "- Morning (DEEP WORK)",
     "  {{morning}}",
-    "",
-    "- AI Automation Opportunities (Can anything be automated by AI today? What's the plan?)",
-    "  {{automation}}",
     "",
     "- Work",
     "  {{work}}",
@@ -71,6 +73,9 @@
     "",
     "- Evenings",
     "  {{evenings}}",
+    "",
+    "- AI Automation Opportunities (Can anything be automated by AI today? What's the plan?)",
+    "  {{automation}}",
     "",
     "- Outcomes: What specific outcomes will you produce?",
     "  {{outcomes}}",
