@@ -6,7 +6,7 @@ import sys
 from .. import logger, update, updater
 from ..errorlog import get_logger
 from .selector import open_template_selector
-from .variable_collector import collect_variables_gui
+from .collector import collect_variables_gui
 from .review_window import review_output_gui
 from .file_append import _append_to_files
 
