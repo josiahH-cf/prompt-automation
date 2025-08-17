@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .. import menus
+from ..menus import render_template
 from ..gui.file_append import _append_to_files
 
 
@@ -31,7 +31,7 @@ def render_template_cli(tmpl: dict[str, Any]) -> tuple[str, dict[str, Any]] | No
         if input("\nProceed with input collection? [Y/n]: ").lower() in {"n", "no"}:
             return None
 
-    return menus.render_template(tmpl, return_vars=True)
+    return render_template(tmpl, return_vars=True)
 
 
 __all__ = ["render_template_cli", "_append_to_files"]

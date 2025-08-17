@@ -1,7 +1,8 @@
 """Final review window for rendered output."""
 from __future__ import annotations
 
-from .. import menus, paste
+from ..menus import render_template
+from .. import paste
 
 
 def review_output_gui(template, variables):
@@ -15,7 +16,7 @@ def review_output_gui(template, variables):
     from tkinter import messagebox
 
     # Render the template
-    rendered_text, var_map = menus.render_template(
+    rendered_text, var_map = render_template(
         template, variables, return_vars=True
     )
 
