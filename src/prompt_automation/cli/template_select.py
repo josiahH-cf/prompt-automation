@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .. import logger, menus
+from .. import logger
+from ..menus import list_styles, list_prompts, load_template, PROMPTS_DIR
 
 
 def select_template_cli() -> dict[str, Any] | None:
     """Enhanced CLI template selection with better navigation."""
-    styles = menus.list_styles()
+    styles = list_styles()
     if not styles:
         print("No template styles found.")
         return None
@@ -41,7 +42,7 @@ def select_template_cli() -> dict[str, Any] | None:
 
 def pick_prompt_cli(style: str) -> dict[str, Any] | None:
     """Enhanced CLI prompt selection."""
-    prompts = menus.list_prompts(style)
+    prompts = list_prompts(style)
     if not prompts:
         print(f"No templates found in style '{style}'.")
         return None
@@ -56,8 +57,8 @@ def pick_prompt_cli(style: str) -> dict[str, Any] | None:
 
     print(f"\nTemplates in '{style}':")
     for i, prompt_path in enumerate(sorted_prompts, 1):
-        template = menus.load_template(prompt_path)
-        rel = prompt_path.relative_to(menus.PROMPTS_DIR / style)
+        template = load_template(prompt_path)
+        rel = prompt_path.relative_to(PROMPTS_DIR / style)
         rel_display = str(rel.parent) + "/" if str(rel.parent) != "." else ""
         title = template.get("title", prompt_path.stem)
         freq_info = (
@@ -79,7 +80,7 @@ def pick_prompt_cli(style: str) -> dict[str, Any] | None:
             if not choice:
                 return select_template_cli()
             if choice.isdigit() and 1 <= int(choice) <= len(sorted_prompts):
-                return menus.load_template(sorted_prompts[int(choice) - 1])
+                return load_template(sorted_prompts[int(choice) - 1])
             print("Invalid selection. Please try again.")
         except KeyboardInterrupt:
             return None

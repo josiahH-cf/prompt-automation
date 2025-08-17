@@ -9,7 +9,14 @@ import platform
 from pathlib import Path
 from typing import Any
 
-from .. import logger, menus, paste, update as manifest_update, updater
+from .. import logger, paste, update as manifest_update, updater
+from ..menus import (
+    ensure_unique_ids,
+    list_styles,
+    list_prompts,
+    load_template,
+    PROMPTS_DIR,
+)
 from ..variables import (
     reset_file_overrides,
     reset_single_file_override,
@@ -116,18 +123,18 @@ class PromptCLI:
             return
 
         try:
-            menus.ensure_unique_ids(menus.PROMPTS_DIR)
+            ensure_unique_ids(PROMPTS_DIR)
         except ValueError as e:
             print(f"[prompt-automation] {e}")
             return
 
         if args.self_test:
-            styles = menus.list_styles()
+            styles = list_styles()
             template_files: list[Path] = []
             for s in styles:
-                for p in menus.list_prompts(s):
+                for p in list_prompts(s):
                     try:
-                        data = menus.load_template(p)
+                        data = load_template(p)
                         if isinstance(data, dict) and "template" in data:
                             template_files.append(p)
                     except Exception:
@@ -190,9 +197,9 @@ class PromptCLI:
             return
 
         if args.list:
-            for style in menus.list_styles():
+            for style in list_styles():
                 print(style)
-                for tmpl_path in menus.list_prompts(style):
+                for tmpl_path in list_prompts(style):
                     print("  ", tmpl_path.name)
             return
 

@@ -11,7 +11,7 @@ def test_menus_nested_import():
     # Create a temporary nested prompt structure and ensure listing works
     import json, tempfile, shutil
     import prompt_automation.config as config
-    import prompt_automation.menus as menus
+    from prompt_automation.menus import list_styles, list_prompts
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -28,8 +28,8 @@ def test_menus_nested_import():
         (style_dir / '01_nested-template.json').write_text(json.dumps(tmpl))
         # Point PROMPTS_DIR to styles root (production layout)
         config.PROMPTS_SEARCH_PATHS[:] = [styles_root]  # type: ignore
-        menus.PROMPTS_DIR = styles_root  # type: ignore
-        styles = menus.list_styles()
+        config.PROMPTS_DIR = styles_root  # type: ignore
+        styles = list_styles()
         assert 'TestStyle' in styles
-        prompts = menus.list_prompts('TestStyle')
+        prompts = list_prompts('TestStyle')
         assert any(p.name.endswith('nested-template.json') for p in prompts)

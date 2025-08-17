@@ -35,7 +35,7 @@ def test_imports():
         return False
     
     try:
-        import prompt_automation.menus
+        from prompt_automation import menus
         print("✓ prompt_automation.menus imported successfully")
     except ImportError as e:
         print(f"✗ prompt_automation.menus import failed: {e}")
@@ -48,9 +48,9 @@ def test_templates():
     print("\nTesting template discovery...")
     
     try:
-        import prompt_automation.menus as menus
-        
-        styles = menus.list_styles()
+        from prompt_automation.menus import list_styles, list_prompts, load_template
+
+        styles = list_styles()
         if not styles:
             print("✗ No template styles found")
             return False
@@ -59,14 +59,14 @@ def test_templates():
         
         total_templates = 0
         for style in styles:
-            prompts = menus.list_prompts(style)
+            prompts = list_prompts(style)
             print(f"  - {style}: {len(prompts)} template(s)")
             total_templates += len(prompts)
             
             # Test loading first template
             if prompts:
                 try:
-                    template = menus.load_template(prompts[0])
+                    template = load_template(prompts[0])
                     title = template.get('title', 'Unknown')
                     placeholders = len(template.get('placeholders', []))
                     print(f"    ✓ Loaded '{title}' with {placeholders} placeholder(s)")

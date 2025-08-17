@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from ... import menus
+from ...menus import PROMPTS_DIR
 from ...renderer import validate_template, load_template
 
 @dataclass
@@ -127,6 +127,6 @@ class BrowserState:
 
 
 def create_browser_state() -> BrowserState:
-    return BrowserState(menus.PROMPTS_DIR)
+    return BrowserState(PROMPTS_DIR)
 
 __all__ = ["TemplateEntry", "ListingItem", "BrowserState", "create_browser_state"]
