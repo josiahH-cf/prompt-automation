@@ -164,7 +164,7 @@ Responsibilities:
 Renumber Process:
 1. Build map of desired digit -> template path from mapping file.
 2. For each desired numeric key, if current holder differs and digit occupied, the occupant is reassigned to the next free ID.
-3. Update template JSON `id` and rename file to `NN_slug.json` (preserving rest of filename).
+3. Assign / fix missing or duplicate numeric `id` values (positive integers). Filenames are no longer auto-renamed to match the title; new files are created as `ID.json` (zero‑padded to at least two digits for IDs < 100). Existing filenames are left unchanged when titles change.
 4. Update shortcut mapping paths if filenames changed.
 5. Persist mapping atomically.
 

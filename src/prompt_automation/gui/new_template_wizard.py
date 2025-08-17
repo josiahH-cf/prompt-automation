@@ -17,32 +17,33 @@ from pathlib import Path
 import json
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from typing import List
+from typing import List, Dict, Any
 
 from ..config import PROMPTS_DIR
+from ..renderer import fill_placeholders
 
-
-def _slug(text: str) -> str:
-    return "".join(c.lower() if c.isalnum() else "-" for c in text).strip("-") or "template"
+# Legacy helper retained for any external import; now a no-op.
+def _slug(text: str) -> str:  # pragma: no cover - legacy shim
+    return text
 
 
 def _next_id(style_root: Path) -> int:
+    """Return next free positive integer id in style (no upper bound)."""
     used: set[int] = set()
     for p in style_root.rglob("*.json"):
         try:
             data = json.loads(p.read_text())
-            if data.get("style") == style_root.name and isinstance(data.get("id"), int):
+            if data.get("style") == style_root.name and isinstance(data.get("id"), int) and data.get("id") > 0:
                 used.add(int(data["id"]))
         except Exception:
             continue
-    for i in range(1, 99):
-        if i not in used:
-            return i
-    raise ValueError("No free ID 01-98 remaining in this style")
+    if not used:
+        return 1
+    return max(used) + 1
 
 
 SUGGESTED_PLACEHOLDERS = [
-    "role",
+    # 'role' intentionally omitted – no longer auto-included
     "objective",
     "context",
     "instructions",
@@ -102,23 +103,264 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
     title_entry = tk.Entry(main, textvariable=title_var)
     title_entry.pack(fill="x", pady=(0, 8))
 
-    # Placeholders
-    tk.Label(main, text="Placeholders (one per line):", font=("Arial", 10, "bold")).pack(anchor="w")
-    ph_frame = tk.Frame(main)
-    ph_frame.pack(fill="both", expand=True)
-    ph_text = tk.Text(ph_frame, height=8, font=("Consolas", 10))
-    ph_text.pack(fill="both", expand=True)
-    ph_text.insert("1.0", "\n".join(SUGGESTED_PLACEHOLDERS))
+    # --- Placeholder Builder -------------------------------------------------
+    builder_label = tk.Label(main, text="Placeholders", font=("Arial", 10, "bold"))
+    builder_label.pack(anchor="w")
+    builder = tk.Frame(main)
+    builder.pack(fill="x", pady=(0, 6))
 
-    # Body override
-    body_override_var = tk.BooleanVar(value=True)
-    tk.Checkbutton(main, text="Generate skeleton body (uncheck to supply custom body below)", variable=body_override_var).pack(anchor="w", pady=(6, 2))
-    body_text = tk.Text(main, height=10, font=("Consolas", 10))
+    ph_name_var = tk.StringVar()
+    ph_type_var = tk.StringVar(value="text")
+    ph_format_var = tk.StringVar(value="")
+    ph_default_var = tk.StringVar()
+    ph_multiline_var = tk.BooleanVar(value=False)
+    ph_persist_var = tk.BooleanVar(value=False)
+    ph_override_var = tk.BooleanVar(value=False)
+    ph_remove_var = tk.StringVar()  # comma separated phrases
+    ph_options_var = tk.StringVar()  # comma separated for 'options' type
+
+    def build_labeled(parent, text, widget):
+        row = tk.Frame(parent)
+        tk.Label(row, text=text, width=12, anchor="w").pack(side="left")
+        widget.pack(side="left", fill="x", expand=True)
+        row.pack(fill="x", pady=1)
+
+    build_labeled(builder, "Name", tk.Entry(builder, textvariable=ph_name_var))
+    type_combo = ttk.Combobox(builder, textvariable=ph_type_var, values=["text","list","file","number","options"], width=12, state="readonly")
+    build_labeled(builder, "Type", type_combo)
+    fmt_combo = ttk.Combobox(builder, textvariable=ph_format_var, values=["","list","checklist","auto"], width=12, state="readonly")
+    build_labeled(builder, "Format", fmt_combo)
+    build_labeled(builder, "Default", tk.Entry(builder, textvariable=ph_default_var))
+    build_labeled(builder, "Options", tk.Entry(builder, textvariable=ph_options_var))
+    build_labeled(builder, "Remove If Empty", tk.Entry(builder, textvariable=ph_remove_var))
+
+    flags = tk.Frame(builder)
+    tk.Checkbutton(flags, text="Multiline", variable=ph_multiline_var).pack(side="left")
+    tk.Checkbutton(flags, text="Persist", variable=ph_persist_var).pack(side="left")
+    tk.Checkbutton(flags, text="Override(File)", variable=ph_override_var).pack(side="left")
+    flags.pack(anchor="w", pady=(2,3))
+
+    # Placeholder list (treeview)
+    columns = ("type","default","format","flags")
+    ph_tree = ttk.Treeview(main, columns=columns, show="headings", height=6)
+    for col in columns:
+        ph_tree.heading(col, text=col.capitalize())
+        ph_tree.column(col, width=110, stretch=True)
+    ph_tree.pack(fill="x", pady=(0,4))
+
+    ph_objects: List[Dict[str, Any]] = []
+
+    def refresh_tree():
+        for i in ph_tree.get_children():
+            ph_tree.delete(i)
+        for ph in ph_objects:
+            flags_txt = "+".join([
+                f for f, cond in [("M", ph.get("multiline")), ("P", ph.get("persist")), ("O", ph.get("override"))] if cond
+            ])
+            ph_tree.insert("", "end", iid=ph["name"], values=(ph.get("type","text"), str(ph.get("default",""))[:20], ph.get("format",""), flags_txt))
+
+    def clear_form():
+        ph_name_var.set("")
+        ph_type_var.set("text")
+        ph_format_var.set("")
+        ph_default_var.set("")
+        ph_multiline_var.set(False)
+        ph_persist_var.set(False)
+        ph_override_var.set(False)
+        ph_remove_var.set("")
+        ph_options_var.set("")
+
+    def add_or_update_placeholder():
+        name = ph_name_var.get().strip()
+        if not name:
+            messagebox.showerror("Validation", "Placeholder name required")
+            return
+        # Basic schema
+        ph: Dict[str, Any] = {"name": name}
+        ptype = ph_type_var.get().strip() or "text"
+        if ptype != "text":
+            ph["type"] = ptype
+        if ph_format_var.get().strip():
+            ph["format"] = ph_format_var.get().strip()
+        if ph_default_var.get().strip():
+            # list formatting: if list type and comma present -> split; else string
+            if ptype == "list" and "\n" in ph_default_var.get():
+                ph["default"] = [l for l in ph_default_var.get().splitlines() if l.strip()]
+            else:
+                ph["default"] = ph_default_var.get()
+        if ph_multiline_var.get():
+            ph["multiline"] = True
+        if ph_persist_var.get():
+            ph["persist"] = True
+        if ph_override_var.get() and ptype == "file":
+            ph["override"] = True
+        if ph_remove_var.get().strip():
+            phrases = [p.strip() for p in ph_remove_var.get().split(",") if p.strip()]
+            if phrases:
+                ph["remove_if_empty"] = phrases if len(phrases) > 1 else phrases[0]
+        if ptype == "options" and ph_options_var.get().strip():
+            opts = [o.strip() for o in ph_options_var.get().split(",") if o.strip()]
+            if opts:
+                ph["options"] = opts
+        # Replace existing by name or append
+        for i, existing in enumerate(ph_objects):
+            if existing["name"] == name:
+                ph_objects[i] = ph
+                break
+        else:
+            ph_objects.append(ph)
+        refresh_tree()
+        update_preview()
+        clear_form()
+
+    def on_tree_select(event):  # populate form for edit
+        sel = ph_tree.selection()
+        if not sel:
+            return
+        name = sel[0]
+        for ph in ph_objects:
+            if ph["name"] == name:
+                ph_name_var.set(ph["name"])
+                ph_type_var.set(ph.get("type","text"))
+                ph_format_var.set(ph.get("format",""))
+                dval = ph.get("default")
+                if isinstance(dval, list):
+                    ph_default_var.set("\n".join(dval))
+                elif dval is not None:
+                    ph_default_var.set(str(dval))
+                else:
+                    ph_default_var.set("")
+                ph_multiline_var.set(bool(ph.get("multiline")))
+                ph_persist_var.set(bool(ph.get("persist")))
+                ph_override_var.set(bool(ph.get("override")))
+                rem = ph.get("remove_if_empty")
+                if isinstance(rem, list):
+                    ph_remove_var.set(", ".join(rem))
+                elif isinstance(rem, str):
+                    ph_remove_var.set(rem)
+                else:
+                    ph_remove_var.set("")
+                if ph.get("type") == "options" and isinstance(ph.get("options"), list):
+                    ph_options_var.set(",".join(ph.get("options")))
+                else:
+                    ph_options_var.set("")
+                break
+
+    ph_tree.bind("<<TreeviewSelect>>", on_tree_select)
+
+    btns_row = tk.Frame(main)
+    tk.Button(btns_row, text="Add / Update", command=add_or_update_placeholder).pack(side="left")
+    def delete_sel():
+        sel = ph_tree.selection()
+        if not sel:
+            return
+        name = sel[0]
+        for i, ph in enumerate(ph_objects):
+            if ph["name"] == name:
+                ph_objects.pop(i)
+                break
+        refresh_tree(); update_preview()
+    tk.Button(btns_row, text="Delete", command=delete_sel).pack(side="left", padx=(6,0))
+    def move(offset: int):
+        sel = ph_tree.selection()
+        if not sel:
+            return
+        name = sel[0]
+        for i, ph in enumerate(ph_objects):
+            if ph["name"] == name:
+                ni = i + offset
+                if 0 <= ni < len(ph_objects):
+                    ph_objects[i], ph_objects[ni] = ph_objects[ni], ph_objects[i]
+                    refresh_tree()
+                    ph_tree.selection_set(ph["name"])
+                break
+        update_preview()
+    tk.Button(btns_row, text="Up", command=lambda: move(-1)).pack(side="left", padx=(6,0))
+    tk.Button(btns_row, text="Down", command=lambda: move(1)).pack(side="left", padx=(4,0))
+    tk.Button(btns_row, text="Clear Form", command=clear_form).pack(side="left", padx=(10,0))
+    btns_row.pack(anchor="w", pady=(2,6))
+
+    # Seed with suggested placeholders (without defaults beyond blanks)
+    for name in SUGGESTED_PLACEHOLDERS:
+        ph_objects.append({"name": name, "multiline": name in {"context","instructions","inputs","constraints","output_format","quality_checks","follow_ups"}})
+    refresh_tree()
+
+    # Body editor & preview side-by-side
+    body_frame = tk.Frame(main)
+    body_frame.pack(fill="both", expand=True)
+    body_left = tk.Frame(body_frame)
+    body_left.pack(side="left", fill="both", expand=True)
+    tk.Label(body_left, text="Template Body (one line per entry)", font=("Arial", 10, "bold")).pack(anchor="w")
+    body_text = tk.Text(body_left, height=14, font=("Consolas", 10))
     body_text.pack(fill="both", expand=True)
-    body_text.insert("1.0", "# Custom body here (ignored if skeleton generation checked)")
+    body_text.insert("1.0", "# Compose your template lines here. Use {{placeholder_name}} tokens.\n")
 
-    # Private checkbox
-    tk.Checkbutton(main, text="Private (store under prompts/local instead of prompts/styles)", variable=private_var).pack(anchor="w", pady=(6, 2))
+    # Preview
+    preview_frame = tk.Frame(body_frame, padx=8)
+    preview_frame.pack(side="left", fill="both", expand=True)
+    tk.Label(preview_frame, text="Live Preview", font=("Arial", 10, "bold")).pack(anchor="w")
+    preview_text = tk.Text(preview_frame, height=14, font=("Consolas", 10), state="disabled")
+    preview_text.pack(fill="both", expand=True)
+
+    def compute_preview() -> str:
+        lines = body_text.get("1.0", "end-1c").splitlines()
+        # Build value map from defaults
+        var_map: Dict[str, Any] = {}
+        for ph in ph_objects:
+            d = ph.get("default")
+            if isinstance(d, list):
+                var_map[ph["name"]] = d
+            elif isinstance(d, str):
+                var_map[ph["name"]] = d
+            else:
+                var_map[ph["name"]] = ""  # empty
+        try:
+            rendered = fill_placeholders(lines, var_map)
+        except Exception as e:
+            rendered = f"<error rendering: {e}>"
+        return rendered
+
+    def update_preview():
+        text = compute_preview()
+        preview_text.configure(state="normal")
+        preview_text.delete("1.0", "end")
+        preview_text.insert("1.0", text)
+        preview_text.configure(state="disabled")
+
+    tk.Button(preview_frame, text="Refresh Preview", command=update_preview).pack(anchor="w", pady=(4,2))
+    update_preview()
+
+    # Private checkbox & metadata/global exclusions
+    opts_frame = tk.Frame(main)
+    opts_frame.pack(fill="x", pady=(4,2))
+    tk.Checkbutton(opts_frame, text="Private (store under prompts/local)", variable=private_var).pack(side="left")
+    share_var = tk.BooleanVar(value=True)
+    tk.Checkbutton(opts_frame, text="Shareable", variable=share_var).pack(side="left", padx=(12,0))
+
+    # Global placeholder exclusion checkboxes
+    exclude_frame = tk.Frame(main)
+    exclude_frame.pack(fill="x", pady=(2,4))
+    tk.Label(exclude_frame, text="Include Globals:", font=("Arial",9,"bold")).pack(anchor="w")
+    global_keys: List[str] = []
+    gfile = PROMPTS_DIR / "globals.json"
+    if gfile.exists():
+        try:
+            gdata = json.loads(gfile.read_text())
+            gph = gdata.get("global_placeholders") or {}
+            if isinstance(gph, dict):
+                global_keys = sorted([k for k in gph.keys() if isinstance(k, str)])
+        except Exception:
+            global_keys = []
+    global_vars: Dict[str, tk.BooleanVar] = {}
+    if global_keys:
+        row = tk.Frame(exclude_frame)
+        row.pack(fill="x")
+        for k in global_keys:
+            var = tk.BooleanVar(value=True)
+            global_vars[k] = var
+            tk.Checkbutton(row, text=k, variable=var).pack(side="left", padx=2)
+    else:
+        tk.Label(exclude_frame, text="(no globals detected)").pack(anchor="w")
 
     status_var = tk.StringVar()
     tk.Label(main, textvariable=status_var, fg="#2c662d", anchor="w").pack(fill="x", pady=(4, 2))
@@ -126,11 +368,8 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
     btns = tk.Frame(main); btns.pack(fill="x", pady=(8,0))
 
     def build_skeleton(phs: List[str]) -> List[str]:
+        # Provide a minimal scaffold only if body still default.
         lines: List[str] = []
-        # Role section if role placeholder present
-        if "role" in phs:
-            lines.append("{{role}}")
-            lines.append("")
         mapping = [
             ("objective", "## Objective"),
             ("context", "## Context"),
@@ -171,40 +410,37 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
             messagebox.showerror("Error", f"Failed to create directory: {e}")
             return
         pid = _next_id(base_style_dir)
-        raw_phs = [l.strip() for l in ph_text.get("1.0", "end-1c").splitlines() if l.strip()]
-        # Always ensure role first if present
-        ph_objects = []
-        for name in raw_phs:
-            ph_objects.append({"name": name, "multiline": name in {"context","instructions","inputs","constraints","output_format","quality_checks","follow_ups"}})
-        # Add defaults for important placeholders
-        for ph in ph_objects:
-            if ph["name"] == "role":
-                ph["default"] = "assistant"
-            else:
-                ph.setdefault("default", "")
-        if body_override_var.get():
-            body = build_skeleton([p["name"] for p in ph_objects])
+        # If user left the single starter line, build skeleton automatically
+        raw_body_lines = [l for l in body_text.get("1.0", "end-1c").splitlines()]
+        if len(raw_body_lines) <= 2 and raw_body_lines[0].startswith("# Compose your template"):
+            body = build_skeleton([p["name"] for p in ph_objects]) or []
         else:
-            body = [l for l in body_text.get("1.0", "end-1c").splitlines()]
+            body = raw_body_lines
         data = {
             "schema": 1,
             "id": pid,
             "title": title,
             "style": style_name,
-            "role": "{{role}}" if any(p["name"] == "role" for p in ph_objects) else "assistant",
-            "template": body,
+            "role": "assistant",  # no automatic role placeholder
+            # Order: placeholders then template for workflow preference
             "placeholders": ph_objects,
+            "template": body,
             "global_placeholders": {},
             "metadata": {
-                "path": f"{style_name}/{_slug(title)}.json",
+                # 'path' deprecated: keep empty string to signal no sync-to-title renaming.
+                "path": "",
                 "tags": [],
                 "version": 1,
                 "render": "markdown",
-                # Will be normalized again by loader; set tentative flag
-                "share_this_file_openly": not private_var.get(),
+                "share_this_file_openly": share_var.get() and not private_var.get(),
             },
         }
-        fname = f"{pid:02d}_{_slug(title)}.json"
+        # Exclusions: any global key checkbox that is unchecked
+        excluded = [k for k, var in global_vars.items() if not var.get()]
+        if excluded:
+            data["metadata"]["exclude_globals"] = excluded
+        pad_width = 2 if pid < 100 else len(str(pid))
+        fname = f"{pid:0{pad_width}d}.json"
         fpath = final_dir / fname
         try:
             if fpath.exists():

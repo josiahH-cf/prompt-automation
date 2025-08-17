@@ -8,15 +8,21 @@ from typing import Any, Dict, List
 from ..config import PROMPTS_DIR
 from ..renderer import validate_template
 
-
-def _slug(text: str) -> str:
-    return "".join(c.lower() if c.isalnum() else "-" for c in text).strip("-")
+# NOTE: Slug logic removed. Filenames are now stable once created. We keep a
+# tiny helper for backwards compatibility if any external code imported it.
+def _slug(text: str) -> str:  # pragma: no cover - legacy shim
+    return text
 
 
 def _check_unique_id(pid: int, exclude: Path | None = None) -> None:
-    """Raise ``ValueError`` if ``pid`` already exists in prompts (excluding path)."""
+    """Raise ``ValueError`` if ``pid`` already exists (excluding provided path).
+
+    ID range is no longer restricted to 01-98; any positive int is accepted.
+    """
+    if not isinstance(pid, int) or pid <= 0:
+        raise ValueError("Template 'id' must be a positive integer")
     for p in PROMPTS_DIR.rglob("*.json"):
-        if exclude and p.resolve() == exclude.resolve():
+        if exclude and p.resolve() == (exclude.resolve()):
             continue
         try:
             data = json.loads(p.read_text())
@@ -27,19 +33,30 @@ def _check_unique_id(pid: int, exclude: Path | None = None) -> None:
 
 
 def save_template(data: Dict[str, Any], orig_path: Path | None = None) -> Path:
-    """Write ``data`` to disk with validation and backup."""
+    """Persist ``data`` without automatic renaming based on title.
+
+    Rules now:
+      - On create (no ``orig_path``): filename = ``<id>.json`` (zero padded to
+        at least 2 digits for legacy sort friendliness) under style directory.
+      - On update (``orig_path`` provided): reuse the existing filename even if
+        ``title`` changed.
+    """
     if not validate_template(data):
         raise ValueError("invalid template structure")
     _check_unique_id(data["id"], exclude=orig_path)
     dir_path = PROMPTS_DIR / data["style"]
     dir_path.mkdir(parents=True, exist_ok=True)
-    fname = f"{int(data['id']):02d}_{_slug(data['title'])}.json"
-    path = dir_path / fname
-    if path.exists():
+    if orig_path and orig_path.exists():
+        path = orig_path
+    else:
+        pid = int(data["id"])
+        # Preserve at least two digits for readability; allow growth past 99.
+        pad_width = 2 if pid < 100 else len(str(pid))
+        fname = f"{pid:0{pad_width}d}.json"
+        path = dir_path / fname
+    if path.exists() and (not orig_path or orig_path == path):
+        # Backup existing when overwriting.
         shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
-    if orig_path and orig_path.exists() and orig_path != path:
-        shutil.copy2(orig_path, orig_path.with_suffix(orig_path.suffix + ".bak"))
-        orig_path.unlink()
     path.write_text(json.dumps(data, indent=2))
     return path
 
@@ -65,76 +82,51 @@ def delete_style(name: str) -> None:
 
 
 def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
-    """Ensure every template has a unique ID."""
-    paths = sorted(base.rglob("*.json"))
-    used_ids_global: set[int] = set()
-    changes: List[str] = []
-    problems: List[str] = []
+    """Ensure every template has a unique positive integer ID.
 
+    Behaviour change: No file renaming occurs. Only assigns IDs to files
+    missing an integer ``id`` or resolves duplicates by assigning the next
+    free integer greater than the current max.
+    """
+    paths = sorted(base.rglob("*.json"))
     templates: List[tuple[Path, Dict[str, Any]]] = []
+    problems: List[str] = []
+    used: set[int] = set()
+
     for path in paths:
         try:
             data = json.loads(path.read_text())
             templates.append((path, data))
+            if isinstance(data.get("id"), int) and data["id"] > 0:
+                if data["id"] in used:
+                    # mark duplicate; will fix later
+                    pass
+                used.add(int(data["id"]))
         except Exception as e:
             problems.append(f"Unreadable JSON: {path} ({e})")
 
-    def next_free_id() -> int | None:
-        for i in range(1, 99):
-            if i not in used_ids_global:
-                return i
-        return None
+    if used:
+        next_id = max(used) + 1
+    else:
+        next_id = 1
 
-    for path, data in templates:
-        if "template" not in data or data.get("type") == "globals":
-            continue
-        orig_id = data.get("id")
-        if not isinstance(orig_id, int):
-            new_id = next_free_id()
-            if new_id is None:
-                raise ValueError("No free IDs (01-98) remain to assign missing id")
-            data["id"] = new_id
-            used_ids_global.add(new_id)
-            changes.append(f"Assigned missing id {new_id:02d} -> {path}")
-        else:
-            if orig_id in used_ids_global:
-                new_id = next_free_id()
-                if new_id is None:
-                    raise ValueError(
-                        f"Duplicate id {orig_id:02d} in {path} and elsewhere; no free IDs left"
-                    )
-                data["id"] = new_id
-                used_ids_global.add(new_id)
-                changes.append(
-                    f"Reassigned duplicate id {orig_id:02d} -> {new_id:02d} in {path}"
-                )
-            else:
-                used_ids_global.add(orig_id)
-
+    changes: List[str] = []
+    seen: set[int] = set()
     for path, data in templates:
         if "template" not in data:
             continue
-        try:
-            pid = data["id"]
-            title = data.get("title")
-            if not title and path.name.startswith(f"{int(pid):02d}_"):
-                expected_name = path.name
-            else:
-                slug_title = _slug(title or path.stem)
-                expected_name = f"{int(pid):02d}_{slug_title}.json"
-            if path.name != expected_name:
-                new_path = path.with_name(expected_name)
+        cur = data.get("id")
+        if not isinstance(cur, int) or cur <= 0 or cur in seen:
+            data["id"] = next_id
+            changes.append(f"Assigned id {next_id} -> {path}")
+            seen.add(next_id)
+            next_id += 1
+            try:
                 path.write_text(json.dumps(data, indent=2))
-                if new_path.exists() and new_path != path:
-                    backup = new_path.with_suffix(new_path.suffix + ".bak")
-                    shutil.copy2(new_path, backup)
-                if new_path != path:
-                    path.rename(new_path)
-                    changes.append(f"Renamed {path.name} -> {new_path.name}")
-            else:
-                path.write_text(json.dumps(data, indent=2))
-        except Exception as e:
-            problems.append(f"Failed updating {path}: {e}")
+            except Exception as e:
+                problems.append(f"Failed writing updated id for {path}: {e}")
+        else:
+            seen.add(cur)
 
     if problems:
         print("[prompt-automation] Issues during ID check:")
@@ -176,7 +168,9 @@ def create_new_template() -> None:
         "template": body,
         "placeholders": placeholders,
     }
-    fname = f"{int(pid):02d}_{_slug(title)}.json"
+    # New creation now uses plain id-based filename only.
+    pad_width = 2 if int(pid) < 100 else len(str(int(pid)))
+    fname = f"{int(pid):0{pad_width}d}.json"
     (dir_path / fname).write_text(json.dumps(data, indent=2))
     print(f"Created {fname}")
 
