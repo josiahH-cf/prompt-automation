@@ -57,7 +57,8 @@ def review_output_gui(template, variables):
     text_frame = tk.Frame(main_frame)
     text_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-    text_widget = tk.Text(text_frame, font=("Consolas", 10), wrap="word")
+    from .fonts import get_display_font
+    text_widget = tk.Text(text_frame, font=get_display_font(master=root), wrap="word")
     scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
     text_widget.config(yscrollcommand=scrollbar.set)
 

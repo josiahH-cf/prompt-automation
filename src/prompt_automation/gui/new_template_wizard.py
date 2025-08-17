@@ -21,6 +21,7 @@ from typing import List, Dict, Any
 
 from ..config import PROMPTS_DIR
 from ..renderer import fill_placeholders
+from .fonts import get_display_font
 
 # Legacy helper retained for any external import; now a no-op.
 def _slug(text: str) -> str:  # pragma: no cover - legacy shim
@@ -291,7 +292,7 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
     body_left = tk.Frame(body_frame)
     body_left.pack(side="left", fill="both", expand=True)
     tk.Label(body_left, text="Template Body (one line per entry)", font=("Arial", 10, "bold")).pack(anchor="w")
-    body_text = tk.Text(body_left, height=14, font=("Consolas", 10))
+    body_text = tk.Text(body_left, height=14, font=get_display_font(master=root))
     body_text.pack(fill="both", expand=True)
     body_text.insert("1.0", "# Compose your template lines here. Use {{placeholder_name}} tokens.\n")
 
@@ -299,7 +300,7 @@ def open_new_template_wizard():  # pragma: no cover - GUI logic
     preview_frame = tk.Frame(body_frame, padx=8)
     preview_frame.pack(side="left", fill="both", expand=True)
     tk.Label(preview_frame, text="Live Preview", font=("Arial", 10, "bold")).pack(anchor="w")
-    preview_text = tk.Text(preview_frame, height=14, font=("Consolas", 10), state="disabled")
+    preview_text = tk.Text(preview_frame, height=14, font=get_display_font(master=root), state="disabled")
     preview_text.pack(fill="both", expand=True)
 
     def compute_preview() -> str:

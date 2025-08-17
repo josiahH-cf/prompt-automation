@@ -18,13 +18,25 @@ _log = get_logger(__name__)
 
 
 def read_file_safe(path: str) -> str:
-    """Return file contents (best-effort) or empty string.
+    """Return file contents (best‑effort) or empty string.
 
-    Strategy:
-      1. Fast path: Path.read_text() with system default (utf-8 in most envs)
-      2. On failure, read raw bytes & attempt a small ordered set of encodings:
-         utf-8-sig, utf-16, utf-16-le, utf-16-be, cp1252
-      3. Gracefully degrade: log once per failure & return empty string.
+    Why rewrite? Previously we relied on ``Path.read_text()`` raising to
+    try alternative encodings; on Windows a UTF‑8 file with emoji could be
+    decoded as cp1252 *without error*, producing mojibake like ``ðŸ‘—``.
+    We now always read bytes first and attempt a deterministic, Unicode‑
+    friendly list of decoders in priority order, guaranteeing UTF‑8 wins
+    when valid.
+
+    Order rationale:
+      1. utf-8 (most common; fast happy path)
+      2. utf-8-sig (BOM variants)
+      3. utf-16 / utf-16-le / utf-16-be (common exported docs)
+      4. cp1252 (legacy Windows fallback)
+
+    If all fail we log and return an empty string. We also perform a simple
+    heuristic: if a *later* decoder produced typical UTF‑8 mojibake tokens
+    (``\u00f0\u009f`` sequences rendered as ``ðŸ``) but the raw bytes are
+    valid UTF‑8, we re-decode with UTF‑8.
     """
     p = Path(path).expanduser()
     if not p.exists():
@@ -37,17 +49,35 @@ def read_file_safe(path: str) -> str:
             except Exception as e:  # pragma: no cover - optional dependency
                 _log.error("cannot read Word file %s: %s", path, e)
                 return ""
-        # Primary attempt (utf-8 / platform default)
-        try:
-            return p.read_text()
-        except Exception:
-            data = p.read_bytes()
-            for enc in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252"):
-                try:
-                    return data.decode(enc)
-                except Exception:  # pragma: no cover - individual encoding fail
-                    continue
-            raise
+        data = p.read_bytes()
+        encodings = ("utf-8", "utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252")
+        last_text: str | None = None
+        for enc in encodings:
+            try:
+                text = data.decode(enc)
+                # Quick success for the first (ideal) encodings
+                if enc.startswith("utf-8"):
+                    return text
+                # Save candidate; continue in case utf-8 later would have succeeded (already tried)
+                last_text = text
+                break
+            except Exception:  # pragma: no cover - per-encoding failure
+                continue
+        if last_text is None:
+            # utf-16 variants or cp1252 may have worked; but if not, attempt strict utf-8 once more
+            try:
+                return data.decode("utf-8")
+            except Exception:
+                _log.error("cannot decode file %s with fallback set", path)
+                return ""
+        # Heuristic fix: if mojibake markers present and raw bytes are valid utf-8, prefer utf-8 decode
+        if ("ðŸ" in last_text or "â€™" in last_text or "â€“" in last_text):
+            try:
+                utf8_text = data.decode("utf-8")
+                return utf8_text
+            except Exception:
+                pass
+        return last_text
     except Exception as e:
         _log.error("cannot read file %s: %s", path, e)
         return ""

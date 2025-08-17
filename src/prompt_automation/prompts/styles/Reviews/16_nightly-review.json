@@ -8,12 +8,19 @@
       "name": "time_allocation",
       "label": "Time Allocation: Estimate tomorrow's time: \nDeep Work (hrs), \nMeetings (hrs), \nShallow Work (hrs). List or bullet your planned allocation (with realistic timelines built in).",
       "multiline": true,
-      "default": "- Deep Work: 3 hrs\n- Meetings: 2 hrs\n- Shallow Work: 1 hr\n\n Time Slots for Deep Work:",
+      "default": "",
       "format": "bullet"
     },
     {
       "name": "priority",
-      "label": "3 Priority 1 (P1) Tasks for Tomorrow: List the 3 most important outcome or task you'll start with.",
+      "label": "3 Priority 1 (P1) Tasks for Tomorrow: List the 3 most important outcomes or tasks you'll start with in the morning.",
+      "multiline": true,
+      "default": "",
+      "format": "bullet"
+    },
+    {
+      "name": "reading",
+      "label": "What will you read tomorrow? Anything to pray for?",
       "multiline": true,
       "default": "",
       "format": "bullet"
@@ -50,6 +57,9 @@
   "template": [
     "- 3 Priority 1 (P1) Tasks for Tomorrow",
     "  {{priority}}",
+    "",
+    "- Reading & Prayer",
+    "  {{reading}}",
     "",
     "- Time Allocation (Deep Work / Meetings / Shallow Work)",
     "  {{time_allocation}}",

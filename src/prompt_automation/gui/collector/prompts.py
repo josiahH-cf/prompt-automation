@@ -78,7 +78,8 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
         text_frame = tk.Frame(viewer)
         text_frame.pack(fill="both", expand=True)
-        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        from ..fonts import get_display_font
+        text = tk.Text(text_frame, wrap="word", font=get_display_font(master=viewer))
         scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
         text.configure(yscrollcommand=scroll.set)
         text.pack(side="left", fill="both", expand=True)
@@ -184,7 +185,8 @@ def collect_reference_file_variable_gui(template_id: int, placeholder: dict):
 
         text_frame = tk.Frame(viewer)
         text_frame.pack(fill="both", expand=True)
-        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        from ..fonts import get_display_font
+        text = tk.Text(text_frame, wrap="word", font=get_display_font(master=viewer))
         scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
         text.configure(yscrollcommand=scroll.set)
         text.pack(side="left", fill="both", expand=True)
@@ -286,77 +288,86 @@ def collect_global_reference_file_gui(placeholder: dict):
         return None
 
     def _show_viewer(path: str) -> str:
-        # returns 'accept' | 'reset' | 'cancel'
         viewer = tk.Tk()
         viewer.title(f"Reference File: {Path(path).name}")
         viewer.geometry("900x680")
         viewer.resizable(True, True)
         viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
-
         action = {"value": "cancel"}
-
-        # Toolbar/instructions
-        top = tk.Frame(viewer, padx=14, pady=8)
-        top.pack(fill="x")
+        top = tk.Frame(viewer, padx=14, pady=8); top.pack(fill="x")
         instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
         instr.pack(side="left")
-
         # Text area
-        text_frame = tk.Frame(viewer)
-        text_frame.pack(fill="both", expand=True)
-        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        text_frame = tk.Frame(viewer); text_frame.pack(fill="both", expand=True)
+        from ..fonts import get_display_font
+        base_family, base_size = get_display_font(master=viewer)
+        text = tk.Text(text_frame, wrap="word", font=(base_family, base_size))
         scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
         text.configure(yscrollcommand=scroll.set)
-        text.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
-        # Markdown tag styles
-        text.tag_configure("h1", font=("Consolas", 16, "bold"))
-        text.tag_configure("h2", font=("Consolas", 14, "bold"))
-        text.tag_configure("h3", font=("Consolas", 12, "bold"))
-        text.tag_configure("bold", font=("Consolas", 10, "bold"))
-        text.tag_configure("codeblock", background="#f5f5f5", font=("Consolas", 10))
+        text.pack(side="left", fill="both", expand=True); scroll.pack(side="right", fill="y")
+        # Tags
+        text.tag_configure("h1", font=(base_family, base_size + 6, "bold"))
+        text.tag_configure("h2", font=(base_family, base_size + 4, "bold"))
+        text.tag_configure("h3", font=(base_family, base_size + 2, "bold"))
+        text.tag_configure("bold", font=(base_family, base_size, "bold"))
+        text.tag_configure("codeblock", background="#f5f5f5", font=(base_family, base_size))
         text.tag_configure("inlinecode", background="#eee")
         text.tag_configure("hr", foreground="#666")
 
+        def _apply_markdown(text_widget, raw: str):
+            lines = raw.splitlines(); cursor = 1; in_code = False; code_start_index = None
+            for ln in lines:
+                line_index = f"{cursor}.0"
+                if ln.strip().startswith("```"):
+                    if not in_code:
+                        in_code = True; code_start_index = line_index
+                    else:
+                        try: text_widget.tag_add("codeblock", code_start_index, f"{cursor}.0 lineend")
+                        except Exception: pass
+                        in_code = False; code_start_index = None
+                elif not in_code:
+                    if ln.startswith("### "): text_widget.tag_add("h3", line_index, f"{cursor}.0 lineend")
+                    elif ln.startswith("## "): text_widget.tag_add("h2", line_index, f"{cursor}.0 lineend")
+                    elif ln.startswith("# "): text_widget.tag_add("h1", line_index, f"{cursor}.0 lineend")
+                    elif ln.strip() in {"---", "***"}: text_widget.tag_add("hr", line_index, f"{cursor}.0 lineend")
+                cursor += 1
+            import re
+            full = text_widget.get("1.0", "end-1c")
+            for m in re.finditer(r"\*\*(.+?)\*\*", full): text_widget.tag_add("bold", f"1.0+{m.start(1)}c", f"1.0+{m.end(1)}c")
+            for m in re.finditer(r"`([^`]+?)`", full): text_widget.tag_add("inlinecode", f"1.0+{m.start(1)}c", f"1.0+{m.end(1)}c")
+
+        wants_md = (placeholder.get("render") == "markdown")
+
         def render(markdown: bool = True):
-            content = read_file_safe(path)
+            content = read_file_safe(path).replace("\r", "")
             if len(content.encode("utf-8")) > SIZE_LIMIT:
-                banner = "*** File truncated (too large) ***\n\n"
-                content = banner + content[: SIZE_LIMIT // 2]
-            text.delete("1.0", "end")
-            text.insert("1.0", content)
-            # no markdown rendering in Tkinter; placeholder
+                banner = "*** File truncated (too large) ***\n\n"; content = banner + content[: SIZE_LIMIT // 2]
+            if markdown and wants_md:
+                new_lines=[]; in_code=False
+                for ln in content.splitlines():
+                    if ln.strip().startswith("```"):
+                        in_code = not in_code; new_lines.append(ln); continue
+                    if not in_code and ln.startswith("- "): ln = "• " + ln[2:]
+                    new_lines.append(ln)
+                content_to_insert = "\n".join(new_lines)
+            else:
+                content_to_insert = content
+            text.delete("1.0", "end"); text.insert("1.0", content_to_insert)
+            if markdown and wants_md:
+                try: _apply_markdown(text, content_to_insert)
+                except Exception: pass
 
         render()
 
-        def on_accept(event=None):
-            action["value"] = "accept"
-            viewer.destroy()
-            return "break"
-
-        def on_reset(event=None):
-            action["value"] = "reset"
-            viewer.destroy()
-            return "break"
-
-        def on_refresh(event=None):
-            render()
-            return "break"
-
-        def on_cancel(event=None):
-            action["value"] = "cancel"
-            viewer.destroy()
-            return "break"
+        def on_accept(event=None): action["value"] = "accept"; viewer.destroy(); return "break"
+        def on_reset(event=None): action["value"] = "reset"; viewer.destroy(); return "break"
+        def on_refresh(event=None): render(); return "break"
+        def on_cancel(event=None): action["value"] = "cancel"; viewer.destroy(); return "break"
 
         viewer.bind("<Control-Return>", on_accept)
-        viewer.bind("<Control-r>", on_reset)
-        viewer.bind("<Control-R>", on_reset)
-        viewer.bind("<Escape>", on_cancel)
-        viewer.bind("<Control-u>", on_refresh)
-        viewer.bind("<Control-U>", on_refresh)
-
-        viewer.mainloop()
-        return action["value"]
+        viewer.bind("<Control-r>", on_reset); viewer.bind("<Control-R>", on_reset)
+        viewer.bind("<Escape>", on_cancel); viewer.bind("<Control-u>", on_refresh); viewer.bind("<Control-U>", on_refresh)
+        viewer.mainloop(); return action["value"]
 
     # Main flow
     stored = get_global_reference_file()
@@ -485,7 +496,8 @@ def show_reference_file_content(path: str) -> None:
 
     text_frame = tk.Frame(main_frame)
     text_frame.pack(fill="both", expand=True)
-    text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+    from ..fonts import get_display_font
+    text = tk.Text(text_frame, wrap="word", font=get_display_font(master=root))
     scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
     text.configure(yscrollcommand=scroll.set)
     text.pack(side="left", fill="both", expand=True)
@@ -500,9 +512,43 @@ def show_reference_file_content(path: str) -> None:
 
     show_raw = {"value": False}
 
+    def _apply_markdown(text_widget, raw: str):
+        lines = raw.splitlines(); cursor = 1
+        in_code = False; code_start = None
+        for ln in lines:
+            idx = f"{cursor}.0"
+            if ln.strip().startswith("```"):
+                if not in_code:
+                    in_code = True; code_start = idx
+                else:
+                    try: text_widget.tag_add("codeblock", code_start, f"{cursor}.0 lineend")
+                    except Exception: pass
+                    in_code = False; code_start = None
+            elif not in_code:
+                if ln.startswith("### "):
+                    text_widget.tag_add("h3", idx, f"{cursor}.0 lineend")
+                elif ln.startswith("## "):
+                    text_widget.tag_add("h2", idx, f"{cursor}.0 lineend")
+                elif ln.startswith("# "):
+                    text_widget.tag_add("h1", idx, f"{cursor}.0 lineend")
+            cursor += 1
+        import re
+        full = text_widget.get("1.0", "end-1c")
+        for m in re.finditer(r"\*\*(.+?)\*\*", full):
+            start = f"1.0+{m.start(1)}c"; end = f"1.0+{m.end(1)}c"; text_widget.tag_add("bold", start, end)
+        for m in re.finditer(r"`([^`]+?)`", full):
+            start = f"1.0+{m.start(1)}c"; end = f"1.0+{m.end(1)}c"; text_widget.tag_add("inlinecode", start, end)
+
     def render(markdown: bool = True):
-        # Placeholder: no markdown formatting; simply toggle raw
-        pass
+        if markdown:
+            try:
+                text.config(state="normal"); text.delete("1.0", "end"); text.insert("1.0", content)
+                _apply_markdown(text, content)
+                text.config(state="disabled")
+            except Exception:
+                text.config(state="normal"); text.delete("1.0", "end"); text.insert("1.0", content); text.config(state="disabled")
+        else:
+            text.config(state="normal"); text.delete("1.0", "end"); text.insert("1.0", content); text.config(state="disabled")
 
     def toggle_view():
         show_raw["value"] = not show_raw["value"]
@@ -712,7 +758,8 @@ def collect_single_variable(name, label, ptype, options, multiline):
         text_frame = tk.Frame(main_frame)
         text_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-        input_widget = tk.Text(text_frame, font=("Arial", 10), wrap="word")
+        from ..fonts import get_display_font
+        input_widget = tk.Text(text_frame, font=get_display_font(master=root), wrap="word")
         scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=input_widget.yview)
         input_widget.config(yscrollcommand=scrollbar.set)
 
@@ -751,7 +798,8 @@ def collect_single_variable(name, label, ptype, options, multiline):
                 top = tk.Toplevel(root)
                 top.title(f"Default value – {label}")
                 top.geometry("600x400")
-                txt = tk.Text(top, wrap="word", font=("Consolas", 10))
+                from ..fonts import get_display_font
+                txt = tk.Text(top, wrap="word", font=get_display_font(master=top))
                 txt.pack(fill="both", expand=True)
                 txt.insert("1.0", full_default)
                 txt.config(state="disabled")

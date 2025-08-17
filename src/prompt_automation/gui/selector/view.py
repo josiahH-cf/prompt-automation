@@ -30,7 +30,8 @@ def _open_preview(parent: tk.Tk, entry: TemplateEntry) -> None:
         preview.title(f"Preview: {tmpl.get('title', entry.path.name)}")
         preview.geometry("700x500")
         preview.resizable(True, True)
-        text = tk.Text(preview, wrap="word", font=("Consolas", 10))
+        from ..fonts import get_display_font
+        text = tk.Text(preview, wrap="word", font=get_display_font(master=parent))
         text.pack(fill="both", expand=True)
         lines = tmpl.get('template', [])
         text.insert("1.0", "\n".join(lines))
@@ -562,11 +563,12 @@ def open_template_selector(service) -> Optional[dict]:
         # Open new preview window and keep reference
         try:
             tmpl = item.template.data
+            from ..fonts import get_display_font
             preview_win = tk.Toplevel(root)
             preview_win.title(f"Preview: {tmpl.get('title', item.path.name)}")
             preview_win.geometry("700x500")
             preview_win.resizable(True, True)
-            txt = tk.Text(preview_win, wrap='word', font=("Consolas", 10))
+            txt = tk.Text(preview_win, wrap='word', font=get_display_font(master=preview_win))
             txt.pack(fill='both', expand=True)
             lines = tmpl.get('template', [])
             txt.insert('1.0', "\n".join(lines))

@@ -1,91 +1,134 @@
 {
   "schema": 1,
   "_comment": [
-    "Template for Agentic Workflow Orchestration.",
-    "Auto-refactored for standard placeholder structure."
+    "Agentic Workflow Starred — agnostic vNext",
+    "Edits: role is the MODEL role; users/reference_file removed; objective = explicit end-state + why; implementation steps clarified; inputs -> optional examples; constraints = avoidances; acceptance = test/verification; output_format -> additional_verifications; first-person removed in favor of model-directed voice; shorter and stack-agnostic."
   ],
   "id": 10,
-  "title": "Agentic Workflow Orchestration Feature Add",
-  "style": "Code",
+  "title": "Agentic Workflow Orchestration",
+  "style": "LLM-Techniques",
   "placeholders": [
     {
-      "name": "constraints",
-      "label": "Constraints",
-      "multiline": true,
-      "default": ""
-    },
-    {
-      "name": "context",
-      "label": "Context",
-      "multiline": true,
-      "default": ""
-    },
-    {
-      "name": "follow_ups",
-      "label": "Follow Ups",
-      "multiline": true,
-      "default": ""
-    },
-    {
-      "name": "inputs",
-      "label": "Inputs",
-      "multiline": true,
-      "default": ""
-    },
-    {
-      "name": "instructions",
-      "label": "Instructions",
-      "multiline": true,
-      "default": ""
+      "name": "role",
+      "label": "Model Role (What should the model be in this run?)",
+      "multiline": false,
+      "default": "You are a highly capable AI agent tasked with achieving a specific end-state through precise, stack-agnostic implementation steps. Your goal is to produce clear, actionable artifacts that meet the defined requirements without unnecessary complexity or assumptions."
     },
     {
       "name": "objective",
-      "label": "Objective",
-      "multiline": false,
-      "default": ""
+      "label": "Objective (Define the explicit end-state AND why it’s valuable; speak as requirements the model must achieve. Provide a couple examples.)",
+      "multiline": true,
+      "default": "End-state (must exist and work):\n- <e.g., Provide a complete implementation plan and final artifacts for the requested change, ready to apply with no missing steps.>\n- <e.g., Modularize the relevant work into focused units while preserving behavior and interfaces.>\n\nWhy this is valuable:\n- <e.g., Improves maintainability, reduces errors, accelerates future edits, and clarifies responsibilities.>\n\nExamples of valid end-states (choose/modify):\n- “Add the requested capability behind a configurable flag, with parity tests and documentation.”\n- “Refactor the relevant logic into clearer, smaller units while keeping inputs/outputs stable.”\n- “Produce a robust prompt/template that guides future executions to the same outcome.”"
     },
     {
-      "name": "output_format",
-      "label": "Output Format",
+      "name": "context",
+      "label": "Context (Paste any extra context beyond the files already attached to the session. This may include relevant files, project details, or other information that will help the model understand the task.)",
       "multiline": true,
       "default": ""
     },
     {
-      "name": "quality_checks",
-      "label": "Quality Checks",
+      "name": "implementation_steps",
+      "type": "list",
+      "format": "bullet",
+      "label": "Implementation Steps (Exact, imperative actions the model should perform in THIS run—agnostic to language or stack. Reference artifacts generically: code, config, data, docs, prompts, etc.)",
+      "multiline": true,
+      "default": [
+        "Discover: identify the relevant artifacts and understand current state.",
+        "Plan: propose a minimal-risk approach to reach the end-state; itemize changes needed in a clear way. Break it down into the smallest possible steps without it being too granular.",
+        "Execute: produce the concrete changes (diffs/patches or final content) in small, verifiable increments.",
+        "Validate: understand and later describe how the changes meet the end-state and remain safe/reversible.",
+        "Report: provide a concise summary and any safe next steps."
+      ]
+    },
+    {
+      "name": "examples",
+      "type": "list",
+      "format": "bullet",
+      "label": "Optional Examples to Reference (Sample inputs/outputs, tiny snippets, data shapes, or template fragments to mirror.)",
       "multiline": true,
       "default": ""
+    },
+    {
+      "name": "constraints",
+      "label": "Avoid / Prohibitions (Explicitly state what the model must NOT do.)",
+      "multiline": true,
+      "default": "- Do NOT introduce external services/dependencies or require non-standard tooling.\n- Do NOT change public interfaces, behavior, or data contracts unless the Objective authorizes it.\n- Do NOT perform sweeping rewrites; prefer incremental, reversible edits.\n- Do NOT assume a specific language, framework, or runtime; keep instructions/artifacts portable.\n- Do NOT degrade performance, security, privacy, or observability.\n- Do NOT delete or overwrite unrelated content."
+    },
+    {
+      "name": "acceptance_criteria",
+      "type": "list",
+      "format": "checklist",
+      "label": "Test Cases & Verification (How will we know the end-state is achieved, agnostic to stack?)",
+      "multiline": true,
+      "default": [
+        "Demonstrable parity where required (inputs/outputs/behavior unchanged unless specified).",
+        "Concrete artifacts produced (final content or precise diffs/patches) with no TODO gaps.",
+        "Clear run/usage instructions and if applicable a minimal rollback path.",
+        "Validation evidence included (checks, reasoning, or example runs as appropriate).",
+        "No forbidden changes made (per Avoid/Prohibitions)."
+      ]
+    },
+    {
+      "name": "additional_verifications",
+      "label": "Anything Else to Verify or Edit? (Edge cases, risks, assumptions to call out for confirmation.)",
+      "multiline": true,
+      "default": ""
+    },
+    {
+      "name": "follow_up",
+      "label": "Follow-Up (What should the model do next after this run? This may include further actions, checks, or clarifications needed.)",
+      "multiline": true,
+      "default": "Review the changes made, ensure all acceptance criteria is met, and suggest any next steps or improvements based on the outcomes of this run."
     }
   ],
   "template": [
-    "## Objective",
+    "{{role}}",
+    "",
+    "----------------------------------------------------------------",
+    "## Mission Overview (End-State & Rationale)",
+    "Achieve the end-state exactly as specified:",
     "{{objective}}",
     "",
+    "----------------------------------------------------------------",
+    "## Guardrails (Obligations & Prohibitions)",
+    "{{constraints}}",
+    "",
+    "----------------------------------------------------------------",
     "## Context",
     "{{context}}",
     "",
-    "## Instructions",
-    "{{instructions}}",
+    "----------------------------------------------------------------",
+    "## Plan & Steps (Do These Precisely)",
+    "{{implementation_steps}}",
     "",
-    "## Inputs",
-    "{{inputs}}",
+    "----------------------------------------------------------------",
+    "## Optional Examples to Mirror",
+    "{{examples}}",
     "",
-    "## Constraints",
-    "{{constraints}}",
+    "----------------------------------------------------------------",
+    "## Success Criteria (Must Pass)",
+    "{{acceptance_criteria}}",
     "",
-    "## Output Format",
-    "{{output_format}}",
+    "----------------------------------------------------------------",
+    "## Output Contract & Final Checks",
+    "- Provide only final artifacts (or exact diffs/patches) plus a concise change summary.",
+    "- State explicit assumptions you made, if any, and why they are safe.",
+    "{{additional_verifications}}",
     "",
-    "## Quality Checks",
-    "{{quality_checks}}",
-    "",
-    "## Follow-ups",
-    "{{follow_ups}}"
+    "----------------------------------------------------------------",
+    "## Next Steps (Follow-Up)",
+    "{{follow_up}}"
   ],
   "metadata": {
-    "path": "Code/10_agentic-workflow-orchestration.json",
-    "tags": [],
-    "version": 1,
+    "path": "Code/32_agentic-workflow-starred.json",
+    "tags": [
+      "agentic",
+      "agnostic",
+      "implementation",
+      "prompt",
+      "workflow"
+    ],
+    "version": 4,
     "render": "markdown",
     "share_this_file_openly": true
   }

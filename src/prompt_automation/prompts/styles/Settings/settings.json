@@ -1,12 +1,19 @@
 {
   "_comment": "User-adjustable settings for prompt-automation. file_overrides mirrors placeholder-overrides.json entries.",
   "file_overrides": {
-    "templates": {}
+    "templates": {
+      "3": {
+        "reference_file": {
+          "path": "C:/Josiah Hunter Sync Vault/Josiah Hunter Sync Vault/01 - Master Sheets/Systems/Goals - OKRs - KPIs.md",
+          "skip": false
+        }
+      }
+    }
   },
   "metadata": {
     "created": "initial",
     "notes": "Edit paths or set skip=true for any file placeholder. Changes sync to local overrides automatically.",
-    "last_sync": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "last_sync": "Windows-11-10.0.26100-SP0",
     "share_this_file_openly": true
   }
 }
