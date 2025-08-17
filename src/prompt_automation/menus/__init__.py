@@ -103,19 +103,31 @@ def render_template(
         raw_vars["context_append_file"] = str(context_path)
 
     ref_path_global = get_global_reference_file()
+    declared_reference_placeholder = any(ph.get("name") == "reference_file" for ph in placeholders)
     for ph in placeholders:
         if ph.get("type") != "file":
             continue
         name = ph["name"]
         path = raw_vars.get(name)
         if name == "reference_file":
-            if not path and ref_path_global:
+            # use per-template path; only fallback to global if template left value blank
+            if (not path) and ref_path_global:
                 path = ref_path_global
                 raw_vars[name] = path
             content = read_file_safe(path) if path else ""
+            # Populate both the main placeholder (content) and legacy _content alias
+            vars[name] = content
             vars["reference_file_content"] = content
         else:
             vars[name] = read_file_safe(path) if path else ""
+    # If no reference_file placeholder declared at all but a global exists and template references content token, inject it
+    if not declared_reference_placeholder and ref_path_global:
+        try:
+            tmpl_text_all = "\n".join(tmpl.get("template", []))
+            if "{{reference_file_content}}" in tmpl_text_all and "reference_file_content" not in vars:
+                vars["reference_file_content"] = read_file_safe(ref_path_global)
+        except Exception:
+            pass
 
     for ph in placeholders:
         name = ph.get("name")

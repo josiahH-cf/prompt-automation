@@ -84,24 +84,7 @@ def get_variables(
             else:
                 ph["label"] = note_text.strip() or name
 
-        if name == "reference_file" and ptype == "file":
-            ov = _load_overrides()
-            gfiles = ov.setdefault("global_files", {})
-            existing = gfiles.get("reference_file")
-            if isinstance(existing, str) and existing and Path(existing).expanduser().exists():
-                values[name] = existing
-                continue
-            label = ph.get("label", name)
-            chosen = _gui_file_prompt(label) or input(
-                f"File for {label} (leave blank to skip): "
-            ).strip()
-            if chosen and Path(chosen).expanduser().exists():
-                gfiles["reference_file"] = str(Path(chosen).expanduser())
-                _save_overrides(ov)
-                values[name] = gfiles["reference_file"]
-            else:
-                values[name] = ""
-            continue
+    # reference_file now behaves like a normal per-template file placeholder when declared
 
         if ptype == "file" and template_id is not None:
             path_val = _resolve_file_placeholder(ph, template_id, globals_map)
@@ -172,7 +155,7 @@ def get_variables(
                 else:
                     val = input(f"{label}: ")
 
-        if ptype == "file" and name != "reference_file" and isinstance(val, str) and val and template_id is None:
+        if ptype == "file" and isinstance(val, str) and val and template_id is None:
             while val:
                 path = Path(val).expanduser()
                 if path.exists():
