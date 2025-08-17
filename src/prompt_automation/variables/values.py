@@ -30,23 +30,40 @@ def load_template_value_memory(template_id: int) -> Dict[str, Any]:
 
 
 def persist_template_values(template_id: int, placeholders: List[Dict[str, Any]], values: Dict[str, Any]) -> None:
-    """Store scalar/list placeholder values (excluding files) for the template."""
+    """Persist only placeholders explicitly marked with "persist": true.
+
+    Rationale: Defaults already provide stable baseline; user-entered ad‑hoc
+    text should not auto-fill future runs unless the template author opts in.
+    File paths are persisted separately in the overrides "templates" section,
+    so file placeholders (including reference_file) are excluded here.
+    """
     overrides_data = _load_overrides()
     tvals = overrides_data.setdefault("template_values", {}).setdefault(str(template_id), {})
     for ph in placeholders:
         nm = ph.get("name")
         if not nm or ph.get("type") == "file" or nm == "reference_file_content":
             continue
+        if not ph.get("persist"):
+            # Drop previously stored value if persist flag removed
+            if nm in tvals:
+                tvals.pop(nm, None)
+            continue
         v = values.get(nm)
         if isinstance(v, (str, int, float)):
             if str(v).strip():
                 tvals[nm] = v
+            else:
+                tvals.pop(nm, None)
         elif isinstance(v, list):
             cleaned = [str(x) for x in v if str(x).strip()]
             if cleaned:
                 if len(cleaned) > 200:
                     cleaned = cleaned[:200]
                 tvals[nm] = cleaned
+            else:
+                tvals.pop(nm, None)
+    if not tvals:
+        overrides_data.get("template_values", {}).pop(str(template_id), None)
     _save_overrides(overrides_data)
 
 

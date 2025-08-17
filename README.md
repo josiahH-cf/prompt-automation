@@ -7,6 +7,10 @@ Recent feature highlights:
 - Global reminders: define `global_placeholders.reminders` (string or list) in `globals.json` and they'll be appended as a markdown blockquote to every template that doesn't override them.
 - New Template Wizard: GUI tool (Options -> New template wizard) to create styles/subfolders and scaffold a template with suggested structured sections.
 - Numeric shortcuts & renumbering: Assign single‑digit keys to favorite templates (Options -> Manage shortcuts / renumber) and optionally renumber files/IDs to match those digits. Press the digit in the selector for instant open.
+ - Multi-file reference placeholders with per‑placeholder persistence via `override: true`, plus lazy `{{name_path}}` tokens for any file variable.
+ - Opt‑in value persistence using `"persist": true` (replaces legacy always‑persist behavior) with clear override management UI & CLI.
+ - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
+ - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
 
 ### Default Value Hints & Fallback (Feature A)
 
@@ -186,7 +190,7 @@ From the selector choose Options -> New template wizard to interactively:
 The wizard allocates the next free ID (01–98) in that style and writes a JSON skeleton with defaults (role defaults to `assistant`).
 
 
-For a detailed codebase overview, see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md). AI coding partners should consult it before making changes.
+For a detailed codebase overview, see [docs/CODEBASE_REFERENCE.md](docs/CODEBASE_REFERENCE.md). For comprehensive, example‑rich placeholder & global variable semantics (multi‑file, persistence, path tokens, formatting, exclusions, troubleshooting) read [docs/VARIABLES_REFERENCE.md](docs/VARIABLES_REFERENCE.md). AI coding partners should consult these before making changes.
 ---
 
 ## Getting Started
@@ -280,17 +284,43 @@ prompt-automation --update
 
 Templates live under `prompts/styles/`. Nested subfolders are supported (e.g. `prompts/styles/Code/Troubleshoot/`). Only a small starter set is bundled; add your own freely.
 
-### Reference / Context File Placeholders
+### Reference / Context File Placeholders (Multi-File)
 
-Add a placeholder with `"name": "reference_file", "type": "file"` once. The first run prompts you to choose a file; the path persists globally and subsequent runs auto-load and (optionally) inject the content. Press **Ctrl+R** in the reference file dialog to reset/clear and immediately pick a new file. `{{reference_file_content}}` is kept for backward compatibility but no longer required—content is always available.
+You can declare **multiple** file placeholders. Each one captures a path and injects its file contents.
 
-Skipping a file: Press the `Skip` button in the file picker dialog. That choice is persisted per template (stored in `~/.prompt-automation/placeholder-overrides.json` and mirrored to `prompts/styles/Settings/settings.json`) and you will not be prompted again unless you reset it.
+Example snippet:
 
-Manage or clear individual stored paths / skips via:
+```jsonc
+"placeholders": [
+   { "name": "reference_file", "type": "file" },
+   { "name": "architecture_notes_file", "type": "file" },
+   { "name": "reference_file_2", "type": "file" }
+]
+```
+
+Tokens you can use inside the template body:
+* `{{reference_file}}` → content of the main reference file
+* `{{reference_file_content}}` → legacy alias for the same content (still supported)
+* `{{architecture_notes_file}}` → content of that secondary file
+* `{{architecture_notes_file_path}}` → the filesystem path (path tokens are only created when referenced)
+* `{{reference_file_path}}`, `{{reference_file_2_path}}`, etc. follow the same pattern
+
+Global fallback rules:
+* Only the canonical name `reference_file` can fall back to a globally configured file if the template either omits the placeholder or leaves it blank but references `{{reference_file}}` or `{{reference_file_content}}`.
+* Other file placeholders never use the global fallback—they remain empty if not selected.
+
+Skipping / persistence:
+* Each (template id, placeholder name) pair stores its own selected path or skip flag in `~/.prompt-automation/placeholder-overrides.json` (mirrored to `prompts/styles/Settings/settings.json`).
+* Remove the entry (GUI or CLI) to re-enable prompting.
+
+Refreshing / updates:
+* Content is always read fresh at render time and on viewer refresh (no caching). Editing a referenced file and re-rendering immediately shows the updated content.
+
+Manage or clear stored paths / skips via:
 * GUI: Options -> Manage overrides
 * CLI: `prompt-automation --list-overrides`, `--reset-one-override <TID> <NAME>`, or `--reset-file-overrides`
 
-The legacy global "reference_file_skip" flag has been removed—skipping is now an explicit per-template action only.
+The legacy global "reference_file_skip" behavior is removed—skipping is explicit per template & placeholder now.
 
 ## Managing Templates
 

@@ -25,14 +25,20 @@ from .overrides import (
 # ------------------------- file prompts ------------------------------------
 
 def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: dict):
-    """GUI file selector with persistence and skip support."""
+    """GUI file selector + viewer with persistence, skip & refresh.
+
+    Workflow:
+      - If stored path & exists -> open viewer directly.
+      - Else show picker dialog; on choose -> persist then open viewer.
+      - Viewer key bindings: Ctrl+Enter accept, Ctrl+R reset (repick), Ctrl+U refresh, Esc cancel.
+    Return: path string | "" (skipped) | CANCELLED sentinel.
+    """
     import tkinter as tk
     from tkinter import filedialog
 
+    SIZE_LIMIT = 200 * 1024
     name = placeholder["name"]
     label = placeholder.get("label", name)
-    # No longer support template/global skip flags via globals.json; only persisted user skip
-
     overrides = load_overrides()
     entry = get_template_entry(overrides, template_id, name) or {}
 
@@ -40,85 +46,197 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
         print_one_time_skip_reminder(overrides, template_id, name)
         return ""
 
-    path_str = entry.get("path")
-    if path_str:
-        p = Path(path_str).expanduser()
-        if p.exists():
-            return str(p)
-        # remove stale path so user is prompted again
-        overrides.get("templates", {}).get(str(template_id), {}).pop(name, None)
+    def _persist(pth: str):
+        set_template_entry(overrides, template_id, name, {"path": pth, "skip": False})
         save_overrides(overrides)
 
-    root = tk.Tk()
-    root.title(f"File: {label}")
-    # Larger default & allow resize/maximize
-    root.geometry("640x180")
-    root.resizable(True, True)
-    root.lift()
-    root.focus_force()
-    root.attributes("-topmost", True)
-    root.after(100, lambda: root.attributes("-topmost", False))
+    def _clear():
+        ov = load_overrides()
+        tmap = ov.get("templates", {}).get(str(template_id), {})
+        if name in tmap:
+            tmap.pop(name, None)
+            save_overrides(ov)
 
-    result = CANCELLED
+    def _pick_file(initial: str | None = None) -> str | None:
+        root = tk.Tk(); root.withdraw()
+        fname = filedialog.askopenfilename(title=label, initialfile=initial or "")
+        root.destroy()
+        return fname or None
 
-    main_frame = tk.Frame(root, padx=20, pady=20)
-    main_frame.pack(fill="both", expand=True)
+    def _show_viewer(path: str):
+        viewer = tk.Tk()
+        viewer.title(f"File: {Path(path).name}")
+        viewer.geometry("900x680")
+        viewer.resizable(True, True)
+        viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
+        action = {"value": "cancel"}
 
-    path_var = tk.StringVar()
-    entry_widget = tk.Entry(main_frame, textvariable=path_var, font=("Arial", 10))
-    entry_widget.pack(side="left", fill="x", expand=True, padx=(0, 10))
-    entry_widget.focus_set()
+        top = tk.Frame(viewer, padx=14, pady=8)
+        top.pack(fill="x")
+        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr.pack(side="left")
 
-    def browse_file():
-        filename = filedialog.askopenfilename(parent=root, title=label)
-        if filename:
-            path_var.set(filename)
+        text_frame = tk.Frame(viewer)
+        text_frame.pack(fill="both", expand=True)
+        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        text.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
 
-    browse_btn = tk.Button(main_frame, text="Browse", command=browse_file, font=("Arial", 10))
-    browse_btn.pack(side="right")
+        def render():
+            content = read_file_safe(path)
+            if len(content.encode("utf-8")) > SIZE_LIMIT:
+                banner = "*** File truncated (display only) ***\n\n"
+                content = banner + content[: SIZE_LIMIT // 2]
+            text.delete("1.0", "end")
+            text.insert("1.0", content)
 
-    button_frame = tk.Frame(root)
-    button_frame.pack(pady=(10, 0))
+        render()
 
-    def on_ok():
-        nonlocal result
-        p = Path(path_var.get()).expanduser()
-        if p.exists():
-            set_template_entry(overrides, template_id, name, {"path": str(p), "skip": False})
-            save_overrides(overrides)
-            result = str(p)
+        def on_accept(event=None):
+            action["value"] = "accept"; viewer.destroy(); return "break"
+        def on_reset(event=None):
+            action["value"] = "reset"; viewer.destroy(); return "break"
+        def on_refresh(event=None):
+            render(); return "break"
+        def on_cancel(event=None):
+            action["value"] = "cancel"; viewer.destroy(); return "break"
+
+        viewer.bind("<Control-Return>", on_accept)
+        viewer.bind("<Control-r>", on_reset); viewer.bind("<Control-R>", on_reset)
+        viewer.bind("<Control-u>", on_refresh); viewer.bind("<Control-U>", on_refresh)
+        viewer.bind("<Escape>", on_cancel)
+        viewer.mainloop()
+        return action["value"]
+
+    path = entry.get("path") if isinstance(entry, dict) else None
+    if path and not Path(path).expanduser().exists():
+        path = None
+
+    while True:
+        if not path:
+            picked = _pick_file()
+            if not picked:
+                return CANCELLED
+            path = picked
+            _persist(path)
+        outcome = _show_viewer(path)
+        if outcome == "accept":
+            return path
+        elif outcome == "reset":
+            _clear(); path = None; continue
         else:
-            result = ""
-        root.destroy()
+            return CANCELLED
 
-    def on_skip():
-        nonlocal result
-        set_template_entry(overrides, template_id, name, {"skip": True})
-        save_overrides(overrides)
+
+# ---------------- per-template reference file (viewer) --------------------
+
+def collect_reference_file_variable_gui(template_id: int, placeholder: dict):
+    """File selector + viewer (Ctrl+Enter accept, Ctrl+R reset, Ctrl+U refresh, Esc cancel)
+    scoped per *template* (not global). Returns path string, empty string if skipped, or CANCELLED.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+
+    SIZE_LIMIT = 200 * 1024  # 200KB display truncation only
+    name = placeholder["name"]
+    label = placeholder.get("label", name)
+
+    overrides = load_overrides()
+    entry = get_template_entry(overrides, template_id, name) or {}
+    if entry.get("skip"):
         print_one_time_skip_reminder(overrides, template_id, name)
-        result = ""
+        return ""
+
+    def _pick_file(initial: str | None = None) -> str | None:
+        root = tk.Tk(); root.withdraw()
+        fname = filedialog.askopenfilename(title=label, initialfile=initial or "")
         root.destroy()
+        if fname:
+            return fname
+        return None
 
-    def on_cancel():
-        nonlocal result
-        result = CANCELLED
-        root.destroy()
+    def _persist(path: str):
+        set_template_entry(overrides, template_id, name, {"path": path, "skip": False})
+        save_overrides(overrides)
 
-    ok_btn = tk.Button(button_frame, text="OK (Enter)", command=on_ok, font=("Arial", 10), padx=20)
-    ok_btn.pack(side="left", padx=(0, 10))
+    def _clear():
+        # remove persisted path
+        ov = load_overrides()
+        tmpl = ov.get("templates", {}).get(str(template_id), {})
+        if name in tmpl:
+            tmpl.pop(name, None)
+            save_overrides(ov)
 
-    skip_btn = tk.Button(button_frame, text="Skip", command=on_skip, font=("Arial", 10), padx=20)
-    skip_btn.pack(side="left", padx=(0, 10))
+    def _show_viewer(path: str):
+        viewer = tk.Tk()
+        viewer.title(f"Reference File: {Path(path).name}")
+        viewer.geometry("900x680")
+        viewer.resizable(True, True)
+        viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
+        action = {"value": "cancel"}
 
-    cancel_btn = tk.Button(button_frame, text="Cancel (Esc)", command=on_cancel, font=("Arial", 10), padx=20)
-    cancel_btn.pack(side="left")
+        top = tk.Frame(viewer, padx=14, pady=8)
+        top.pack(fill="x")
+        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr.pack(side="left")
 
-    root.bind("<Return>", lambda e: (on_ok(), "break"))
-    root.bind("<KP_Enter>", lambda e: (on_ok(), "break"))
-    root.bind("<Escape>", lambda e: (on_cancel(), "break"))
+        text_frame = tk.Frame(viewer)
+        text_frame.pack(fill="both", expand=True)
+        text = tk.Text(text_frame, wrap="word", font=("Consolas", 10))
+        scroll = tk.Scrollbar(text_frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        text.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
 
-    root.mainloop()
-    return result
+        def render():
+            content = read_file_safe(path)
+            if len(content.encode("utf-8")) > SIZE_LIMIT:
+                banner = "*** File truncated (display only) ***\n\n"
+                content = banner + content[: SIZE_LIMIT // 2]
+            text.delete("1.0", "end")
+            text.insert("1.0", content)
+
+        render()
+
+        def on_accept(event=None):
+            action["value"] = "accept"; viewer.destroy(); return "break"
+        def on_reset(event=None):
+            action["value"] = "reset"; viewer.destroy(); return "break"
+        def on_refresh(event=None):
+            render(); return "break"
+        def on_cancel(event=None):
+            action["value"] = "cancel"; viewer.destroy(); return "break"
+
+        viewer.bind("<Control-Return>", on_accept)
+        viewer.bind("<Control-r>", on_reset); viewer.bind("<Control-R>", on_reset)
+        viewer.bind("<Control-u>", on_refresh); viewer.bind("<Control-U>", on_refresh)
+        viewer.bind("<Escape>", on_cancel)
+        viewer.mainloop()
+        return action["value"]
+
+    # Workflow loop
+    path = entry.get("path") if isinstance(entry, dict) else None
+    if path and not Path(path).expanduser().exists():
+        path = None  # stale path triggers repick
+
+    while True:
+        if not path:
+            picked = _pick_file()
+            if not picked:
+                return CANCELLED
+            path = picked
+            _persist(path)
+        outcome = _show_viewer(path)
+        if outcome == "accept":
+            return path
+        elif outcome == "reset":
+            _clear()
+            path = None
+            continue
+        else:  # cancel
+            return CANCELLED
 
 
 # ------------------ global reference file prompts ---------------------------
@@ -494,7 +612,7 @@ def collect_variables_gui(template):
 
         if ptype == "file":
             if name == "reference_file":
-                value = collect_global_reference_file_gui(placeholder)
+                value = collect_reference_file_variable_gui(template_id, placeholder)
             else:
                 value = collect_file_variable_gui(template_id, placeholder, globals_map)
         else:

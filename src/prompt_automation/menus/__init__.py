@@ -102,30 +102,46 @@ def render_template(
         vars["context"] = read_file_safe(str(context_path))
         raw_vars["context_append_file"] = str(context_path)
 
+    # --- File placeholder handling (multi-file support) ------------------
     ref_path_global = get_global_reference_file()
+    template_lines_all = tmpl.get("template", []) or []
+    tmpl_text_all = "\n".join(template_lines_all)
     declared_reference_placeholder = any(ph.get("name") == "reference_file" for ph in placeholders)
+
     for ph in placeholders:
         if ph.get("type") != "file":
             continue
-        name = ph["name"]
+        name = ph.get("name")
+        if not name:
+            continue
         path = raw_vars.get(name)
+        # For canonical reference_file placeholder: fallback to global *only if blank*
+        if name == "reference_file" and (not path) and ref_path_global:
+            path = ref_path_global
+            raw_vars[name] = path  # record effective path for caller if they requested return_vars
+        content = read_file_safe(path) if path else ""
+        vars[name] = content
+        # Optional path token lazily injected only if referenced (saves clutter in vars)
+        if f"{{{{{name}_path}}}}" in tmpl_text_all:
+            vars[f"{name}_path"] = path or ""
+        # Legacy alias only for canonical name
         if name == "reference_file":
-            # use per-template path; only fallback to global if template left value blank
-            if (not path) and ref_path_global:
-                path = ref_path_global
-                raw_vars[name] = path
-            content = read_file_safe(path) if path else ""
-            # Populate both the main placeholder (content) and legacy _content alias
-            vars[name] = content
             vars["reference_file_content"] = content
-        else:
-            vars[name] = read_file_safe(path) if path else ""
-    # If no reference_file placeholder declared at all but a global exists and template references content token, inject it
+
+    # Global fallback when template did NOT declare reference_file placeholder at all.
+    # If the template references either {{reference_file}} or {{reference_file_content}} tokens
+    # inject the global file content (and path token if requested) without a placeholder definition.
     if not declared_reference_placeholder and ref_path_global:
         try:
-            tmpl_text_all = "\n".join(tmpl.get("template", []))
-            if "{{reference_file_content}}" in tmpl_text_all and "reference_file_content" not in vars:
-                vars["reference_file_content"] = read_file_safe(ref_path_global)
+            needs_ref = ("{{reference_file}}" in tmpl_text_all) or ("{{reference_file_content}}" in tmpl_text_all)
+            if needs_ref:
+                content = read_file_safe(ref_path_global)
+                if "{{reference_file}}" in tmpl_text_all and "reference_file" not in vars:
+                    vars["reference_file"] = content
+                if "reference_file_content" not in vars and "{{reference_file_content}}" in tmpl_text_all:
+                    vars["reference_file_content"] = content
+                if "{{reference_file_path}}" in tmpl_text_all and "reference_file_path" not in vars:
+                    vars["reference_file_path"] = ref_path_global
         except Exception:
             pass
 

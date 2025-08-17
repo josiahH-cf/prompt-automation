@@ -78,15 +78,29 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 Prompt JSON files live under `prompts/styles/<Style>/`. The repository bundles only `basic/01_basic.json` as a minimal example. Each template includes an integer `id`, a `title`, a `style`, a list of `template` lines, and optional `placeholders`. The application enforces unique IDs via `menus.ensure_unique_ids()`.
 
-### File / Reference Placeholder Pattern
-To attach (and optionally inject) an external file:
-1. Add `{ "name": "reference_file", "type": "file" }` once. First run prompts for a file and persists globally (not per template). Content is auto-loaded each run and available via `{{reference_file_content}}` for backward compatibility.
+### File / Reference Placeholder Pattern (Multi-File Support)
+You can declare **any number** of file placeholders inside a template. Example:
 
-Skipping the file via the GUI "Skip" button persists a `skip` flag; future runs won't prompt unless you reset it. Management:
-* GUI: Options → Manage overrides (remove an entry to re-enable prompting)
+```jsonc
+"placeholders": [
+   { "name": "reference_file", "type": "file" },
+   { "name": "architecture_notes_file", "type": "file" },
+   { "name": "reference_file_2", "type": "file" }
+]
+```
+
+Behavior:
+* Each placeholder's collected path is persisted **per template + placeholder name** under `templates.<id>.<name>.path` in `placeholder-overrides.json` (only when user actually selects a file). The GUI treats `reference_file` the same as any other file placeholder—each template can reference a different file.
+* On render the **file content** is injected at `{{<name>}}`.
+* If the template body references `{{<name>_path}}` that token receives the raw filesystem path (only created when referenced – lazy insertion keeps var map clean).
+* The legacy alias `{{reference_file_content}}` is still populated with the content of the canonical `reference_file` placeholder for backward compatibility. Other file placeholders do **not** get a `_content` alias.
+* **Render-time global fallback (reference_file only)**: If a template does NOT declare `reference_file` *or* its collected path is blank, yet the body contains `{{reference_file}}` or `{{reference_file_content}}`, the globally configured reference file (if any) is loaded and injected. No other placeholder name receives a global fallback.
+* Skipping a file via the GUI persists a `skip` flag for that (template,id,name). Remove the entry to re-enable prompting.
+* Contents are always read fresh at render time—no cached snapshots—so edits to referenced files are reflected immediately upon re-render.
+
+Management:
+* GUI: Options → Manage overrides (add/remove per-file entries or clear skips)
 * CLI: `--list-overrides`, `--reset-one-override <TID> <NAME>`, `--reset-file-overrides`
-
-Overrides are stored locally in `~/.prompt-automation/placeholder-overrides.json` and synced to `prompts/styles/Settings/settings.json` so a curated default set can be versioned. No global skip flag remains—behavior is explicit and per-template.
 
 ## Hotkey System Architecture
 
@@ -169,7 +183,3 @@ Default Hint (Feature A):
 Global Reminders (Feature B):
 - At render time `menus.render_template()` merges a `reminders` value (string or list) from root `globals.json` into the template's `global_placeholders` when not already defined.
 - Appends a markdown blockquote list `> Reminders:` with each reminder truncated to 500 chars.
-
-Tests: `tests/test_defaults_and_reminders.py` covers fallback substitution and reminder block rendering.
-
-

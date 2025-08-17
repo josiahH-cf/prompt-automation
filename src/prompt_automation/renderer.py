@@ -18,17 +18,36 @@ _log = get_logger(__name__)
 
 
 def read_file_safe(path: str) -> str:
-    """Return file contents or empty string with logging."""
+    """Return file contents (best-effort) or empty string.
+
+    Strategy:
+      1. Fast path: Path.read_text() with system default (utf-8 in most envs)
+      2. On failure, read raw bytes & attempt a small ordered set of encodings:
+         utf-8-sig, utf-16, utf-16-le, utf-16-be, cp1252
+      3. Gracefully degrade: log once per failure & return empty string.
+    """
     p = Path(path).expanduser()
+    if not p.exists():
+        return ""
     try:
-        if p.suffix.lower() == ".docx":
+        if p.suffix.lower() == ".docx":  # optional dependency branch
             try:
                 import docx  # type: ignore
                 return "\n".join(par.text for par in docx.Document(p).paragraphs)
             except Exception as e:  # pragma: no cover - optional dependency
                 _log.error("cannot read Word file %s: %s", path, e)
                 return ""
-        return p.read_text()
+        # Primary attempt (utf-8 / platform default)
+        try:
+            return p.read_text()
+        except Exception:
+            data = p.read_bytes()
+            for enc in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252"):
+                try:
+                    return data.decode(enc)
+                except Exception:  # pragma: no cover - individual encoding fail
+                    continue
+            raise
     except Exception as e:
         _log.error("cannot read file %s: %s", path, e)
         return ""

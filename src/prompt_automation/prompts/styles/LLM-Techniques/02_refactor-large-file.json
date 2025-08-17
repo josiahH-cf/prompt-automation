@@ -4,9 +4,7 @@
   "title": "refactor-large-file",
   "style": "LLM-Techniques",
   "template": [
-    "Copy and paste the following contents into the prompt editor with the relevant context needed",
-    "",
-    "{{reference_file_content}}"
+    "{{reference_file}}"
   ],
   "placeholders": [
     {
