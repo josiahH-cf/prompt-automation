@@ -23,7 +23,7 @@
       "label": "Shallow Work / Meetings (Is there any shallow work or meetings you have to prepare for today?)",
       "multiline": true,
       "default": "",
-      "format": "checklist"
+      "format": "bullet"
     },
     {
       "name": "evenings",

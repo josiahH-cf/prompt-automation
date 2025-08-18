@@ -8,6 +8,7 @@ from ..errorlog import get_logger
 from .selector import open_template_selector
 from .collector import collect_variables_gui
 from .review_window import review_output_gui
+from .single_window import SingleWindowApp
 from .file_append import _append_to_files
 
 
@@ -42,30 +43,33 @@ class PromptGUI:
             return
 
         try:
-            self._log.info("Starting GUI workflow")
-            template = open_template_selector()
-            if template:
-                self._log.info("Template selected: %s", template.get("title", "Unknown"))
-                variables = collect_variables_gui(template)
-                if variables is not None:
-                    self._log.info(
-                        "Variables collected: %d placeholders",
-                        len(template.get("placeholders", [])),
-                    )
-                    final_text, var_map = review_output_gui(template, variables)
-                    if final_text is not None:
-                        self._log.info(
-                            "Final text confirmed, length: %d", len(final_text)
-                        )
-                        _append_to_files(var_map, final_text)
-                        logger.log_usage(template, len(final_text))
-                        self._log.info("Workflow completed successfully")
-                    else:
-                        self._log.info("User cancelled at review stage")
+            self._log.info("Starting GUI workflow (single-window mode)")
+            single_started = False
+            try:
+                app = SingleWindowApp(); single_started = True
+                final_text, var_map = app.run()
+                template = app.template if hasattr(app, 'template') else None
+                if template and final_text is not None and var_map is not None:
+                    _append_to_files(var_map, final_text)
+                    logger.log_usage(template, len(final_text))
+                    self._log.info("Workflow completed successfully (single-window)")
                 else:
-                    self._log.info("User cancelled during variable collection")
-            else:
-                self._log.info("User cancelled template selection")
+                    self._log.info("User cancelled workflow (single-window)")
+                return
+            except Exception as e_app:
+                self._log.error("Single-window path failed: %s -- falling back", e_app, exc_info=True)
+                if single_started:
+                    # If failure occurred after partial creation, abort entirely
+                    return
+                template = open_template_selector()
+                if template:
+                    variables = collect_variables_gui(template)
+                    if variables is not None:
+                        final_text, var_map = review_output_gui(template, variables)
+                        if final_text is not None:
+                            _append_to_files(var_map, final_text)
+                            logger.log_usage(template, len(final_text))
+                return
         except Exception as e:  # pragma: no cover - GUI runtime errors
             self._log.error("GUI workflow failed: %s", e, exc_info=True)
             try:

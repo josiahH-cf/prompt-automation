@@ -17,7 +17,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       ├── cli.py            # Command-line entry point and dependency checks
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
 │       ├── gui/             # Optional Tkinter interface for choosing templates
-│       │   ├── controller.py       # High-level GUI workflow (uses selector)
+│       │   ├── controller.py       # High-level GUI workflow (prefers single-window orchestration)
 │       │   ├── selector/           # Modular template selector (model + controller)
 │       │   │   ├── model.py        # BrowserState, recursive index & search
 │       │   │   └── controller.py   # Hierarchical UI, multi-select, preview, search
@@ -27,7 +27,9 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       │   │   ├── prompts.py     # GUI prompt construction
 │       │   │   ├── overrides.py   # File override logic
 │       │   │   └── persistence.py # Session state & persistence
-│       │   ├── review_window.py
+│       │   ├── review_window.py    # Legacy review (still used for fallback / modular reuse)
+│       │   ├── single_window.py    # Unified selector → (optional multi-select combined preview) → variables → review (geometry + inline viewers + append targets preview)
+│       │   ├── options_menu.py     # Centralized Options menu builder reused by selector & single-window
 │       │   ├── file_append.py      # Shared append-to-file logic
 │       │   └── gui.py              # Entry point launching PromptGUI
 │       ├── hotkey/           # Platform-specific hotkey definitions
@@ -56,16 +58,18 @@ This document provides a machine-readable and human-readable overview of the `pr
    - `hotkeys.update_hotkeys()` refreshes existing hotkey configuration and verifies dependencies
    - `hotkeys.ensure_hotkey_dependencies()` checks for required platform dependencies (AutoHotkey, espanso)
    - Platform-specific functions generate scripts with GUI-first, terminal fallback execution chains
-3. **Template Selection**
-   - GUI: `gui/selector/model.py` builds a hierarchical listing and a one-time recursive content index (path, title, placeholders, body lines) for fast AND-token search.
-   - GUI: `gui/selector/controller.py` provides: recursive search (default), optional non-recursive filter, multi-select with synthetic combined template, preview window (Ctrl+P), quick search focus (`s`), numeric shortcut activation (0-9), backspace up-navigation, initial focus on search entry, shortcut manager & template wizard access.
-   - CLI: `menus.list_styles()` and `menus.list_prompts()` (recursive) then `menus.pick_style()` / `menus.pick_prompt()` (fzf or text fallback).
+3. **Template Selection & Single Window**
+   - Single Window: `gui/single_window.py` embeds the selector in a persistent root, then swaps frames for variable collection and in-place review (no new root windows). Geometry is persisted to `~/.prompt-automation/gui-settings.json`.
+   - Selector Model: `gui/selector/model.py` builds hierarchical listing and recursive index (path, title, placeholders, body lines) for fast AND-token search.
+   - Selector Controller: `gui/selector/controller.py` provides recursive / non-recursive search toggle (runtime toggle via Ctrl+L), multi-select synthetic template, preview window (Ctrl+P), quick search focus (`s`), numeric shortcut activation (0-9), backspace up-navigation, shortcut manager & template wizard access. In single-window mode its widgets are mounted inside a parent frame instead of their own root.
+   - CLI: `menus.list_styles()` / `menus.list_prompts()` (recursive) then `menus.pick_style()` / `menus.pick_prompt()` (fzf or plain fallback).
 4. **Rendering**
    - Selected templates are loaded with `renderer.load_template()` and placeholders are filled via `variables.get_variables()`.
    - The final text is produced by `renderer.fill_placeholders()`.
 5. **Output**
    - `paste.paste_text()` copies the rendered text to the clipboard and attempts to send the paste keystroke.
    - `logger.log_usage()` records prompt usage to `~/.prompt-automation/usage.db` and rotates the database when it grows too large.
+   - Single-window review occurs inline (Ctrl+Enter confirm, Esc cancel, Ctrl+Shift+C copy without closing) preserving window geometry.
 6. **Error Handling**
    - All modules use `errorlog.get_logger()` to write diagnostic information to a shared log file.
 
@@ -78,7 +82,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 
 Prompt JSON files live under `prompts/styles/<Style>/`. The repository bundles only `basic/01_basic.json` as a minimal example. Each template includes an integer `id`, a `title`, a `style`, a list of `template` lines, and optional `placeholders`. The application enforces unique IDs via `menus.ensure_unique_ids()`.
 
-### File / Reference Placeholder Pattern (Multi-File Support)
+### File / Reference Placeholder Pattern (Multi-File Support & Inline Viewer)
 You can declare **any number** of file placeholders inside a template. Example:
 
 ```jsonc
@@ -97,6 +101,7 @@ Behavior:
 * **Render-time global fallback (reference_file only)**: If a template does NOT declare `reference_file` *or* its collected path is blank, yet the body contains `{{reference_file}}` or `{{reference_file_content}}`, the globally configured reference file (if any) is loaded and injected. No other placeholder name receives a global fallback.
 * Skipping a file via the GUI persists a `skip` flag for that (template,id,name). Remove the entry to re-enable prompting.
 * Contents are always read fresh at render time—no cached snapshots—so edits to referenced files are reflected immediately upon re-render.
+* Single-window enhancement: `reference_file` now uses an inline integrated selector + markdown-capable preview (Ctrl+Enter accept, Ctrl+R reset, Ctrl+U refresh, Ctrl+S skip) instead of a separate viewer window; other file placeholders retain legacy modal flow (future extensibility: declare `"inline_view": true`).
 
 Management:
 * GUI: Options → Manage overrides (add/remove per-file entries or clear skips)
@@ -134,7 +139,7 @@ The hotkey system provides cross-platform global hotkey support with robust fall
 
 | Feature | Implementation | Shortcut |
 |---------|----------------|----------|
-| Recursive search (default) | BrowserState.search index | (on by default) |
+| Recursive search (default) | BrowserState.search index | (on by default; toggle Ctrl+L) |
 | Non-recursive filter | In-memory filter of current dir | Toggle checkbox |
 | Focus search | Tk bindings | `s` |
 | Numeric shortcut open | shortcuts.load_shortcuts + key bind | Digits 0-9 |
@@ -144,9 +149,22 @@ The hotkey system provides cross-platform global hotkey support with robust fall
 | Preview window | Toplevel (read-only) | Button / Ctrl+P |
 | Multi-select toggle | UI checkbox | (mouse/space) |
 | Mark template | Prefix `*` | Enter in multi-select |
-| Finish multi | Synthetic merged template | Finish Multi button |
+| Finish multi | Synthetic merged template | Finish Multi button (combined preview stage appears before variable prompts) |
 | Manage shortcuts / renumber | _manage_shortcuts dialog | Menu / Ctrl+Shift+S |
 | New template wizard | open_new_template_wizard | Menu |
+
+## Single Window Variable Collection & Review
+
+| Feature | Keys / Actions | Notes |
+|---------|----------------|-------|
+| Auto focus next field | After Next / Skip | Eliminates extra clicks |
+| Single-line text | Enter=Next, Ctrl+S=Skip, Esc=Cancel | Status hints below title |
+| Multiline / list | Ctrl+Enter=Next, Enter=newline, Ctrl+S=Skip | Word wrap + scroll |
+| Dropdown/options | Enter=Next, Up/Down navigate | First option preselected |
+| reference_file (inline) | Ctrl+Enter=Next, Ctrl+R=Reset, Ctrl+U=Refresh, Ctrl+S=Skip | Markdown-ish rendering, truncates >200KB |
+| Other file placeholders | Legacy modal chooser/viewer | Future: inline flag |
+| Context placeholder | Ctrl+Enter save/advance | Remembers last context globally |
+| Review stage | Ctrl+Enter confirm, Ctrl+Shift+C copy only, Esc cancel | Inline review frame (toolbar: conditional Copy Paths, Preview Append Targets) |
 
 ## Working With This File
 

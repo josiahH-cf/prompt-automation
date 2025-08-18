@@ -20,7 +20,25 @@ from .overrides import (
     set_template_entry,
     print_one_time_skip_reminder,
 )
+try:  # Detect single-window root if running in embedded mode
+    from ..selector import view as _sel_view  # type: ignore
+    _SINGLE_WINDOW_ROOT = getattr(_sel_view, "_EMBEDDED_SINGLE_WINDOW_ROOT", None)
+except Exception:  # pragma: no cover - best effort
+    _SINGLE_WINDOW_ROOT = None
 
+def _create_window(title: str):
+    """Create a visible window: Toplevel if single root present else new Tk.
+
+    Ensures ancillary dialogs don't spawn separate top-level OS windows when
+    in single-window mode (preserves snapped geometry).
+    """
+    import tkinter as tk
+    if _SINGLE_WINDOW_ROOT:
+        win = tk.Toplevel(_SINGLE_WINDOW_ROOT)
+    else:
+        win = tk.Tk()
+    win.title(title)
+    return win
 
 # ------------------------- file prompts ------------------------------------
 
@@ -64,8 +82,7 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
         return fname or None
 
     def _show_viewer(path: str):
-        viewer = tk.Tk()
-        viewer.title(f"File: {Path(path).name}")
+        viewer = _create_window(f"File: {Path(path).name}")
         viewer.geometry("900x680")
         viewer.resizable(True, True)
         viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
@@ -171,8 +188,7 @@ def collect_reference_file_variable_gui(template_id: int, placeholder: dict):
             save_overrides(ov)
 
     def _show_viewer(path: str):
-        viewer = tk.Tk()
-        viewer.title(f"Reference File: {Path(path).name}")
+        viewer = _create_window(f"Reference File: {Path(path).name}")
         viewer.geometry("900x680")
         viewer.resizable(True, True)
         viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
@@ -288,8 +304,7 @@ def collect_global_reference_file_gui(placeholder: dict):
         return None
 
     def _show_viewer(path: str) -> str:
-        viewer = tk.Tk()
-        viewer.title(f"Reference File: {Path(path).name}")
+        viewer = _create_window(f"Reference File: {Path(path).name}")
         viewer.geometry("900x680")
         viewer.resizable(True, True)
         viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
@@ -584,6 +599,13 @@ def show_reference_file_content(path: str) -> None:
 
 def collect_variables_gui(template):
     """Collect variables for template placeholders (GUI) with persistence."""
+    # If running in single-window mode, variable collection is handled there.
+    try:
+        from ..selector import view as _sv  # type: ignore
+        if getattr(_sv, "_EMBEDDED_SINGLE_WINDOW_ROOT", None):
+            return {}  # signal no-op to caller in single-window path
+    except Exception:
+        pass
     placeholders = template.get("placeholders", [])
     if not placeholders:
         return {}

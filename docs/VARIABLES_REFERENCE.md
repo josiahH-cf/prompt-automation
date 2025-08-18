@@ -99,7 +99,7 @@ Default injection? No (non-blank present)
 ```
 
 ---
-## 4. File Placeholders (Multi-File)
+## 4. File Placeholders (Multi-File + Inline Viewer)
 
 Declare: `{ "name": "ref2", "type": "file", "override": true }`.
 
@@ -107,7 +107,7 @@ Rules:
 * `override: true` persists `{path, skip}` per (template, name).
 * Omit `override` → ephemeral (always prompt).
 * Content at `{{name}}`; path at `{{name_path}}` (only if token appears).
-* `reference_file` also provides legacy `{{reference_file_content}}` + global fallback.
+* `reference_file` also provides legacy `{{reference_file_content}}` + global fallback. In single-window mode it renders inline with a markdown-ish preview (headings, bold, fenced code, simple bullets) and large file truncation (display only) instead of opening a separate modal viewer. Other file placeholders retain the legacy modal chooser unless future flags (e.g. `"inline_view": true`) are added.
 * Global fallback triggers only if no/blank `reference_file` placeholder but body references it.
 * Skipping: user can permanent skip (`skip:true`); one-time reminder emitted.
 * Always fresh read (supports multiple encodings + `.docx`).
@@ -144,14 +144,14 @@ Design Notes Length:      (line removed if token line empty)
 
 | Name | Purpose | Notes |
 |------|---------|-------|
-| reference_file | Primary file | Legacy alias & fallback. |
+| reference_file | Primary file | Inline viewer (single-window) + legacy alias & fallback. |
 | reference_file_content | Legacy alias | Not declared manually. |
-| append_file / *_append_file | Append output file | Post-render write. |
+| append_file / *_append_file | Append output file | Post-render write (review toolbar offers 'Preview Append Targets' to inspect existing file contents before confirmation). |
 | context | Freeform context | May be replaced by file content manually pasted. |
 | context_file / context_append_file | Internal path tracking | Not user-authored. |
 | hallucinate | Creativity policy | Auto options & mapping. |
 | think_deeply | Reflect directive | Appended if token absent. |
-| reminders | Quality checklist | Appended blockquote; token optional. |
+| reminders | Quality checklist | Appended blockquote; token optional (Copy Paths button appears in review only if any *_path tokens referenced). |
 
 ---
 ## 6. Formatting (`format` / `as`)
@@ -391,6 +391,7 @@ Flow: globals merge → snapshot → collect → file content injected → path 
 |--------|---------|
 | reference_file_content | Still populated automatically. |
 | Global fallback for arbitrary file placeholders | Limited to `reference_file` only. |
+| Modal reference_file viewer | Inline viewer in single-window path (legacy modal remains for others). |
 | Auto-persist all values | Replaced by `persist: true`. |
 
 Migration tips:

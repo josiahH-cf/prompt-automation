@@ -59,9 +59,24 @@ When launched via the global hotkey the GUI opens focused on the search box:
 | Enter / Double-click | Open folder or select template |
 | Backspace | Go up one level |
 | Ctrl+P | Toggle preview window for highlighted template |
+| Ctrl+L | Toggle recursive search on/off (focus preserved) |
 | Multi-select checkbox | Enable marking multiple templates |
 | Enter (in multi mode) | Toggle mark (adds/removes `*` prefix) |
 | Finish Multi | Build synthetic combined template (id -1) |
+| (After Finish Multi) | Combined preview stage appears before variable prompts |
 | Esc | Cancel/close selector |
 
-After template selection you proceed to variable collection (file placeholders, multi-line, enums, lists) and then review window (Ctrl+Enter to confirm, Ctrl+Shift+C copy without close).
+After template selection the single-window workflow swaps to variable collection (auto-focused inputs, inline reference file viewer) and then to an embedded review (Ctrl+Enter confirm, Ctrl+Shift+C copy without close). Legacy modal windows still appear for non-inline file placeholders.
+
+### Variable Collection (Single Window) Keys
+
+| Placeholder Type | Keys |
+|------------------|------|
+| Single-line text | Enter = Next, Ctrl+S = Skip, Esc = Cancel |
+| Multiline / list | Ctrl+Enter = Next, Enter = newline, Ctrl+S = Skip, Esc = Cancel |
+| Dropdown/options | Enter = Next, Up/Down navigate, Ctrl+S = Skip |
+| reference_file (inline) | Ctrl+Enter = Next, Ctrl+R = Reset, Ctrl+U = Refresh, Ctrl+S = Skip, Esc = Cancel |
+| Other file (modal) | Ctrl+Enter accept (viewer), Ctrl+R reset, Esc cancel |
+| Context | Ctrl+Enter save & next | Remembers last context |
+| Review stage | Ctrl+Enter confirm, Ctrl+Shift+C copy only, Esc cancel |
+| Review toolbar buttons | Copy Paths (shown only if any *_path tokens referenced), Preview Append Targets (lists each pending append file + current contents) |

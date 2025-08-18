@@ -123,12 +123,107 @@ def _manage_overrides(root: tk.Tk, service):
 
 # --- Main selector --------------------------------------------------------
 
-def open_template_selector(service) -> Optional[dict]:
-    root = tk.Tk()
-    root.title("Select Template - Prompt Automation")
-    root.geometry("950x720")
-    root.resizable(True, True)
-    root.lift(); root.focus_force(); root.attributes("-topmost", True); root.after(120, lambda: root.attributes("-topmost", False))
+def _edit_exclusions(root: tk.Tk, service):  # extracted for shared menu use
+    try:
+        import json
+        _PD = service.PROMPTS_DIR
+    except Exception:
+        return
+    dlg = tk.Toplevel(root)
+    dlg.title("Edit Global Exclusions (exclude_globals)")
+    dlg.geometry("640x400")
+    tk.Label(dlg, text="Enter template ID (numeric) or browse to load its metadata.").pack(anchor='w', padx=10, pady=(10,4))
+    topf = tk.Frame(dlg); topf.pack(fill='x', padx=10)
+    id_var = tk.StringVar()
+    tk.Entry(topf, textvariable=id_var, width=10).pack(side='left')
+    status_var = tk.StringVar(value="")
+    tk.Label(dlg, textvariable=status_var, fg="#555").pack(anchor='w', padx=10, pady=(4,4))
+    txt = tk.Text(dlg, wrap='word')
+    txt.pack(fill='both', expand=True, padx=10, pady=6)
+    txt.insert('1.0', "# Enter one global key per line to exclude for this template\n")
+    current_path: list[Path] = []
+    def _load():
+        tid = id_var.get().strip()
+        if not tid.isdigit():
+            status_var.set("Template id must be numeric")
+            return
+        target = None
+        for p in _PD.rglob("*.json"):
+            try:
+                data = json.loads(p.read_text())
+            except Exception:
+                continue
+            if data.get('id') == int(tid):
+                target = (p, data); break
+        if not target:
+            status_var.set("Template not found")
+            return
+        p, data = target
+        current_path.clear(); current_path.append(p)
+        meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
+        raw_ex = meta.get('exclude_globals')
+        lines = []
+        if isinstance(raw_ex, (list, tuple)):
+            lines = [str(x) for x in raw_ex]
+        elif isinstance(raw_ex, str):
+            if ',' in raw_ex:
+                lines = [s.strip() for s in raw_ex.split(',') if s.strip()]
+            elif raw_ex.strip():
+                lines = [raw_ex.strip()]
+        txt.delete('1.0','end')
+        if lines:
+            txt.insert('1.0', "\n".join(lines))
+        status_var.set(f"Loaded {p.name}")
+    def _save():
+        if not current_path:
+            status_var.set("Load a template first")
+            return
+        p = current_path[0]
+        try:
+            data = json.loads(p.read_text())
+        except Exception as e:
+            status_var.set(f"Read error: {e}")
+            return
+        meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
+        if not isinstance(meta, dict):
+            meta = {}; data['metadata'] = meta
+        raw = [l.strip() for l in txt.get('1.0','end-1c').splitlines() if l.strip() and not l.strip().startswith('#')]
+        if raw:
+            meta['exclude_globals'] = raw
+        else:
+            meta.pop('exclude_globals', None)
+        try:
+            p.write_text(json.dumps(data, indent=2))
+            status_var.set("Saved")
+        except Exception as e:
+            status_var.set(f"Write error: {e}")
+    tk.Button(topf, text="Load", command=_load).pack(side='left', padx=6)
+    tk.Button(topf, text="Save", command=_save).pack(side='left')
+    tk.Button(topf, text="Close", command=dlg.destroy).pack(side='right')
+    dlg.transient(root); dlg.grab_set(); dlg.focus_set()
+
+def open_template_selector(service, embedded: bool = False, parent=None) -> Optional[dict]:
+    """Open the template selector.
+
+    When embedded=True, reuse the provided parent (frame/root) and avoid creating
+    a new Tk root so that OS window snapping is preserved.
+    """
+    if embedded and parent is None:
+        embedded = False
+
+    if embedded:
+        # In embedded mode we still want a real toplevel for menus/bindings.
+        host = parent.winfo_toplevel()  # type: ignore[attr-defined]
+        root = host  # treat host toplevel as root for bindings/menus
+        container = tk.Frame(parent)
+        container.pack(fill="both", expand=True)
+    else:
+        root = tk.Tk()
+        root.title("Select Template - Prompt Automation")
+        root.geometry("950x720")
+        root.resizable(True, True)
+        root.lift(); root.focus_force(); root.attributes("-topmost", True); root.after(120, lambda: root.attributes("-topmost", False))
+        container = root
 
 
     # Build two browsers: one for shared (PROMPTS_DIR), and optionally one for local/private
@@ -145,108 +240,20 @@ def open_template_selector(service) -> Optional[dict]:
     except Exception:
         local_browser = None
 
-    # Menu
-    menubar = tk.Menu(root); root.config(menu=menubar)
-    opt = tk.Menu(menubar, tearoff=0)
-    def do_reset_refs():
-        if service.reset_file_overrides():
-            messagebox.showinfo("Reset", "Reference file prompts will reappear.")
-        else:
-            messagebox.showinfo("Reset", "No overrides found.")
-    opt.add_command(label="Reset reference files", command=do_reset_refs, accelerator="Ctrl+Shift+R")
-    opt.add_command(label="Manage overrides", command=lambda: _manage_overrides(root, service))
-    def _edit_exclusions():
-        try:
-            import json
-            _PD = service.PROMPTS_DIR
-        except Exception:
-            return
-        dlg = tk.Toplevel(root)
-        dlg.title("Edit Global Exclusions (exclude_globals)")
-        dlg.geometry("640x400")
-        tk.Label(dlg, text="Enter template ID (numeric) or browse to load its metadata.").pack(anchor='w', padx=10, pady=(10,4))
-        topf = tk.Frame(dlg); topf.pack(fill='x', padx=10)
-        id_var = tk.StringVar()
-        tk.Entry(topf, textvariable=id_var, width=10).pack(side='left')
-        status_var = tk.StringVar(value="")
-        tk.Label(dlg, textvariable=status_var, fg="#555").pack(anchor='w', padx=10, pady=(4,4))
-        txt = tk.Text(dlg, wrap='word')
-        txt.pack(fill='both', expand=True, padx=10, pady=6)
-        txt.insert('1.0', "# Enter one global key per line to exclude for this template\n")
-        current_path: list[Path] = []
-        def _load():
-            tid = id_var.get().strip()
-            if not tid.isdigit():
-                status_var.set("Template id must be numeric")
-                return
-            # search for file with matching id
-            target = None
-            for p in _PD.rglob("*.json"):
-                try:
-                    data = json.loads(p.read_text())
-                except Exception:
-                    continue
-                if data.get('id') == int(tid):
-                    target = (p, data); break
-            if not target:
-                status_var.set("Template not found")
-                return
-            p, data = target
-            current_path.clear(); current_path.append(p)
-            meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
-            raw_ex = meta.get('exclude_globals')
-            lines = []
-            if isinstance(raw_ex, (list, tuple)):
-                lines = [str(x) for x in raw_ex]
-            elif isinstance(raw_ex, str):
-                if ',' in raw_ex:
-                    lines = [s.strip() for s in raw_ex.split(',') if s.strip()]
-                elif raw_ex.strip():
-                    lines = [raw_ex.strip()]
-            txt.delete('1.0','end')
-            if lines:
-                txt.insert('1.0', "\n".join(lines))
-            status_var.set(f"Loaded {p.name}")
-        def _save():
-            if not current_path:
-                status_var.set("Load a template first")
-                return
-            p = current_path[0]
-            try:
-                data = json.loads(p.read_text())
-            except Exception as e:
-                status_var.set(f"Read error: {e}")
-                return
-            meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
-            if not isinstance(meta, dict):
-                meta = {}; data['metadata'] = meta
-            raw = [l.strip() for l in txt.get('1.0','end-1c').splitlines() if l.strip() and not l.strip().startswith('#')]
-            if raw:
-                meta['exclude_globals'] = raw
-            else:
-                meta.pop('exclude_globals', None)
-            try:
-                p.write_text(json.dumps(data, indent=2))
-                status_var.set("Saved")
-            except Exception as e:
-                status_var.set(f"Write error: {e}")
-        tk.Button(topf, text="Load", command=_load).pack(side='left', padx=6)
-        tk.Button(topf, text="Save", command=_save).pack(side='left')
-        tk.Button(topf, text="Close", command=dlg.destroy).pack(side='right')
-        dlg.transient(root); dlg.grab_set(); dlg.focus_set()
-    opt.add_command(label="Edit global exclusions", command=_edit_exclusions)
-    opt.add_separator()
-    opt.add_command(label="New template wizard", command=lambda: open_new_template_wizard())
-    opt.add_separator()
-    def _open_shortcuts_manager():
-        _manage_shortcuts(root, service)
-    opt.add_command(label="Manage shortcuts / renumber", command=_open_shortcuts_manager)
-    menubar.add_cascade(label="Options", menu=opt)
-    root.bind("<Control-Shift-R>", lambda e: (do_reset_refs(), "break"))
-    root.bind("<Control-Shift-S>", lambda e: (_open_shortcuts_manager(), "break"))
+    # Menu replaced with shared options menu
+    from ..options_menu import configure_options_menu
+    accels = configure_options_menu(
+        root,
+        selector_view_module=__import__(__name__),
+        selector_service=service,
+        include_global_reference=False,
+        include_manage_templates=False,
+    )
+    for seq, fn in accels.items():
+        root.bind(seq, lambda e, f=fn: (f(), 'break'))
 
     # Top controls: search box & multi-select toggle
-    top = tk.Frame(root, padx=10, pady=6); top.pack(fill="x")
+    top = tk.Frame(container, padx=10, pady=6); top.pack(fill="x")
     tk.Label(top, text="Search:").pack(side="left")
     search_var = tk.StringVar()
     search_entry = tk.Entry(top, textvariable=search_var, width=42)
@@ -263,7 +270,7 @@ def open_template_selector(service) -> Optional[dict]:
     breadcrumb_lbl.pack(side="left", fill="x", expand=True, padx=(12,0))
 
     # Listbox
-    main_frame = tk.Frame(root, padx=10, pady=6)
+    main_frame = tk.Frame(container, padx=10, pady=6)
     main_frame.pack(fill="both", expand=True)
     listbox = tk.Listbox(main_frame, font=("Arial", 10), selectmode="extended")
     sb = tk.Scrollbar(main_frame, orient="vertical", command=listbox.yview)
@@ -450,7 +457,14 @@ def open_template_selector(service) -> Optional[dict]:
                     disp = '* ' + disp
                 listbox.delete(idx); listbox.insert(idx, disp); listbox.selection_set(idx)
             else:
-                selected_template = item.template.data; root.destroy()
+                selected_template = item.template.data
+                if embedded:
+                    try:
+                        container.destroy()
+                    except Exception:
+                        pass
+                else:
+                    root.destroy()
 
     # --- Shortcut key handling (numeric keys mapped to specific templates) ---
     def _on_digit(event):
@@ -459,7 +473,13 @@ def open_template_selector(service) -> Optional[dict]:
             if tmpl:
                 nonlocal selected_template
                 selected_template = tmpl
-                root.destroy()
+                if embedded:
+                    try:
+                        container.destroy()
+                    except Exception:
+                        pass
+                else:
+                    root.destroy()
                 return "break"
         return None
     # Bind 0-9 keys globally (without modifiers) when focus is in list or search
@@ -585,8 +605,15 @@ def open_template_selector(service) -> Optional[dict]:
     listbox.bind('<Control-p>', toggle_preview)
     search_entry.bind('<Control-p>', toggle_preview)
 
+    # Toggle recursive search mode (Ctrl+L) for convenience
+    def _toggle_recursive(event=None):
+        non_recursive_var.set(not non_recursive_var.get())
+        on_search(); return 'break'
+    root.bind('<Control-l>', _toggle_recursive)
+    search_entry.bind('<Control-l>', _toggle_recursive)
+
     # Buttons
-    btns = tk.Frame(root, pady=6); btns.pack(fill="x")
+    btns = tk.Frame(container, pady=6); btns.pack(fill="x")
     def finish_multi():
         nonlocal selected_template
         if multi_selected:
@@ -599,16 +626,39 @@ def open_template_selector(service) -> Optional[dict]:
                 'placeholders': [],
             }
             selected_template = combined
-            root.destroy()
+            if embedded:
+                try:
+                    container.destroy()
+                except Exception:
+                    pass
+            else:
+                root.destroy()
     tk.Button(btns, text="Open / Select (Enter)", command=open_or_select, padx=18).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Finish Multi", command=finish_multi).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Preview", command=on_preview).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Cancel (Esc)", command=root.destroy).pack(side="left")
 
-    root.bind("<Escape>", lambda e: (root.destroy(), "break"))
+    def _finish():
+        if embedded:
+            try:
+                container.destroy()
+            except Exception:
+                pass
+        else:
+            root.destroy()
+    root.bind("<Escape>", lambda e: (_finish(), "break"))
 
-    root.mainloop()
-    return selected_template
+    if embedded:
+        # Poll until selection set; run nested loop to remain responsive
+        while container.winfo_exists() and selected_template is None:
+            try:
+                container.update(); container.update_idletasks()
+            except Exception:
+                break
+        return selected_template
+    else:
+        root.mainloop()
+        return selected_template
 
 # --- Shortcuts manager dialog ----------------------------------------------
 
