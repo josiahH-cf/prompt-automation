@@ -151,6 +151,11 @@ def configure_options_menu(
             selector_view_module._manage_shortcuts(root, selector_service)  # type: ignore[attr-defined]
         except Exception as e:
             _log.error("Shortcut manager failed: %s", e)
+            try:
+                from tkinter import messagebox
+                messagebox.showerror("Shortcut Manager", f"Failed to open: {e}")
+            except Exception:
+                pass
     opt.add_command(label="Manage shortcuts / renumber", command=_open_shortcut_manager, accelerator="Ctrl+Shift+S")
     accelerators['<Control-Shift-S>'] = _open_shortcut_manager
 
@@ -238,7 +243,17 @@ def configure_options_menu(
             win.bind('<Escape>', lambda e: _close())
             win.protocol('WM_DELETE_WINDOW', lambda: _close())
             _render(); ent.focus_set()
-        opt.add_command(label='Global reference file', command=_open_global_reference_manager)
+        # Wrap global reference manager with visible error surfacing
+        def _safe_open_global():
+            try:
+                _open_global_reference_manager()
+            except Exception as e:
+                try:
+                    from tkinter import messagebox
+                    messagebox.showerror('Global Reference', f'Failed: {e}')
+                except Exception:
+                    pass
+        opt.add_command(label='Global reference file', command=_safe_open_global)
         def _reset_global():
             try: reset_global_reference_file()
             except Exception: pass

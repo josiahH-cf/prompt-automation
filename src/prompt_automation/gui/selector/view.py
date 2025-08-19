@@ -18,6 +18,7 @@ from typing import List, Optional
 from .model import ListingItem, TemplateEntry, BrowserState
 from ..new_template_wizard import open_new_template_wizard
 from ...errorlog import get_logger
+from ...starred import load_starred, toggle_star, MAX_STARRED
 
 _log = get_logger(__name__)
 
@@ -242,9 +243,12 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
 
     # Menu replaced with shared options menu
     from ..options_menu import configure_options_menu
+    # Pass this module object directly so options menu can access internal callbacks
+    import sys as _sys
+    _this_module = _sys.modules.get(__name__)
     accels = configure_options_menu(
         root,
-        selector_view_module=__import__(__name__),
+        selector_view_module=_this_module,
         selector_service=service,
         include_global_reference=False,
         include_manage_templates=False,
@@ -298,7 +302,68 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
         nonlocal selected_template, flat_items, active_domain
         listbox.delete(0, 'end')
         flat_items = []
+        show_extra_sections = (
+            active_domain == 'shared'
+            and browser.current == browser.root
+            and not search_var.get().strip()
+            and not non_recursive_var.get()  # only at top-level unfiltered
+        )
+        # Starred section
+        if show_extra_sections:
+            starred = load_starred()
+            # Filter out missing templates silently
+            valid_starred: list[tuple[str, dict]] = []  # (rel, tmpl)
+            for rel in starred:
+                data = None
+                if rel.startswith('local/') and local_browser:
+                    # local relative path: local/<relative inside local root>
+                    sub = rel.split('/', 1)[1] if '/' in rel else ''
+                    p = (local_browser.root / sub) if sub else None
+                    if p and p.exists():
+                        try:
+                            from ...renderer import load_template
+                            data = load_template(p)
+                        except Exception:
+                            data = None
+                else:
+                    data = service.load_template_by_relative(rel)
+                if data and 'template' in data:
+                    valid_starred.append((rel, data))
+            if valid_starred:
+                flat_items.append(ListingItem(type='header', display='--- Starred ---'))
+                for rel, data in valid_starred:
+                    li = ListingItem(type='template', path=None, template=TemplateEntry(path=None, data=data), display=f"{data.get('title', rel)}")
+                    setattr(li, 'star_rel', rel)
+                    setattr(li, 'is_starred_section', True)
+                    flat_items.append(li)
+        # Quick command section
+        if show_extra_sections:
+            mapping = service.load_shortcuts()
+            # Only digits 0-9
+            display_pairs = []
+            for d in '0123456789':
+                rel = mapping.get(d)
+                if not rel:
+                    continue
+                data = service.load_template_by_relative(rel)
+                if data and 'template' in data:
+                    display_pairs.append((d, rel, data))
+            if display_pairs:
+                flat_items.append(ListingItem(type='header', display='--- Quick Commands ---'))
+                for digit, rel, data in display_pairs:
+                    li = ListingItem(type='template', path=None, template=TemplateEntry(path=None, data=data), display=f"{digit}: {data.get('title', rel)}")
+                    setattr(li, 'quick_digit', digit)
+                    setattr(li, 'quick_rel', rel)
+                    setattr(li, 'is_quick_section', True)
+                    flat_items.append(li)
+        # Normal listing afterwards
+        inserted_any_section = show_extra_sections and any(
+            it.type == 'header' and it.display.strip() in {'--- Starred ---','--- Quick Commands ---'} for it in flat_items
+        )
         if active_domain == 'shared':
+            if inserted_any_section:
+                # Add MAIN header spacer before core directory/template listing
+                flat_items.append(ListingItem(type='header', display='--- MAIN ---'))
             base_items = display_items if display_items is not None else browser.items
             if base_items:
                 flat_items.extend(base_items)
@@ -407,6 +472,16 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
         item = get_selected_item()
         if not item:
             return
+        # Starred or quick sections behave like normal templates
+        if getattr(item, 'is_starred_section', False) or getattr(item, 'is_quick_section', False):
+            if item.template:
+                selected_template = item.template.data
+                if embedded:
+                    try: container.destroy()
+                    except Exception: pass
+                else:
+                    root.destroy()
+            return
         origin = getattr(item, 'origin', active_domain)
         # Back navigation
         if item.type == 'back':
@@ -414,25 +489,19 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
             refresh(current_items()); return
         if item.type in {'up','dir'}:
             if origin == 'local' and local_browser:
-                # Switch to local domain if coming from shared root listing
                 if active_domain != 'local':
                     active_domain = 'local'
-                # Navigate inside local
-                # Find corresponding listing item in local_browser to use enter logic
                 if item.type == 'up':
                     for it2 in local_browser.items:
                         if it2.type == 'up':
                             local_browser.enter(it2); break
                 else:
-                    # directory
                     for it2 in local_browser.items:
                         if it2.path == item.path:
                             local_browser.enter(it2); break
                 refresh(current_items()); return
             else:
-                # Shared domain navigation
                 active_domain = 'shared'
-                # Similar search within browser items
                 if item.type == 'up':
                     for it2 in browser.items:
                         if it2.type == 'up':
@@ -459,10 +528,8 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
             else:
                 selected_template = item.template.data
                 if embedded:
-                    try:
-                        container.destroy()
-                    except Exception:
-                        pass
+                    try: container.destroy()
+                    except Exception: pass
                 else:
                     root.destroy()
 
@@ -474,10 +541,8 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
                 nonlocal selected_template
                 selected_template = tmpl
                 if embedded:
-                    try:
-                        container.destroy()
-                    except Exception:
-                        pass
+                    try: container.destroy()
+                    except Exception: pass
                 else:
                     root.destroy()
                 return "break"
@@ -612,6 +677,49 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
     root.bind('<Control-l>', _toggle_recursive)
     search_entry.bind('<Control-l>', _toggle_recursive)
 
+    # Star toggle (logic defined before buttons so button & keybinding share it)
+    def _toggle_star(event=None):  # pragma: no cover - GUI only
+        item = get_selected_item()
+        if not item or not item.template:
+            return 'break'
+        # Determine rel path
+        rel: Optional[str] = getattr(item, 'star_rel', None)
+        if not rel:
+            # normal shared template
+            if getattr(item, 'origin', 'shared') == 'shared' and item.path:
+                try:
+                    rel = str(item.path.relative_to(service.PROMPTS_DIR))
+                except Exception:
+                    rel = None
+            elif getattr(item, 'origin', None) == 'local' and item.path and local_browser:
+                try:
+                    rel = f"local/{item.path.relative_to(local_browser.root)}"
+                except Exception:
+                    rel = None
+            # quick command section item
+            if not rel and getattr(item, 'quick_rel', None):
+                rel = getattr(item, 'quick_rel')
+        if not rel:
+            return 'break'
+        current = load_starred()
+        if rel in current:
+            toggle_star(rel)
+            refresh(current_items())
+        else:
+            if len(current) >= MAX_STARRED:
+                try:
+                    messagebox.showerror('Starred Limit', f'Max {MAX_STARRED} starred templates reached. Unstar another first.')
+                except Exception:
+                    pass
+                return 'break'
+            toggle_star(rel)
+            refresh(current_items())
+        return 'break'
+
+    root.bind('*', _toggle_star)
+    listbox.bind('*', _toggle_star)
+    search_entry.bind('*', _toggle_star)
+
     # Buttons
     btns = tk.Frame(container, pady=6); btns.pack(fill="x")
     def finish_multi():
@@ -636,6 +744,7 @@ def open_template_selector(service, embedded: bool = False, parent=None) -> Opti
     tk.Button(btns, text="Open / Select (Enter)", command=open_or_select, padx=18).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Finish Multi", command=finish_multi).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Preview", command=on_preview).pack(side="left", padx=(0,8))
+    tk.Button(btns, text="Star / Unstar (*)", command=_toggle_star).pack(side="left", padx=(0,8))
     tk.Button(btns, text="Cancel (Esc)", command=root.destroy).pack(side="left")
 
     def _finish():

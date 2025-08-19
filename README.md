@@ -249,6 +249,8 @@ Search:
 
 Preview:
 - Select a template and use the Preview button or Ctrl+P to open / close a read‑only preview window.
+- Press * (asterisk) or click the "Star / Unstar (*)" button to toggle a template in your starred list (max 10). When at the shared root with no active search, a ---Starred--- section will appear at the top listing your favorites. Use arrow keys as usual to navigate.
+- Assign numeric quick command keys (0-9) via Options -> Manage Shortcuts. When assigned, a --- Quick Commands--- section appears (shared root, no search) showing entries like `1: Title`. Hitting the digit key instantly opens that template.
 
 Breadcrumb & Focus:
 - Breadcrumb line shows current path within styles

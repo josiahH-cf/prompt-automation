@@ -25,6 +25,7 @@ from ...shortcuts import (
 )
 from ...renderer import load_template
 from ...config import PROMPTS_DIR
+from ..collector.overrides import load_overrides, save_overrides  # for options menu global reference manager
 
 
 def load_template_by_relative(rel: str) -> Optional[dict]:
@@ -65,4 +66,6 @@ __all__ = [
     "resolve_shortcut",
     "load_template_by_relative",
     "PROMPTS_DIR",
+    "load_overrides",
+    "save_overrides",
 ]

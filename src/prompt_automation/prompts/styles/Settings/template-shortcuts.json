@@ -1,4 +1,6 @@
 {
-  "1": "Test/01_one.json",
-  "2": "Test/02_three.json"
+  "2": "Test/02_three.json",
+  "8": "Reviews\\03_daily-review.json",
+  "1": "Reviews\\04_next-right-action-todoist.json",
+  "9": "Reviews\\16_nightly-review.json"
 }
