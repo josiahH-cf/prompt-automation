@@ -1,6 +1,7 @@
 {
   "2": "Test/02_three.json",
   "8": "Reviews\\03_daily-review.json",
-  "1": "Reviews\\04_next-right-action-todoist.json",
-  "9": "Reviews\\16_nightly-review.json"
+  "9": "Reviews\\16_nightly-review.json",
+  "1": "Code\\01_todoist_task.json",
+  "3": "Reviews\\04_next-right-action-todoist.json"
 }

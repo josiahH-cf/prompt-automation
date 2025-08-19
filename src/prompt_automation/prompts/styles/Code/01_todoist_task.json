@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "_comment": [
+    "Template for Track Bug.",
+    "Auto-refactored for standard placeholder structure."
+  ],
+  "id": 1,
+  "title": "Ticket Quick Add",
+  "style": "Code",
+  "placeholders": [
+    {
+      "name": "objective",
+      "label": "\nObjective \nDescribe the task or objective clearly for your future self.",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "acceptance",
+      "label": "Acceptance Criteria \nHow do you know you did it right?",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "notes",
+      "label": "Optional Notes or Additional Context",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "estimate",
+      "label": "Time Estimate",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "type",
+      "label": "Type: \nTask, Bug, Minor Feature, Major Feature, Chore",
+      "multiline": false,
+      "default": ""
+    },
+    {
+      "name": "project",
+      "label": "Project \n(leave blank for no project)",
+      "multiline": false,
+      "default": ""
+    }
+  ],
+  "template": [
+    "{{type}} - {{project}} - Objective: {{objective}} - Acceptance: {{acceptance}} - ⏳{{estimate}} - Opt. Notes: {{notes}}"
+  ],
+  "metadata": {
+    "path": "Code/01_todoist_task.json",
+    "tags": [],
+    "version": 1,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}
