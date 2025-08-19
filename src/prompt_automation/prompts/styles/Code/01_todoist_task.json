@@ -46,7 +46,7 @@
     }
   ],
   "template": [
-    "{{type}} - {{project}} - Objective: {{objective}} - Acceptance: {{acceptance}} - ⏳{{estimate}} - Opt. Notes: {{notes}}"
+    "{{type}} - {{project}} - Objective: {{objective}} - Acceptance: {{acceptance}} - ⏳{{estimate}} - Additional Notes: {{notes}}"
   ],
   "metadata": {
     "path": "Code/01_todoist_task.json",

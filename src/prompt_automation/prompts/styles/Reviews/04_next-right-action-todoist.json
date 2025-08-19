@@ -6,7 +6,7 @@
   "placeholders": [
     {
       "name": "next_action",
-      "label": "Next Action: (I will...)",
+      "label": "\nNext Action: (I will...)",
       "multiline": false,
       "default": "",
       "remove_if_empty": [
@@ -17,25 +17,13 @@
     },
     {
       "name": "so_that",
-      "label": "Objective: (so that...)\nWhy is this important or How does it contribute to the desired result?",
+      "label": "\nOutcome to Achieve: (So That...)",
       "multiline": false,
       "default": "",
       "remove_if_empty": [
         "So That",
         "- So That",
         "so that I can"
-      ]
-    },
-    {
-      "name": "approach",
-      "label": "Approach (How will you execute? Steps / strategy)",
-      "multiline": true,
-      "default": "",
-      "format": "list",
-      "remove_if_empty": [
-        "Approach",
-        "- Approach",
-        "I will take the following approach"
       ]
     },
     {
@@ -51,7 +39,7 @@
     }
   ],
   "template": [
-    "I will {{next_action}} so that {{so_that}}. \nI focus on doing the following things: {{approach}}. \nIt will take {{time_estimate}}."
+    "I will {{next_action}} so that {{so_that}}. ⏳{{time_estimate}}."
   ],
   "metadata": {
     "path": "Reviews/next-right-action-todoist.json",

@@ -248,7 +248,8 @@ class SingleWindowApp:
             ptype = ph.get("type", "text")
             multiline = ph.get("multiline", False) or ptype == "list"
             options = ph.get("options", [])
-            title_var.set(f"{template.get('title','Template')} – {label}")
+            # Add two newlines after template title for clearer separation from field label
+            title_var.set(f"{template.get('title','Template')}\n\n{label}")
             progress_var.set(f"{index+1} / {total}")
             default_val = ph.get("default")
             if name in persisted_simple and name not in vars_map:
