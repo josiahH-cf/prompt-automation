@@ -17,3 +17,9 @@ pip install -e .
 3. Open a pull request describing the changes and reference any related issues.
 
 Happy hacking!
+
+## File Size and Refactoring Policy
+
+- Avoid committing files larger than 500 KB. Use compression or external hosting for sizable assets.
+- Keep individual source modules focused and roughly under 400 lines; split functionality across packages when they grow.
+- Discuss major refactors in an issue before starting and land them in small, reviewable commits.
