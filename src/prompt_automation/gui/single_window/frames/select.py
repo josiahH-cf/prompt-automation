@@ -12,7 +12,7 @@ from typing import Dict, Any
 from ....config import PROMPTS_DIR
 from ....renderer import load_template
 from ....services.template_search import list_templates, resolve_shortcut
-from ....services.multi_select import merge_templates
+from ....services import multi_select as multi_select_service
 
 
 def build(app) -> Any:  # pragma: no cover - Tk runtime
@@ -76,7 +76,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
                 state["preview"] = ""
 
         def combine():
-            tmpl = merge_templates(state["selected"])
+            tmpl = multi_select_service.merge_templates(state["selected"])
             if tmpl:
                 app.advance_to_collect(tmpl)
             return tmpl
@@ -154,7 +154,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
             status.set("Select at least two templates")
             return "break"
         loaded = [load_template(rel_map[i]) for i in sel]
-        tmpl = merge_templates(loaded)
+        tmpl = multi_select_service.merge_templates(loaded)
         if tmpl:
             app.advance_to_collect(tmpl)
         else:

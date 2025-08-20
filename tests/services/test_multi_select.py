@@ -4,6 +4,7 @@ from pathlib import Path
 import prompt_automation.services.multi_select as ms
 import prompt_automation.services.template_search as ts
 from prompt_automation.shortcuts import save_shortcuts
+from prompt_automation.menus import render_template
 
 
 def _make_template(base: Path, rel: str, lines: list[str]) -> Path:
@@ -66,3 +67,29 @@ def test_merge_shortcut_keys(tmp_path, monkeypatch):
     })
     merged = ms.merge_shortcuts(["1", "2", "1"])
     assert merged["template"] == ["Alpha", "Beta"]
+
+
+def test_merged_render_matches_sequential():
+    t1 = {
+        "id": 1,
+        "title": "A",
+        "style": "Test",
+        "template": ["Hello {{x}}"],
+        "placeholders": [{"name": "x"}],
+    }
+    t2 = {
+        "id": 2,
+        "title": "B",
+        "style": "Test",
+        "template": ["Bye {{y}}"],
+        "placeholders": [{"name": "y"}],
+    }
+    legacy = "\n".join(
+        [
+            render_template(t1, {"x": "one"}),
+            render_template(t2, {"y": "two"}),
+        ]
+    )
+    combined = ms.merge_templates([t1, t2])
+    merged = render_template(combined, {"x": "one", "y": "two"})
+    assert merged == legacy

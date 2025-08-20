@@ -90,7 +90,7 @@ def test_multi_select_combination(monkeypatch):
             combined.extend(tmpl.get("template", []))
         return {"template": combined}
 
-    monkeypatch.setattr(select, "merge_templates", fake_merge)
+    monkeypatch.setattr(select.multi_select_service, "merge_templates", fake_merge)
     received = []
     app = types.SimpleNamespace(root=object(), advance_to_collect=lambda data: received.append(data))
 
