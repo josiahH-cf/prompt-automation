@@ -10,19 +10,13 @@
   "placeholders": [
     {
       "name": "objective",
-      "label": "\nObjective \nDescribe the task or objective clearly for your future self.",
+      "label": "\nTask \nDescribe the task or desired outcome clearly for your future self.",
       "multiline": false,
       "default": ""
     },
     {
       "name": "acceptance",
-      "label": "Acceptance Criteria \nHow do you know you did it right?",
-      "multiline": false,
-      "default": ""
-    },
-    {
-      "name": "notes",
-      "label": "Optional Notes or Additional Context",
+      "label": "Acceptance Criteria / Constraints \nHow do you know you did it right? \nAnything to watch out for?",
       "multiline": false,
       "default": ""
     },
@@ -46,7 +40,7 @@
     }
   ],
   "template": [
-    "{{type}} - {{project}} - Objective: {{objective}} - Acceptance: {{acceptance}} - ⏳{{estimate}} - Additional Notes: {{notes}}"
+    "{{type}}/{{project}} - {{objective}} - Acceptance/Risks: {{acceptance}} - ⏳{{estimate}}"
   ],
   "metadata": {
     "path": "Code/01_todoist_task.json",
