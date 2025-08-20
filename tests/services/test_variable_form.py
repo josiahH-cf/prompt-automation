@@ -43,6 +43,8 @@ fd_stub = types.ModuleType("filedialog")
 fd_stub.askopenfilename = lambda title=None, initialfile="": "/chosen/path"
 sys.modules["tkinter.filedialog"] = fd_stub
 
+# ensure module uses the stub regardless of previous imports
+sys.modules.pop("prompt_automation.services.variable_form", None)
 from prompt_automation.services.variable_form import build_widget
 import prompt_automation.services.variable_form as vf
 
