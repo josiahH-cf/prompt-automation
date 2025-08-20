@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, TYPE_CHECKING
 
 from ..config import PROMPTS_DIR, PROMPTS_SEARCH_PATHS
 from ..renderer import (
@@ -13,6 +13,9 @@ from ..renderer import (
     read_file_safe,
     is_shareable,
 )
+
+if TYPE_CHECKING:
+    from ..types import Template
 from ..variables import (
     get_variables,
     ensure_template_global_snapshot,
@@ -43,7 +46,7 @@ from .render_pipeline import (
 # --- Rendering -------------------------------------------------------------
 
 def render_template(
-    tmpl: Dict[str, Any],
+    tmpl: "Template",
     values: Dict[str, Any] | None = None,
     *,
     return_vars: bool = False,

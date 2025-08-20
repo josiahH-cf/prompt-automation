@@ -1,5 +1,7 @@
 """prompt-automation package."""
 
+from .types import Template, Placeholder
+
 __all__ = [
     "cli",
     "menus",
@@ -8,5 +10,7 @@ __all__ = [
     "paste",
     "logger",
     "errorlog",
+    "Template",
+    "Placeholder",
 ]
 

@@ -13,5 +13,6 @@ from __future__ import annotations
 
 from .controller import PromptGUI  # noqa: F401
 from .gui import run  # re-export wrapper function
+from . import constants
 
-__all__ = ["PromptGUI", "run"]
+__all__ = ["PromptGUI", "run", "constants"]

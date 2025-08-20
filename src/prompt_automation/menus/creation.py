@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 from ..config import PROMPTS_DIR
 from ..renderer import validate_template
+
+if TYPE_CHECKING:
+    from ..types import Template, Placeholder
 
 # NOTE: Slug logic removed. Filenames are now stable once created. We keep a
 # tiny helper for backwards compatibility if any external code imported it.
@@ -32,7 +35,7 @@ def _check_unique_id(pid: int, exclude: Path | None = None) -> None:
             continue
 
 
-def save_template(data: Dict[str, Any], orig_path: Path | None = None) -> Path:
+def save_template(data: "Template", orig_path: Path | None = None) -> Path:
     """Persist ``data`` without automatic renaming based on title.
 
     Rules now:
@@ -89,7 +92,7 @@ def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
     free integer greater than the current max.
     """
     paths = sorted(base.rglob("*.json"))
-    templates: List[tuple[Path, Dict[str, Any]]] = []
+    templates: List[tuple[Path, "Template"]] = []
     problems: List[str] = []
     used: set[int] = set()
 
@@ -155,12 +158,12 @@ def create_new_template() -> None:
         if line == ".":
             break
         body.append(line)
-    placeholders: List[Dict[str, Any]] = []
+    placeholders: List["Placeholder"] = []
     print("Placeholder names comma separated (empty to finish):")
     names = input()
     for name in [n.strip() for n in names.split(",") if n.strip()]:
         placeholders.append({"name": name})
-    data = {
+    data: "Template" = {
         "id": int(pid),
         "title": title,
         "style": style,
