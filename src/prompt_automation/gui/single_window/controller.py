@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from ...errorlog import get_logger
 from .geometry import load_geometry, save_geometry
 from .frames import select, collect, review
 
@@ -23,6 +24,8 @@ class SingleWindowApp:
 
     def __init__(self) -> None:
         import tkinter as tk
+
+        self._log = get_logger("prompt_automation.gui.single_window")
 
         self.root = tk.Tk()
         self.root.title("Prompt Automation")
@@ -54,12 +57,38 @@ class SingleWindowApp:
     def start(self) -> None:
         """Enter stage 1 (template selection)."""
         self._clear_content()
-        select.build(self)
+        try:
+            select.build(self)
+        except Exception as e:
+            self._log.error("Template selection failed: %s", e, exc_info=True)
+            from tkinter import messagebox
+
+            messagebox.showerror("Error", f"Failed to open template selector:\n{e}")
+            raise
+        else:
+            try:
+                self.root.update_idletasks()
+                save_geometry(self.root.winfo_geometry())
+            except Exception:
+                pass
 
     def advance_to_collect(self, template: Dict[str, Any]) -> None:
         self.template = template
         self._clear_content()
-        collect.build(self, template)
+        try:
+            collect.build(self, template)
+        except Exception as e:
+            self._log.error("Variable collection failed: %s", e, exc_info=True)
+            from tkinter import messagebox
+
+            messagebox.showerror("Error", f"Failed to collect variables:\n{e}")
+            raise
+        else:
+            try:
+                self.root.update_idletasks()
+                save_geometry(self.root.winfo_geometry())
+            except Exception:
+                pass
 
     def back_to_select(self) -> None:
         self.start()
@@ -67,7 +96,20 @@ class SingleWindowApp:
     def advance_to_review(self, variables: Dict[str, Any]) -> None:
         self.variables = variables
         self._clear_content()
-        review.build(self, self.template, variables)
+        try:
+            review.build(self, self.template, variables)
+        except Exception as e:
+            self._log.error("Review window failed: %s", e, exc_info=True)
+            from tkinter import messagebox
+
+            messagebox.showerror("Error", f"Failed to open review window:\n{e}")
+            raise
+        else:
+            try:
+                self.root.update_idletasks()
+                save_geometry(self.root.winfo_geometry())
+            except Exception:
+                pass
 
     def finish(self, final_text: str) -> None:
         self.final_text = final_text
