@@ -3,6 +3,10 @@
 This project provides platform-specific scripts for launching `prompt-automation` with a keyboard shortcut.
 The default key combination is **Ctrl+Shift+J**. Run `prompt-automation --assign-hotkey` to change it at any time.
 
+The launcher now uses a unified single-window interface for selection, variable
+collection, and review. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` before launching
+if you prefer the older multi-window dialogs.
+
 ## Windows
 1. Run `install/install.ps1` from PowerShell. The script installs dependencies, checks for AutoHotkey v2, and copies `windows.ahk` to your Startup folder.
 2. Verify registration with:

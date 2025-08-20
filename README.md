@@ -1,6 +1,6 @@
 # prompt-automation
 
-**prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and copy the result to your clipboard for manual pasting.
+**prompt-automation** is a keyboard driven prompt launcher designed for absolute beginners. With a single hotkey you can choose a template, fill in any placeholders and copy the result to your clipboard for manual pasting. The selector, collector and review now run in a unified single window. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` before launching to force the older multi-window flow.
 
 Recent feature highlights:
 - Default value helper: input dialogs show a truncated hint of each placeholder's default (with a [view] popup for long defaults) and empty submissions now fall back to that default at render time.
@@ -520,6 +520,16 @@ project/
 │       ├── prompts/    # Contains styles/basic/01_basic.json
 │       └── ...         # Application modules
 ```
+
+## Services
+
+The GUI now delegates work to a small service layer useful for extensions and automation:
+
+- `template_search` – walk the prompts tree and resolve numeric shortcuts.
+- `multi_select` – build synthetic combined templates from marked items.
+- `variable_form` – construct placeholder widgets for variable collection.
+- `overrides` – manage persisted placeholder values and file paths.
+- `exclusions` – parse `exclude_globals` metadata.
 
 Enjoy!
 

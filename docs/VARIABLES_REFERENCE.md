@@ -5,6 +5,10 @@ Comprehensive guide to every kind of variable (placeholder) and global control p
 
 Authoritative, example‑rich guide to every kind of variable (placeholder) and global control point used by `prompt-automation`: how values are collected, transformed, persisted, excluded, and rendered. Each section now includes practical JSON/body snippets plus rendered outputs for clarity.
 
+Variable collection and review now occur in a single window. Set
+`PROMPT_AUTOMATION_FORCE_LEGACY=1` before launching to restore the
+multi-window dialogs.
+
 ---
 ## 1. High-Level Flow
 
@@ -349,6 +353,7 @@ Edge cases:
 | PROMPT_AUTOMATION_TRIM_BLANKS | Force enable/disable trimming (`0/false` disables) | Auto (true) |
 | PROMPT_AUTOMATION_AUTO_UPDATE | Toggle background updater | Enabled |
 | PROMPT_AUTOMATION_MANIFEST_AUTO | Toggle manifest auto-apply | Enabled |
+| PROMPT_AUTOMATION_FORCE_LEGACY | Revert to legacy multi-window GUI | Disabled |
 
 ---
 ## 17. Metadata Keys
@@ -424,7 +429,19 @@ Testing guidance:
 * Use parametrized tests for placeholder type formatting permutations.
 
 ---
-## 22. Related Docs
+## 22. Services
+
+Internally, variable handling is powered by modular service helpers which can be
+reused in custom tooling:
+
+- `template_search`
+- `multi_select`
+- `variable_form`
+- `overrides`
+- `exclusions`
+
+---
+## 23. Related Docs
 
 * Codebase overview: `docs/CODEBASE_REFERENCE.md`
 * Installation issues: `docs/INSTALLATION_TROUBLESHOOTING.md`
