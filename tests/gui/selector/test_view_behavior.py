@@ -51,9 +51,22 @@ class DummyService:
     def __init__(self):
         self.calls = []
 
-    def search(self, query: str, recursive: bool = True):
-        self.calls.append((query, recursive))
-        return []
+        def _search(query: str, recursive: bool = True):
+            self.calls.append((query, recursive))
+            return []
+
+        def _merge(templates):
+            combined = []
+            for tmpl in templates:
+                combined.extend(tmpl.get("template", []))
+            return {
+                "template": combined,
+                "title": f"Multi ({len(templates)})",
+                "style": "multi",
+            }
+
+        self.template_search_service = types.SimpleNamespace(search=_search)
+        self.multi_select_service = types.SimpleNamespace(merge_templates=_merge)
 
 
 def test_recursive_toggle_behavior():
