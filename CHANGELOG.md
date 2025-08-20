@@ -1,7 +1,11 @@
 # Changelog
 
 ## Unreleased
-_No pending changes; preparing for next cycle._
+- Unified single-window UI now matches legacy feature set and is the default
+  experience. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` to restore the old
+  multi-window dialogs.
+- Documented modular service layer (`template_search`, `multi_select`,
+  `variable_form`, `overrides`, `exclusions`).
 
 ## 0.4.4 - 2025-08-18
 Comprehensive GUI refactor + quality-of-life enhancements, consolidating prior selector modernization and adding new safety / clarity features.
