@@ -9,8 +9,7 @@ caused the runtime error: ``open_template_selector() takes 0 positional args``.
 
 We restore compatibility by re‑implementing a lightweight template picker UI
 that accepts the service module argument. This is intentionally minimal but
-functional so legacy multi-window mode works while the new single-window flow
-evolves.
+functional for the legacy multi-window mode retained as a fallback.
 """
 from __future__ import annotations
 
