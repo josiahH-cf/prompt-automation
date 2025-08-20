@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional
-
 from .model import (
     create_browser_state,
     ListingItem,
@@ -23,29 +20,13 @@ from ...shortcuts import (
     renumber_templates,
     SHORTCUT_FILE,
 )
-from ...renderer import load_template
 from ...config import PROMPTS_DIR
 from ..collector.overrides import load_overrides, save_overrides  # for options menu global reference manager
-
-
-def load_template_by_relative(rel: str) -> Optional[dict]:
-    """Load a template given its path relative to ``PROMPTS_DIR``."""
-    path = PROMPTS_DIR / rel
-    if path.exists():
-        try:
-            return load_template(path)
-        except Exception:
-            return None
-    return None
-
-
-def resolve_shortcut(key: str) -> Optional[dict]:
-    """Return template mapped to shortcut key, if any."""
-    mapping = load_shortcuts()
-    rel = mapping.get(key)
-    if not rel:
-        return None
-    return load_template_by_relative(rel)
+from ...services.template_search import (
+    load_template_by_relative,
+    resolve_shortcut,
+    search,
+)
 
 
 __all__ = [
@@ -65,6 +46,7 @@ __all__ = [
     "SHORTCUT_FILE",
     "resolve_shortcut",
     "load_template_by_relative",
+    "search",
     "PROMPTS_DIR",
     "load_overrides",
     "save_overrides",
