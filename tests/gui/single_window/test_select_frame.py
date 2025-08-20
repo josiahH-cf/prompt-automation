@@ -102,3 +102,46 @@ def test_multi_select_combination(monkeypatch):
 
     _restore_tk(real_tk)
 
+
+def test_preview_updates(monkeypatch):
+    real_tk = _stub_tk()
+
+    paths = [Path("a.json"), Path("b.json")]
+    monkeypatch.setattr(select, "list_templates", lambda search="", recursive=True: paths)
+
+    def fake_load(path):
+        return {"template": [path.stem.upper()]}
+
+    monkeypatch.setattr(select, "load_template", fake_load)
+
+    app = types.SimpleNamespace(root=object(), advance_to_collect=lambda data: None)
+    view = select.build(app)
+
+    view.select([0])
+    assert view.state["preview"] == "A"
+
+    view.select([1])
+    assert view.state["preview"] == "B"
+
+    _restore_tk(real_tk)
+
+
+def test_preview_error_handling(monkeypatch):
+    real_tk = _stub_tk()
+
+    paths = [Path("bad.json")]
+    monkeypatch.setattr(select, "list_templates", lambda search="", recursive=True: paths)
+
+    def bad_load(path):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(select, "load_template", bad_load)
+
+    app = types.SimpleNamespace(root=object(), advance_to_collect=lambda data: None)
+    view = select.build(app)
+
+    view.select([0])
+    assert "boom" in view.state["preview"]
+
+    _restore_tk(real_tk)
+

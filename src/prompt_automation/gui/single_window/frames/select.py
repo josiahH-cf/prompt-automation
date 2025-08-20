@@ -26,10 +26,12 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
             "query": "",
             "paths": list_templates("", True),
             "selected": [],
+            "preview": "",
         }
 
         def _refresh() -> None:
             state["paths"] = list_templates(state["query"], state["recursive"])
+            state["preview"] = ""
 
         def search(query: str):
             state["query"] = query
@@ -51,10 +53,27 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
                 tmpl = load_template(state["paths"][n - 1])
                 app.advance_to_collect(tmpl)
 
+        def _set_preview(path: Path) -> None:
+            try:
+                tmpl = load_template(path)
+                state["preview"] = "\n".join(tmpl.get("template", []))
+            except Exception as e:
+                state["preview"] = f"Error: {e}"
+
         def select(indices):
-            state["selected"] = [
-                load_template(state["paths"][i]) for i in indices if i < len(state["paths"])
-            ]
+            state["selected"] = []
+            if indices:
+                idx_paths = [
+                    state["paths"][i] for i in indices if i < len(state["paths"])
+                ]
+                for p in idx_paths:
+                    try:
+                        state["selected"].append(load_template(p))
+                    except Exception:
+                        pass
+                _set_preview(idx_paths[0])
+            else:
+                state["preview"] = ""
 
         def combine():
             tmpl = merge_templates(state["selected"])
@@ -85,11 +104,16 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     recursive_var = tk.BooleanVar(value=True)
     tk.Checkbutton(search_bar, text="Recursive", variable=recursive_var, command=lambda: refresh()).pack(side="right")
 
-    listbox = tk.Listbox(frame, activestyle="dotbox", selectmode="extended")
-    scrollbar = tk.Scrollbar(frame, orient="vertical", command=listbox.yview)
+    main = tk.Frame(frame)
+    main.pack(fill="both", expand=True)
+    listbox = tk.Listbox(main, activestyle="dotbox", selectmode="extended")
+    scrollbar = tk.Scrollbar(main, orient="vertical", command=listbox.yview)
     listbox.config(yscrollcommand=scrollbar.set)
     listbox.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=8)
-    scrollbar.pack(side="right", fill="y", pady=8, padx=(0, 12))
+    scrollbar.pack(side="left", fill="y", pady=8)
+
+    preview = tk.Text(main, wrap="word", height=10, state="disabled")
+    preview.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=8)
 
     rel_map: Dict[int, Path] = {}
 
@@ -102,6 +126,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
             listbox.insert("end", str(rel))
             rel_map[idx] = p
         status.set(f"{len(paths)} templates")
+        update_preview()
 
     btn_bar = tk.Frame(frame)
     btn_bar.pack(fill="x", pady=(0, 8))
@@ -142,6 +167,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
 
     entry.bind("<KeyRelease>", refresh)
     listbox.bind("<Return>", proceed)
+    listbox.bind("<<ListboxSelect>>", lambda e: update_preview())
 
     def on_key(event):
         key = event.char
@@ -160,11 +186,28 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
 
     frame.bind_all("<Key>", on_key)
 
+    def update_preview():
+        sel = listbox.curselection()
+        preview.config(state="normal")
+        preview.delete("1.0", "end")
+        if not sel:
+            preview.config(state="disabled")
+            return
+        path = rel_map.get(sel[0])
+        try:
+            tmpl = load_template(path)
+            lines = tmpl.get("template", [])
+            preview.insert("1.0", "\n".join(lines))
+        except Exception as e:  # pragma: no cover - runtime
+            preview.insert("1.0", f"Error: {e}")
+        preview.config(state="disabled")
+
     refresh()
     if rel_map:
         listbox.selection_set(0)
         listbox.activate(0)
         listbox.focus_set()
+        update_preview()
 
 
 __all__ = ["build"]
