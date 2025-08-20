@@ -67,6 +67,7 @@ def collect_module(monkeypatch):
     stub.Label = _Widget
     stub.Scrollbar = _Widget
     stub.Canvas = _Widget
+    stub.Toplevel = _Widget
     stub.StringVar = _Var
     stub.BooleanVar = _Var
     stub.Widget = _Widget
@@ -124,6 +125,24 @@ def _setup_storage(monkeypatch, vf, initial):
     monkeypatch.setattr(vf, "_get_template_entry", fake_get)
     monkeypatch.setattr(vf, "_set_template_entry", fake_set)
     monkeypatch.setattr(vf, "_save_overrides", fake_save)
+    return storage
+
+
+def _setup_global_storage(monkeypatch, collect, initial):
+    storage = {"data": initial}
+
+    def fake_load():
+        return storage["data"]
+
+    def fake_save(data):
+        storage["data"] = data
+
+    def fake_get():
+        return storage["data"].get("global_files", {}).get("reference_file")
+
+    monkeypatch.setattr(collect, "load_overrides", fake_load)
+    monkeypatch.setattr(collect, "save_overrides", fake_save)
+    monkeypatch.setattr(collect, "get_global_reference_file", fake_get)
     return storage
 
 
@@ -206,3 +225,33 @@ def test_exclusions_access(collect_module):
     view = collect.build(app, template)
     view.open_exclusions()
     assert called == [42]
+
+
+def test_global_reference_memory(monkeypatch, collect_module):
+    collect, vf = collect_module
+    storage = _setup_global_storage(monkeypatch, collect, {})
+
+    app = types.SimpleNamespace(
+        root=object(),
+        back_to_select=lambda: None,
+        advance_to_review=lambda v: None,
+        edit_exclusions=lambda tid: None,
+    )
+    template = {"id": 1, "placeholders": []}
+
+    view = collect.build(app, template)
+    bind = view.bindings["_global_reference"]
+    w = view.widgets["_global_reference"]
+    assert bind["path_var"].get() == ""
+
+    # simulate browse
+    w.browse_btn.kw["command"]()
+    assert bind["path_var"].get() == "/picked/path"
+
+    # persist and rebuild
+    bind["persist"]()
+    assert storage["data"]["global_files"]["reference_file"] == "/picked/path"
+
+    view2 = collect.build(app, template)
+    bind2 = view2.bindings["_global_reference"]
+    assert bind2["path_var"].get() == "/picked/path"
