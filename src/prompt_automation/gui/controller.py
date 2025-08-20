@@ -25,7 +25,7 @@ from ..errorlog import get_logger
 from .selector import open_template_selector
 from .collector import collect_variables_gui
 from .review_window import review_output_gui
-from .single_window import SingleWindowApp
+from . import single_window
 from .file_append import _append_to_files
 
 
@@ -65,7 +65,7 @@ class PromptGUI:
                 self._log.info("Starting GUI workflow (EXPERIMENTAL single-window mode)")
                 single_started = False
                 try:
-                    app = SingleWindowApp(); single_started = True
+                    app = single_window.SingleWindowApp(); single_started = True
                     final_text, var_map = app.run()
                     template = getattr(app, "template", None)
                     if template and final_text is not None and var_map is not None:
