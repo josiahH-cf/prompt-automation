@@ -10,8 +10,12 @@ from __future__ import annotations
 
 from typing import Any, Dict
 import types
+from pathlib import Path
 
 from ....services.variable_form import build_widget as variable_form_factory
+from ...collector.persistence import get_global_reference_file
+from ...collector.overrides import load_overrides, save_overrides
+from ....renderer import read_file_safe
 
 
 def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
@@ -107,7 +111,9 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         app.back_to_select()
 
     def review():
-        vars_map = {k: b["get"]() or None for k, b in bindings.items()}
+        vars_map = {
+            k: b["get"]() or None for k, b in bindings.items() if not k.startswith("_")
+        }
         for b in bindings.values():
             b.get("persist", lambda: None)()
         app.advance_to_review(vars_map)
@@ -124,13 +130,68 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         side="left", padx=4
     )
 
-    def view_reference():
-        if hasattr(app, "view_reference_file"):
-            app.view_reference_file()
+    # --- Global reference file picker ------------------------------------
+    ref_frame = tk.Frame(btn_bar)
+    ref_frame.pack(side="left", padx=4)
+    ref_path_var = tk.StringVar(value=get_global_reference_file() or "")
+    ref_entry = tk.Entry(ref_frame, textvariable=ref_path_var, width=40)
+    ref_entry.pack(side="left", fill="x", expand=True)
 
-    tk.Button(btn_bar, text="View Ref", command=view_reference).pack(
-        side="left", padx=4
-    )
+    def _browse_ref():
+        from tkinter import filedialog
+
+        fname = filedialog.askopenfilename()
+        if fname:
+            ref_path_var.set(fname)
+
+    browse_btn = tk.Button(ref_frame, text="Browse", command=_browse_ref)
+    browse_btn.pack(side="left", padx=2)
+
+    def _view_ref():
+        path = ref_path_var.get().strip()
+        if not path:
+            return
+        win = tk.Toplevel(app.root)
+        win.title(f"Reference File: {Path(path).name}")
+        win.geometry("900x680")
+        text_frame = tk.Frame(win)
+        text_frame.pack(fill="both", expand=True)
+        txt = tk.Text(text_frame, wrap="word")
+        vs = tk.Scrollbar(text_frame, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=vs.set)
+        txt.pack(side="left", fill="both", expand=True)
+        vs.pack(side="right", fill="y")
+        try:
+            content = read_file_safe(path).replace("\r", "")
+        except Exception:
+            content = "(Error reading file)"
+        txt.insert("1.0", content)
+        txt.config(state="disabled")
+
+    view_btn = tk.Button(ref_frame, text="View", command=_view_ref)
+    view_btn.pack(side="left", padx=2)
+
+    def _persist_ref():
+        ov = load_overrides()
+        gfiles = ov.setdefault("global_files", {})
+        pv = ref_path_var.get().strip()
+        if pv:
+            gfiles["reference_file"] = pv
+        else:
+            gfiles.pop("reference_file", None)
+        save_overrides(ov)
+
+    ref_frame.entry = ref_entry  # type: ignore[attr-defined]
+    ref_frame.browse_btn = browse_btn  # type: ignore[attr-defined]
+    ref_frame.view_btn = view_btn  # type: ignore[attr-defined]
+
+    bindings["_global_reference"] = {
+        "get": lambda: ref_path_var.get(),
+        "persist": _persist_ref,
+        "path_var": ref_path_var,
+        "view": _view_ref,
+    }
+    widgets["_global_reference"] = ref_frame
 
     tk.Button(btn_bar, text="Review ▶", command=review).pack(side="right", padx=12)
 
