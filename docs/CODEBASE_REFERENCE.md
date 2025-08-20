@@ -16,6 +16,7 @@ This document provides a machine-readable and human-readable overview of the `pr
 │   └── prompt_automation/
 │       ├── cli.py            # Command-line entry point and dependency checks
 │       ├── errorlog.py       # Shared logger that writes to ~/.prompt-automation/logs/error.log
+│       ├── config.py         # Central configuration paths
 │       ├── gui/             # Optional Tkinter interface for choosing templates
 │       │   ├── controller.py       # High-level GUI workflow (prefers single-window orchestration)
 │       │   ├── selector/           # Modular template selector (model + controller)
@@ -34,10 +35,16 @@ This document provides a machine-readable and human-readable overview of the `pr
 │       │   └── gui.py              # Entry point launching PromptGUI
 │       ├── hotkey/           # Platform-specific hotkey definitions
 │       ├── hotkeys/         # Interactive hotkey assignment, dependency checking, and system integration
+│       ├── hotkeys.py       # Compatibility wrapper for hotkeys package
+│       ├── install/         # Installation helpers (e.g., configure hotkey)
 │       ├── logger.py         # Usage logging with SQLite rotation
 │       ├── menus.py          # Fzf-based style/template picker and template creation
 │       ├── shortcuts.py      # Numeric shortcut mapping & renumbering utilities
+│       ├── starred.py       # Starred template persistence helpers
+│       ├── switch_mode.py   # Toggle default GUI/terminal mode
+│       ├── types.py         # TypedDict definitions for templates
 │       ├── updater.py        # Lightweight PyPI version check + pipx upgrade (rate-limited, silent)
+│       ├── update.py         # Self-update utilities applying manifest files
 │       ├── paste.py          # Clipboard interaction and keystroke simulation
 │       ├── prompts/          # Packaged prompt templates (styles/basic/01_basic.json)
 │       │   └── Settings/     # settings.json (mirrors per-template file overrides; editable)
