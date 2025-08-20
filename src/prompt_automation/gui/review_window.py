@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..menus import render_template
 from .. import paste
+from .constants import INSTR_FINISH_COPY_CLOSE, INSTR_FINISH_COPY_AGAIN
 
 
 def review_output_gui(template, variables):
@@ -41,7 +42,7 @@ def review_output_gui(template, variables):
     instructions_var = tk.StringVar()
     instructions_var.set(
         "Edit the prompt below (this text is fully editable & will be copied). "
-        "Ctrl+Enter = Finish (copies & closes), Ctrl+Shift+C = Copy without closing, Esc = Cancel"
+        + INSTR_FINISH_COPY_CLOSE
     )
     instructions = tk.Label(
         main_frame,
@@ -83,8 +84,7 @@ def review_output_gui(template, variables):
             paste.copy_to_clipboard(text)
             status_var.set("Copied to clipboard ✔")
             instructions_var.set(
-                "Copied. You can keep editing. Ctrl+Enter = Finish (copies & closes), "
-                "Ctrl+Shift+C = Copy again, Esc = Cancel"
+                "Copied. You can keep editing. " + INSTR_FINISH_COPY_AGAIN
             )
             # Clear status after a delay
             root.after(4000, lambda: status_var.set(""))

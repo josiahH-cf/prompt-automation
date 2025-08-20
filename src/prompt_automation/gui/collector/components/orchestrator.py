@@ -10,6 +10,7 @@ from .formatting import (
     truncate_default_hint,
 )
 from ....renderer import read_file_safe
+from ...constants import INSTR_ACCEPT_RESET_REFRESH_CANCEL
 from ..persistence import (
     CANCELLED,
     CURRENT_DEFAULTS,
@@ -77,7 +78,7 @@ def collect_file_variable_gui(template_id: int, placeholder: dict, globals_map: 
 
         top = tk.Frame(viewer, padx=14, pady=8)
         top.pack(fill="x")
-        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr = tk.Label(top, text=INSTR_ACCEPT_RESET_REFRESH_CANCEL, fg="#444")
         instr.pack(side="left")
 
         text_frame = tk.Frame(viewer)
@@ -180,7 +181,7 @@ def collect_reference_file_variable_gui(template_id: int, placeholder: dict):
 
         top = tk.Frame(viewer, padx=14, pady=8)
         top.pack(fill="x")
-        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr = tk.Label(top, text=INSTR_ACCEPT_RESET_REFRESH_CANCEL, fg="#444")
         instr.pack(side="left")
 
         text_frame = tk.Frame(viewer)
@@ -291,7 +292,7 @@ def collect_global_reference_file_gui(placeholder: dict):
         viewer.lift(); viewer.focus_force(); viewer.attributes("-topmost", True); viewer.after(100, lambda: viewer.attributes("-topmost", False))
         action = {"value": "cancel"}
         top = tk.Frame(viewer, padx=14, pady=8); top.pack(fill="x")
-        instr = tk.Label(top, text="Ctrl+Enter = Continue   |   Ctrl+R = Reset   |   Ctrl+U = Refresh   |   Esc = Cancel", fg="#444")
+        instr = tk.Label(top, text=INSTR_ACCEPT_RESET_REFRESH_CANCEL, fg="#444")
         instr.pack(side="left")
         # Text area
         text_frame = tk.Frame(viewer); text_frame.pack(fill="both", expand=True)

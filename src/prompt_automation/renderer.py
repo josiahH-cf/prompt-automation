@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Union, Any
+from typing import Dict, Iterable, List, Sequence, Union, Any, TYPE_CHECKING
 
 from .errorlog import get_logger
+
+if TYPE_CHECKING:
+    from .types import Template
 
 _log = get_logger(__name__)
 
@@ -102,7 +105,7 @@ def _coerce_bool(val: Any) -> bool | None:
     return None
 
 
-def inject_share_flag(data: Dict[str, Any], path: Path) -> None:
+def inject_share_flag(data: "Template", path: Path) -> None:
     """Ensure ``metadata.share_this_file_openly`` exists & normalized.
 
     Behaviour:
@@ -133,7 +136,7 @@ def inject_share_flag(data: Dict[str, Any], path: Path) -> None:
         meta_obj["share_this_file_openly"] = coerced
 
 
-def is_shareable(template: Dict[str, Any], path: Path) -> bool:
+def is_shareable(template: "Template", path: Path) -> bool:
     """Return True if template should be considered share/export eligible.
 
     Precedence order:
@@ -155,7 +158,7 @@ def is_shareable(template: Dict[str, Any], path: Path) -> bool:
         return True
 
 
-def load_template(path: Path) -> Dict:
+def load_template(path: Path) -> "Template":
     """Load JSON template file, injecting share flag defaults."""
     path = path.expanduser().resolve()
     if not path.is_file():

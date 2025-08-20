@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict
 
 from ..errorlog import get_logger
+from .constants import INFO_CLOSE_SAVE
 
 _log = get_logger(__name__)
 
@@ -180,7 +181,7 @@ def configure_options_menu(
             raw_mode = {'value': False}
             toggle_btn = tk.Button(top, text='Raw', width=5); toggle_btn.pack(side='left', padx=(6,0))
             copy_btn = tk.Button(top, text='Copy', width=6); copy_btn.pack(side='left', padx=(6,0))
-            info = tk.Label(top, text='Ctrl+Enter/Esc = Close & Save', fg='#555'); info.pack(side='left', padx=(12,0))
+            info = tk.Label(top, text=INFO_CLOSE_SAVE, fg='#555'); info.pack(side='left', padx=(12,0))
             frame = tk.Frame(win); frame.pack(fill='both', expand=True)
             txt = tk.Text(frame, wrap='word'); vs = tk.Scrollbar(frame, orient='vertical', command=txt.yview)
             txt.configure(yscrollcommand=vs.set); txt.pack(side='left', fill='both', expand=True); vs.pack(side='right', fill='y')
