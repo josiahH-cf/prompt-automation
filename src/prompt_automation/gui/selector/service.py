@@ -27,6 +27,13 @@ from ...services.template_search import (
     resolve_shortcut,
     search,
 )
+from ...services.exclusions import (
+    load_exclusions,
+    set_exclusions,
+    add_exclusion,
+    remove_exclusion,
+    reset_exclusions,
+)
 
 
 __all__ = [
@@ -50,4 +57,9 @@ __all__ = [
     "PROMPTS_DIR",
     "load_overrides",
     "save_overrides",
+    "load_exclusions",
+    "set_exclusions",
+    "add_exclusion",
+    "remove_exclusion",
+    "reset_exclusions",
 ]
