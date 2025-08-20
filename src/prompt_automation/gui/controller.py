@@ -1,19 +1,10 @@
 """High level GUI controller.
 
-Recent refactor introduced an experimental *single-window* workflow implemented
-in :mod:`prompt_automation.gui.single_window`. The current single-window
-implementation intentionally uses placeholder frame builders (see
-``single_window/frames/*.py``) that do **not** create real widgets yet. This
-results in a blank / empty window (only a bare Tk root) exactly like the user
-reported.
-
-To avoid shipping a non-functional GUI we gate the experimental path behind the
-environment variable ``PROMPT_AUTOMATION_SINGLE_WINDOW=1`` and fall back to the
-fully functional legacy multi-step GUI (template selector -> variable
-collection -> review window) by default.
-
-Set ``PROMPT_AUTOMATION_SINGLE_WINDOW=1`` to re-enable the new flow while it is
-under development.
+The project now ships a unified *single-window* workflow implemented in
+``prompt_automation.gui.single_window``. This flow matches the feature set of
+the legacy multi-step GUI and is the default experience. Set the environment
+variable ``PROMPT_AUTOMATION_FORCE_LEGACY=1`` to revert to the legacy
+multi-window dialogs.
 """
 from __future__ import annotations
 
@@ -60,9 +51,9 @@ class PromptGUI:
             return
 
         try:
-            if os.environ.get("PROMPT_AUTOMATION_SINGLE_WINDOW") == "1":
-                # --- Experimental single-window path ---------------------------------
-                self._log.info("Starting GUI workflow (EXPERIMENTAL single-window mode)")
+            if os.environ.get("PROMPT_AUTOMATION_FORCE_LEGACY") != "1":
+                # --- Single-window path (default) ------------------------------------
+                self._log.info("Starting GUI workflow (single-window mode)")
                 single_started = False
                 try:
                     app = single_window.SingleWindowApp(); single_started = True
@@ -85,7 +76,7 @@ class PromptGUI:
                         return
                     # Fall through to legacy flow below
 
-            # --- Legacy multi-window flow (default) ----------------------------------
+            # --- Legacy multi-window flow (forced or fallback) -----------------------
             self._log.info("Starting GUI workflow (legacy multi-window mode)")
             template = open_template_selector()
             if template:

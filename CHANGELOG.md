@@ -4,6 +4,7 @@
 - Unified single-window UI now matches legacy feature set and is the default
   experience. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` to restore the old
   multi-window dialogs.
+- Removed experimental `PROMPT_AUTOMATION_SINGLE_WINDOW` toggle.
 - Documented modular service layer (`template_search`, `multi_select`,
   `variable_form`, `overrides`, `exclusions`).
 
