@@ -1,6 +1,23 @@
-"""High level GUI controller."""
+"""High level GUI controller.
+
+Recent refactor introduced an experimental *single-window* workflow implemented
+in :mod:`prompt_automation.gui.single_window`. The current single-window
+implementation intentionally uses placeholder frame builders (see
+``single_window/frames/*.py``) that do **not** create real widgets yet. This
+results in a blank / empty window (only a bare Tk root) exactly like the user
+reported.
+
+To avoid shipping a non-functional GUI we gate the experimental path behind the
+environment variable ``PROMPT_AUTOMATION_SINGLE_WINDOW=1`` and fall back to the
+fully functional legacy multi-step GUI (template selector -> variable
+collection -> review window) by default.
+
+Set ``PROMPT_AUTOMATION_SINGLE_WINDOW=1`` to re-enable the new flow while it is
+under development.
+"""
 from __future__ import annotations
 
+import os
 import sys
 
 from .. import logger, update, updater
@@ -43,33 +60,42 @@ class PromptGUI:
             return
 
         try:
-            self._log.info("Starting GUI workflow (single-window mode)")
-            single_started = False
-            try:
-                app = SingleWindowApp(); single_started = True
-                final_text, var_map = app.run()
-                template = app.template if hasattr(app, 'template') else None
-                if template and final_text is not None and var_map is not None:
-                    _append_to_files(var_map, final_text)
-                    logger.log_usage(template, len(final_text))
-                    self._log.info("Workflow completed successfully (single-window)")
-                else:
-                    self._log.info("User cancelled workflow (single-window)")
-                return
-            except Exception as e_app:
-                self._log.error("Single-window path failed: %s -- falling back", e_app, exc_info=True)
-                if single_started:
-                    # If failure occurred after partial creation, abort entirely
+            if os.environ.get("PROMPT_AUTOMATION_SINGLE_WINDOW") == "1":
+                # --- Experimental single-window path ---------------------------------
+                self._log.info("Starting GUI workflow (EXPERIMENTAL single-window mode)")
+                single_started = False
+                try:
+                    app = SingleWindowApp(); single_started = True
+                    final_text, var_map = app.run()
+                    template = getattr(app, "template", None)
+                    if template and final_text is not None and var_map is not None:
+                        _append_to_files(var_map, final_text)
+                        logger.log_usage(template, len(final_text))
+                        self._log.info("Workflow completed successfully (single-window)")
+                    else:
+                        self._log.info("User cancelled workflow (single-window)")
                     return
-                template = open_template_selector()
-                if template:
-                    variables = collect_variables_gui(template)
-                    if variables is not None:
-                        final_text, var_map = review_output_gui(template, variables)
-                        if final_text is not None:
-                            _append_to_files(var_map, final_text)
-                            logger.log_usage(template, len(final_text))
-                return
+                except Exception as e_app:  # pragma: no cover - runtime GUI path
+                    self._log.error(
+                        "Single-window path failed: %s -- falling back to legacy GUI", e_app,
+                        exc_info=True,
+                    )
+                    if single_started:
+                        # If failure occurred after partial creation, abort entirely
+                        return
+                    # Fall through to legacy flow below
+
+            # --- Legacy multi-window flow (default) ----------------------------------
+            self._log.info("Starting GUI workflow (legacy multi-window mode)")
+            template = open_template_selector()
+            if template:
+                variables = collect_variables_gui(template)
+                if variables is not None:
+                    final_text, var_map = review_output_gui(template, variables)
+                    if final_text is not None:
+                        _append_to_files(var_map, final_text)
+                        logger.log_usage(template, len(final_text))
+            return
         except Exception as e:  # pragma: no cover - GUI runtime errors
             self._log.error("GUI workflow failed: %s", e, exc_info=True)
             try:
