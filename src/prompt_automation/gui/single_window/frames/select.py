@@ -7,14 +7,11 @@ to the variable collection stage.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from ....config import PROMPTS_DIR
 from ....renderer import load_template
-
-
-def _list_templates() -> List[Path]:
-    return [p for p in PROMPTS_DIR.rglob("*.json") if p.is_file()]
+from ....services.template_search import list_templates
 
 
 def build(app) -> None:  # pragma: no cover - Tk runtime
@@ -31,7 +28,7 @@ def build(app) -> None:  # pragma: no cover - Tk runtime
     listbox.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=8)
     scrollbar.pack(side="right", fill="y", pady=8, padx=(0, 12))
 
-    paths = _list_templates()
+    paths = list_templates()
     rel_map: Dict[int, Path] = {}
     for idx, p in enumerate(sorted(paths)):
         rel = p.relative_to(PROMPTS_DIR)
