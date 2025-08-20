@@ -677,3 +677,8 @@ Force a manual run (still respects interactive mode setting):
 ```bash
 prompt-automation --update
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup. For a summary of the selector, collector, and review window features, see the [GUI parity spec](docs/PARITY_SPEC.md).
+
