@@ -65,18 +65,20 @@ def test_render_pipeline_golden(tmp_path, monkeypatch):
         },
     )
 
-    expected = (
-        'Hello World\n\n'
-        'Tasks:\n'
-        '- [ ] task one\n'
-        '- [ ] task two\n\n'
-        'Reference file path: ref.txt\n'
-        'Reference file content: REF CONTENT\n'
-        'Secondary path: sec.txt\n'
-        'Secondary content: SEC CONTENT\n\n'
-        'Reminders:\n'
-        '> - Remember A\n'
-        '> - Remember B\n\n'
-        'THINK'
-    )
+    expected = """Hello World
+
+Tasks:
+- [ ] task one
+- [ ] task two
+
+Reference file path: ref.txt
+Reference file content: REF CONTENT
+Secondary path: sec.txt
+Secondary content: SEC CONTENT
+
+Reminders:
+> - Remember A
+> - Remember B
+
+THINK"""
     assert rendered == expected
