@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from ....services.multi_select import merge_templates
 from .preview import open_preview
 from .overrides import manage_overrides
 from .exclusions import edit_exclusions
@@ -37,13 +38,7 @@ class SelectorView:
 
     def finish_multi(self) -> Optional[dict]:
         """Combine selected templates into a synthetic multi template."""
-        if not self.multi_selected:
-            return None
-        combined = {
-            'title': f"Multi ({len(self.multi_selected)})",
-            'style': 'multi',
-            'template': sum((t.get('template', []) for t in self.multi_selected), []),
-        }
+        combined = merge_templates(self.multi_selected)
         self.multi_selected = []
         return combined
 
