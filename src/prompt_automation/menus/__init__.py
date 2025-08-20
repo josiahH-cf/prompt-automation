@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
 
 from ..config import PROMPTS_DIR, PROMPTS_SEARCH_PATHS
+from ..services.exclusions import parse_exclusions
 from ..renderer import (
     fill_placeholders,
     load_template,
@@ -57,15 +58,7 @@ def render_template(
     template_id = tmpl.get("id")
 
     meta = tmpl.get("metadata") if isinstance(tmpl.get("metadata"), dict) else {}
-    exclude_globals: set[str] = set()
-    try:
-        raw_ex = meta.get("exclude_globals")
-        if isinstance(raw_ex, (list, tuple)):
-            exclude_globals = {str(x).strip() for x in raw_ex if str(x).strip()}
-        elif isinstance(raw_ex, str):
-            exclude_globals = {s.strip() for s in raw_ex.split(",") if s.strip()}
-    except Exception:
-        exclude_globals = set()
+    exclude_globals: set[str] = parse_exclusions(meta.get("exclude_globals"))
 
     try:
         globals_file = PROMPTS_DIR / "globals.json"

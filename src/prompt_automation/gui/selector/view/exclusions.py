@@ -3,17 +3,13 @@ from __future__ import annotations
 """Dialog to edit template exclusion metadata."""
 
 from typing import TYPE_CHECKING, List
-from pathlib import Path
 
 if TYPE_CHECKING:  # pragma: no cover - hints only
     import tkinter as tk
 
 
 def edit_exclusions(root: "tk.Tk", service) -> None:  # pragma: no cover - GUI dialog
-    try:
-        import json
-        _PD = service.PROMPTS_DIR
-    except Exception:
+    if not hasattr(service, "load_exclusions"):
         return
 
     import tkinter as tk
@@ -30,65 +26,34 @@ def edit_exclusions(root: "tk.Tk", service) -> None:  # pragma: no cover - GUI d
     txt = tk.Text(dlg, wrap='word')
     txt.pack(fill='both', expand=True, padx=10, pady=6)
     txt.insert('1.0', "# Enter one global key per line to exclude for this template\n")
-    current_path: List[Path] = []
+    current_id: List[int] = []
 
     def _load():
         tid = id_var.get().strip()
         if not tid.isdigit():
             status_var.set("Template id must be numeric")
             return
-        target = None
-        for p in _PD.rglob("*.json"):
-            try:
-                data = json.loads(p.read_text())
-            except Exception:
-                continue
-            if data.get('id') == int(tid):
-                target = (p, data)
-                break
-        if not target:
+        exclusions = service.load_exclusions(int(tid))
+        if exclusions is None:
             status_var.set("Template not found")
             return
-        p, data = target
-        current_path.clear(); current_path.append(p)
-        meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
-        raw_ex = meta.get('exclude_globals')
-        lines = []
-        if isinstance(raw_ex, (list, tuple)):
-            lines = [str(x) for x in raw_ex]
-        elif isinstance(raw_ex, str):
-            if ',' in raw_ex:
-                lines = [s.strip() for s in raw_ex.split(',') if s.strip()]
-            elif raw_ex.strip():
-                lines = [raw_ex.strip()]
+        current_id.clear(); current_id.append(int(tid))
         txt.delete('1.0','end')
-        if lines:
-            txt.insert('1.0', "\n".join(lines))
-        status_var.set(f"Loaded {p.name}")
+        if exclusions:
+            txt.insert('1.0', "\n".join(exclusions))
+        status_var.set(f"Loaded {tid}")
 
     def _save():
-        if not current_path:
+        if not current_id:
             status_var.set("Load a template first")
             return
-        p = current_path[0]
-        try:
-            data = json.loads(p.read_text())
-        except Exception as e:
-            status_var.set(f"Read error: {e}")
-            return
-        meta = data.get('metadata') if isinstance(data.get('metadata'), dict) else {}
-        if not isinstance(meta, dict):
-            meta = {}; data['metadata'] = meta
-        raw = [l.strip() for l in txt.get('1.0','end-1c').splitlines() if l.strip() and not l.strip().startswith('#')]
-        if raw:
-            meta['exclude_globals'] = raw
-        else:
-            meta.pop('exclude_globals', None)
-        try:
-            p.write_text(json.dumps(data, indent=2))
-            status_var.set("Saved")
-        except Exception as e:
-            status_var.set(f"Write error: {e}")
+        raw = [
+            l.strip()
+            for l in txt.get('1.0','end-1c').splitlines()
+            if l.strip() and not l.strip().startswith('#')
+        ]
+        ok = service.set_exclusions(current_id[0], raw)
+        status_var.set("Saved" if ok else "Write error")
 
     tk.Button(topf, text="Load", command=_load).pack(side='left', padx=6)
     tk.Button(topf, text="Save", command=_save).pack(side='left')
