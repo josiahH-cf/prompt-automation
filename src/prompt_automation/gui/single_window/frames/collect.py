@@ -123,7 +123,7 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     template_id = template.get("id")
 
     def open_exclusions():
-        if hasattr(app, "edit_exclusions") and template_id is not None:
+        if template_id is not None:
             app.edit_exclusions(template_id)
 
     tk.Button(btn_bar, text="Exclusions", command=open_exclusions).pack(

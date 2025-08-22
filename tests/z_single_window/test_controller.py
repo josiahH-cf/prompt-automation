@@ -108,3 +108,22 @@ def test_service_exception_triggers_dialog_and_log(monkeypatch):
         assert len(saves) == 1
     finally:
         cleanup()
+
+
+def test_edit_exclusions_delegates(monkeypatch):
+    _install_tk(monkeypatch)
+    controller, cleanup = _load_controller(monkeypatch)
+    called = []
+
+    def fake_dialog(root, service, tid):
+        service.load_exclusions(tid)
+
+    monkeypatch.setattr(controller, "exclusions_dialog", fake_dialog)
+    fake_service = types.SimpleNamespace(load_exclusions=lambda tid: called.append(tid))
+    monkeypatch.setattr(controller, "exclusions_service", fake_service)
+    try:
+        app = controller.SingleWindowApp()
+        app.edit_exclusions(7)
+        assert called == [7]
+    finally:
+        cleanup()
