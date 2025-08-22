@@ -255,3 +255,30 @@ def test_global_reference_memory(monkeypatch, collect_module):
     view2 = collect.build(app, template)
     bind2 = view2.bindings["_global_reference"]
     assert bind2["path_var"].get() == "/picked/path"
+
+
+def test_label_precedence_over_name(monkeypatch, collect_module):
+    collect, _ = collect_module
+    labels = []
+
+    class RecordingLabel(_Widget):
+        def __init__(self, master=None, **kw):
+            super().__init__(master, **kw)
+            labels.append(kw.get("text"))
+
+    tk_mod = sys.modules["tkinter"]
+    monkeypatch.setattr(tk_mod, "Label", RecordingLabel)
+
+    app = types.SimpleNamespace(
+        root=object(),
+        back_to_select=lambda: None,
+        advance_to_review=lambda v: None,
+        edit_exclusions=lambda tid: None,
+    )
+    template = {
+        "id": 1,
+        "placeholders": [{"name": "orig", "label": "shown"}],
+    }
+    collect.build(app, template)
+    assert "shown" in labels
+    assert "orig" not in labels
