@@ -13,8 +13,8 @@ if TYPE_CHECKING:  # pragma: no cover - for type hints only
 def open_preview(parent: "tk.Tk", entry: TemplateEntry) -> None:
     """Display a read-only preview of a template."""
     import tkinter as tk
-    from tkinter import messagebox
     from ..fonts import get_display_font
+    from ...error_dialogs import show_error
 
     try:
         tmpl = entry.data
@@ -30,4 +30,4 @@ def open_preview(parent: "tk.Tk", entry: TemplateEntry) -> None:
         preview.transient(parent)
         preview.grab_set()
     except Exception as e:  # pragma: no cover - GUI error path
-        messagebox.showerror("Preview Error", str(e))
+        show_error("Preview Error", str(e))
