@@ -59,6 +59,7 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             ):
                 _append_to_files(variables, rendered)
             log_usage(template, len(rendered))
+            copy_to_clipboard(rendered)
             app.finish(rendered)
 
         def cancel() -> None:
@@ -131,6 +132,7 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
         ):
             _append_to_files(variables, final_text)
         log_usage(template, len(final_text))
+        copy_to_clipboard(final_text)
         app.finish(final_text)
 
     def cancel() -> None:
