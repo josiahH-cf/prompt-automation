@@ -13,6 +13,7 @@ from ....config import PROMPTS_DIR
 from ....renderer import load_template
 from ....services.template_search import list_templates, resolve_shortcut
 from ....services import multi_select as multi_select_service
+from ...constants import INSTR_SELECT_SHORTCUTS
 
 
 def build(app) -> Any:  # pragma: no cover - Tk runtime
@@ -28,6 +29,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
             "selected": [],
             "preview": "",
         }
+        instr = {"text": INSTR_SELECT_SHORTCUTS}
 
         def _refresh() -> None:
             state["paths"] = list_templates(state["query"], state["recursive"])
@@ -89,12 +91,16 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
             select=select,
             combine=combine,
             state=state,
+            instructions=instr,
         )
 
     frame = tk.Frame(app.root)
     frame.pack(fill="both", expand=True)
 
     tk.Label(frame, text="Select Template", font=("Arial", 14, "bold")).pack(pady=(12, 4))
+    tk.Label(frame, text=INSTR_SELECT_SHORTCUTS, anchor="w", fg="#444").pack(
+        fill="x", padx=12
+    )
 
     search_bar = tk.Frame(frame)
     search_bar.pack(fill="x", padx=12)

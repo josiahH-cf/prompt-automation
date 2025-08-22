@@ -12,9 +12,19 @@ INSTR_FINISH_COPY_AGAIN = (
 )
 INFO_CLOSE_SAVE = "Ctrl+Enter/Esc = Close & Save"
 
+# Legends for single-window frame shortcuts.
+INSTR_SELECT_SHORTCUTS = (
+    "Enter = Next   |   digits = Quick select   |   shortcut keys"
+)
+INSTR_COLLECT_SHORTCUTS = (
+    "Ctrl+Enter = Review   |   Ctrl+S = Skip   |   Esc = Cancel"
+)
+
 __all__ = [
     "INSTR_ACCEPT_RESET_REFRESH_CANCEL",
     "INSTR_FINISH_COPY_CLOSE",
     "INSTR_FINISH_COPY_AGAIN",
     "INFO_CLOSE_SAVE",
+    "INSTR_SELECT_SHORTCUTS",
+    "INSTR_COLLECT_SHORTCUTS",
 ]
