@@ -17,6 +17,8 @@ from typing import Any, Dict, Optional
 from ...errorlog import get_logger
 from .geometry import load_geometry, save_geometry
 from .frames import select, collect, review
+from ..selector.view.exclusions import edit_exclusions as exclusions_dialog
+from ...services import exclusions as exclusions_service
 
 
 class SingleWindowApp:
@@ -110,6 +112,19 @@ class SingleWindowApp:
                 save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+
+    def edit_exclusions(self, template_id: int) -> None:
+        """Open the exclusions editor for ``template_id``."""
+        try:
+            try:
+                exclusions_dialog(self.root, exclusions_service, template_id)
+            except TypeError:
+                exclusions_dialog(self.root, exclusions_service)  # type: ignore[misc]
+        except Exception as e:
+            self._log.error("Exclusions editor failed: %s", e, exc_info=True)
+            from tkinter import messagebox
+
+            messagebox.showerror("Error", f"Failed to edit exclusions:\n{e}")
 
     def finish(self, final_text: str) -> None:
         self.final_text = final_text
