@@ -1,6 +1,14 @@
-"""Ensure single-window frames expose shortcut legends."""
+"""Ensure single-window frames expose shortcut legends.
+
+Adds src path like other tests so running file directly works without
+PYTHONPATH modifications.
+"""
 import sys
 import types
+from pathlib import Path
+
+# Ensure local src is importable when test executed in isolation
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 
 def _install_tk(monkeypatch, missing=()):

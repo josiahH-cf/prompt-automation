@@ -112,7 +112,8 @@ def test_shortcut_keys(monkeypatch, review_module):
     monkeypatch.setattr(review, "log_usage", lambda *a, **k: None)
     monkeypatch.setattr(review, "_append_to_files", lambda *a, **k: None)
     tkstub.messagebox.askyesno = lambda *a, **k: False
-    monkeypatch.setattr(review, "copy_to_clipboard", lambda txt: copied.setdefault("text", txt))
+    # Patch safe_copy_to_clipboard to simulate success path and record text
+    monkeypatch.setattr(review, "safe_copy_to_clipboard", lambda txt: (copied.setdefault("text", txt) or True))
     view = review.build(app, template, {})
     assert {"<Control-Return>", "<Control-Shift-c>", "<Escape>"} <= set(view.bindings)
     view.bindings["<Control-Shift-c>"]()
@@ -136,7 +137,7 @@ def test_finish_copies_to_clipboard(monkeypatch, review_module):
     monkeypatch.setattr(review, "_append_to_files", lambda *a, **k: None)
     tkstub.messagebox.askyesno = lambda *a, **k: False
     monkeypatch.setattr(
-        review, "copy_to_clipboard", lambda txt: events.append(("copy", txt))
+        review, "safe_copy_to_clipboard", lambda txt: (events.append(("copy", txt)) or True)
     )
     view = review.build(app, template, {})
     view.finish()

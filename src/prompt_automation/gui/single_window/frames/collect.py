@@ -26,7 +26,12 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     # Headless test stub: provide legend text without constructing widgets
     if not hasattr(tk, "Canvas"):
         instr = {"text": INSTR_COLLECT_SHORTCUTS}
-        return types.SimpleNamespace(instructions=instr)
+        # Provide minimal bindings map for tests (Ctrl+Enter review stub)
+        bindings = {}
+        def _review_stub():
+            return None
+        bindings["<Control-Return>"] = _review_stub
+        return types.SimpleNamespace(instructions=instr, bindings=bindings)
 
     frame = tk.Frame(app.root)
     frame.pack(fill="both", expand=True)
@@ -203,6 +208,13 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     widgets["_global_reference"] = ref_frame
 
     tk.Button(btn_bar, text="Review ▶", command=review).pack(side="right", padx=12)
+
+    # Key bindings (stage-level): Ctrl+Enter = Review, Esc = Back
+    try:
+        app.root.bind("<Control-Return>", lambda e: (review(), "break"))
+        app.root.bind("<Escape>", lambda e: (go_back(), "break"))
+    except Exception:
+        pass
 
     return types.SimpleNamespace(
         frame=frame,

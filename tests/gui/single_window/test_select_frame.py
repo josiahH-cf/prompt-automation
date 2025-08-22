@@ -126,6 +126,20 @@ def test_preview_updates(monkeypatch):
     _restore_tk(real_tk)
 
 
+def test_preview_clears_when_selection_empty(monkeypatch):
+    real_tk = _stub_tk()
+    paths = [Path("a.json")]  # single path for simplicity
+    monkeypatch.setattr(select, "list_templates", lambda search="", recursive=True: paths)
+    monkeypatch.setattr(select, "load_template", lambda p: {"template": ["LINE"]})
+    app = types.SimpleNamespace(root=object(), advance_to_collect=lambda data: None)
+    view = select.build(app)
+    view.select([0])
+    assert view.state["preview"] == "LINE"
+    view.select([])
+    assert view.state["preview"] == ""
+    _restore_tk(real_tk)
+
+
 def test_preview_error_handling(monkeypatch):
     real_tk = _stub_tk()
 

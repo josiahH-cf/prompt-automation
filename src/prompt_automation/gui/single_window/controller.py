@@ -22,7 +22,7 @@ from ...services import exclusions as exclusions_service
 from ...services import overrides as selector_service
 from ..selector import view as selector_view_module
 from .. import options_menu
-from ..error_dialogs import show_error
+from ..error_dialogs import show_error, safe_copy_to_clipboard
 from ...shortcuts import load_shortcuts
 
 
@@ -40,11 +40,19 @@ class SingleWindowApp:
         self.root.minsize(960, 640)
         self.root.resizable(True, True)
 
-        self._accelerators = options_menu.configure_options_menu(
-            self.root, selector_view_module, selector_service
+        # Current stage name (select|collect|review) and view object returned
+        # by the frame builder (namespace or dict). Kept for per-stage menu
+        # dynamic commands.
+        self._stage: str | None = None
+        self._current_view: Any | None = None
+
+        # Build initial menu (will be rebuilt on each stage swap to ensure
+        # per-stage actions are exposed consistently).
+        self._bind_accelerators(
+            options_menu.configure_options_menu(
+                self.root, selector_view_module, selector_service, extra_items=self._stage_extra_items
+            )
         )
-        for seq, func in self._accelerators.items():
-            self.root.bind(seq, lambda e, f=func: (f(), "break"))
 
         # Global shortcut help (F1)
         self.root.bind("<F1>", lambda e: (self._show_shortcuts(), "break"))
@@ -70,11 +78,68 @@ class SingleWindowApp:
             except Exception:
                 pass
 
+    # --- Menu / accelerator handling ----------------------------------------
+    def _bind_accelerators(self, mapping: Dict[str, Any]) -> None:
+        # Unconditional bind (tk replaces existing). Wrap each to return break
+        for seq, func in mapping.items():
+            self.root.bind(seq, lambda e, f=func: (f(), "break"))
+        self._accelerators = mapping
+
+    def _rebuild_menu(self) -> None:
+        try:
+            mapping = options_menu.configure_options_menu(
+                self.root,
+                selector_view_module,
+                selector_service,
+                extra_items=self._stage_extra_items,
+            )
+        except Exception as e:  # pragma: no cover - defensive
+            self._log.error("Menu rebuild failed: %s", e, exc_info=True)
+            return
+        self._bind_accelerators(mapping)
+
+    # Extra items injected into the Options menu: reflect current stage.
+    def _stage_extra_items(self, opt_menu, menubar) -> None:  # pragma: no cover - GUI heavy
+        import tkinter as tk
+        stage = self._stage or "?"
+        # Show a disabled header for clarity
+        opt_menu.add_separator()
+        opt_menu.add_command(label=f"Stage: {stage}", state="disabled")
+        # Stage specific utilities
+        try:
+            if stage == "collect" and getattr(self, "template", None):
+                tid = self.template.get("id") if isinstance(self.template, dict) else None
+                if tid is not None:
+                    opt_menu.add_command(
+                        label="Edit template exclusions",
+                        command=lambda tid=tid: self.edit_exclusions(tid),
+                    )
+                if self._current_view and hasattr(self._current_view, "review"):
+                    opt_menu.add_command(
+                        label="Review ▶",
+                        command=lambda: self._current_view.review(),  # type: ignore[attr-defined]
+                    )
+            elif stage == "review" and self._current_view:
+                # Provide copy / finish commands mirroring toolbar buttons.
+                if hasattr(self._current_view, "copy"):
+                    opt_menu.add_command(
+                        label="Copy (stay)",
+                        command=lambda: self._current_view.copy(),  # type: ignore[attr-defined]
+                    )
+                if hasattr(self._current_view, "finish"):
+                    opt_menu.add_command(
+                        label="Finish (copy & close)",
+                        command=lambda: self._current_view.finish(),  # type: ignore[attr-defined]
+                    )
+        except Exception as e:
+            self._log.error("Stage extra menu items failed: %s", e, exc_info=True)
+
     def start(self) -> None:
         """Enter stage 1 (template selection)."""
         self._clear_content()
+        self._stage = "select"
         try:
-            select.build(self)
+            self._current_view = select.build(self)
         except Exception as e:
             self._log.error("Template selection failed: %s", e, exc_info=True)
             show_error("Error", f"Failed to open template selector:\n{e}")
@@ -85,12 +150,14 @@ class SingleWindowApp:
                 save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+        self._rebuild_menu()
 
     def advance_to_collect(self, template: Dict[str, Any]) -> None:
         self.template = template
         self._clear_content()
+        self._stage = "collect"
         try:
-            collect.build(self, template)
+            self._current_view = collect.build(self, template)
         except Exception as e:
             self._log.error("Variable collection failed: %s", e, exc_info=True)
             show_error("Error", f"Failed to collect variables:\n{e}")
@@ -101,6 +168,7 @@ class SingleWindowApp:
                 save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+        self._rebuild_menu()
 
     def back_to_select(self) -> None:
         self.start()
@@ -108,8 +176,9 @@ class SingleWindowApp:
     def advance_to_review(self, variables: Dict[str, Any]) -> None:
         self.variables = variables
         self._clear_content()
+        self._stage = "review"
         try:
-            review.build(self, self.template, variables)
+            self._current_view = review.build(self, self.template, variables)
         except Exception as e:
             self._log.error("Review window failed: %s", e, exc_info=True)
             show_error("Error", f"Failed to open review window:\n{e}")
@@ -120,6 +189,7 @@ class SingleWindowApp:
                 save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+        self._rebuild_menu()
 
     def edit_exclusions(self, template_id: int) -> None:
         """Open the exclusions editor for ``template_id``."""

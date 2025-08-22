@@ -56,8 +56,12 @@ def _copy_system(text: str, os_name: str) -> bool:
     return False
 
 
-def copy_to_clipboard(text: str) -> None:
-    """Copy text to clipboard without simulating paste keystroke."""
+def copy_to_clipboard(text: str) -> bool:
+    """Copy text to clipboard without simulating paste keystroke.
+
+    Returns True on success, False if all strategies failed. Previous callers
+    ignored the return value so this is a backward‑compatible enhancement.
+    """
     os_name = platform.system()
     copied = False
     try:
@@ -70,7 +74,8 @@ def copy_to_clipboard(text: str) -> None:
         copied = _copy_system(text, os_name)
     if not copied:
         print("[prompt-automation] Unable to copy text to clipboard. See error log.")
-        return
+        return False
+    return True
 
 
 def paste_text(text: str) -> None:
@@ -87,7 +92,7 @@ def paste_text(text: str) -> None:
         copied = _copy_system(text, os_name)
     if not copied:
         print("[prompt-automation] Unable to copy text to clipboard. See error log.")
-        return
+    return
 
     try:
         if os_name == "Windows":

@@ -9,7 +9,8 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from ....renderer import fill_placeholders
-from ....paste import copy_to_clipboard
+from ....paste import copy_to_clipboard  # legacy direct copy
+from ...error_dialogs import safe_copy_to_clipboard
 from ...constants import INSTR_FINISH_COPY_AGAIN, INSTR_FINISH_COPY_CLOSE
 from ...file_append import _append_to_files
 from ....logger import log_usage
@@ -42,7 +43,9 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             status["text"] = msg
 
         def do_copy() -> None:
-            copy_to_clipboard(rendered)
+            # Attempt resilient copy first; fallback to legacy util
+            if not safe_copy_to_clipboard(rendered):
+                copy_to_clipboard(rendered)
             _set_status("Copied ✔")
             instr["text"] = INSTR_FINISH_COPY_AGAIN
 
@@ -50,7 +53,8 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             if not has_paths:
                 return
             paths = [str(v) for k, v in variables.items() if k.endswith("_path") and v]
-            copy_to_clipboard("\n".join(paths))
+            if not safe_copy_to_clipboard("\n".join(paths)):
+                copy_to_clipboard("\n".join(paths))
             _set_status("Paths Copied ✔")
 
         def finish() -> None:
@@ -59,7 +63,8 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             ):
                 _append_to_files(variables, rendered)
             log_usage(template, len(rendered))
-            copy_to_clipboard(rendered)
+            if not safe_copy_to_clipboard(rendered):
+                copy_to_clipboard(rendered)
             app.finish(rendered)
 
         def cancel() -> None:
@@ -115,14 +120,18 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
         app.root.after(3000, lambda: status_var.set(""))
 
     def do_copy() -> None:
-        copy_to_clipboard(text.get("1.0", "end-1c"))
+        content = text.get("1.0", "end-1c")
+        if not safe_copy_to_clipboard(content):
+            copy_to_clipboard(content)
         _set_status("Copied ✔")
         instr_var.set(INSTR_FINISH_COPY_AGAIN)
 
     def copy_paths() -> None:
         paths = [str(v) for k, v in variables.items() if k.endswith("_path") and v]
         if paths:
-            copy_to_clipboard("\n".join(paths))
+            payload = "\n".join(paths)
+            if not safe_copy_to_clipboard(payload):
+                copy_to_clipboard(payload)
             _set_status("Paths Copied ✔")
 
     def finish() -> None:
@@ -132,7 +141,8 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
         ):
             _append_to_files(variables, final_text)
         log_usage(template, len(final_text))
-        copy_to_clipboard(final_text)
+        if not safe_copy_to_clipboard(final_text):
+            copy_to_clipboard(final_text)
         app.finish(final_text)
 
     def cancel() -> None:
@@ -152,7 +162,14 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
     app.root.bind("<Control-Shift-c>", lambda e: (do_copy(), "break"))
     app.root.bind("<Escape>", lambda e: (cancel(), "break"))
 
-    return {"frame": frame, "copy_paths_btn": copy_paths_btn}
+    # Expose functions so controller can surface in per-stage menu
+    return {
+        "frame": frame,
+        "copy_paths_btn": copy_paths_btn,
+        "copy": do_copy,
+        "finish": finish,
+        "cancel": cancel,
+    }
 
 
 __all__ = ["build"]

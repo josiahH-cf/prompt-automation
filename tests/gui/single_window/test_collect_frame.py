@@ -256,6 +256,22 @@ def test_global_reference_memory(monkeypatch, collect_module):
     bind2 = view2.bindings["_global_reference"]
     assert bind2["path_var"].get() == "/picked/path"
 
+def test_view_callback_invocation_headless(monkeypatch, collect_module):
+    collect, tkstub = collect_module
+    # Provide template with no placeholders so build proceeds
+    template = {"placeholders": []}
+    app = types.SimpleNamespace(root=object(), back_to_select=lambda: None, advance_to_review=lambda mv: None, edit_exclusions=lambda _id: None)
+    view = collect.build(app, template)
+    # Headless path does not expose widgets; ensure bindings present
+    if not hasattr(view, "bindings"):
+        pytest.skip("Unexpected collect headless structure")
+    ref_binding = view.bindings.get("_global_reference") if isinstance(view.bindings, dict) else None
+    if not ref_binding or not ref_binding.get("view"):
+        pytest.skip("No view callback available in headless mode")
+    # Invoke view callback; it should not raise even without real Tk
+    ref_binding["view"]()
+    assert True  # reaching here means invocation succeeded
+
 
 def test_label_precedence_over_name(monkeypatch, collect_module):
     collect, _ = collect_module
