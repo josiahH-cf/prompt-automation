@@ -64,6 +64,8 @@ def test_single_window_output_matches_legacy(monkeypatch):
 
     _install_tk(monkeypatch)
 
+    fake_vf = types.SimpleNamespace(build_widget=lambda spec: (lambda m: None, {}))
+    monkeypatch.setitem(sys.modules, "prompt_automation.services.variable_form", fake_vf)
     import prompt_automation.gui.single_window.controller as controller
     from prompt_automation.gui.single_window.frames import review as review_frame
     from prompt_automation.menus import render_template
@@ -72,6 +74,7 @@ def test_single_window_output_matches_legacy(monkeypatch):
     # avoid file system interactions
     monkeypatch.setattr(controller, "load_geometry", lambda: "100x100")
     monkeypatch.setattr(controller, "save_geometry", lambda g: None)
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
     monkeypatch.setattr(review_frame, "log_usage", lambda *a, **k: None)
     monkeypatch.setattr(review_frame, "_append_to_files", lambda *a, **k: None)
 
@@ -108,10 +111,13 @@ def test_single_window_cancel_flow(monkeypatch):
 
     _install_tk(monkeypatch)
 
+    fake_vf = types.SimpleNamespace(build_widget=lambda spec: (lambda m: None, {}))
+    monkeypatch.setitem(sys.modules, "prompt_automation.services.variable_form", fake_vf)
     import prompt_automation.gui.single_window.controller as controller
 
     monkeypatch.setattr(controller, "load_geometry", lambda: "100x100")
     monkeypatch.setattr(controller, "save_geometry", lambda g: None)
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
 
     template = {"id": 1, "template": [], "placeholders": []}
     variables = {}

@@ -14,6 +14,8 @@ def _install_tk(monkeypatch):
         def __init__(self):
             self.children = {}
             self._geom = "111x222"
+            self.bound = {}
+            self.menu = None
         def title(self, *a, **k):
             pass
         def geometry(self, g=None):
@@ -36,6 +38,8 @@ def _install_tk(monkeypatch):
             pass
         def destroy(self):
             pass
+        def bind(self, seq, func):
+            self.bound[seq] = func
     stub = types.ModuleType("tkinter")
     stub.Tk = DummyTk
     stub.messagebox = types.SimpleNamespace(showerror=lambda *a, **k: calls.append((a, k)))
@@ -54,6 +58,7 @@ def _load_controller(monkeypatch):
         "prompt_automation.gui.single_window.frames.collect",
         "prompt_automation.gui.single_window.frames.review",
         "prompt_automation.gui.single_window.frames",
+        "prompt_automation.gui.options_menu",
     ]
     def cleanup():
         for m in mods:
@@ -69,6 +74,7 @@ def test_stage_swap_persists_geometry(monkeypatch):
     _install_tk(monkeypatch)
     controller, cleanup = _load_controller(monkeypatch)
     saves = []
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
     monkeypatch.setattr(controller, "save_geometry", lambda g: saves.append(g))
     monkeypatch.setattr(controller.select, "build", lambda app: None)
     monkeypatch.setattr(controller.collect, "build", lambda app, t: None)
@@ -88,6 +94,7 @@ def test_service_exception_triggers_dialog_and_log(monkeypatch):
     stub, calls = _install_tk(monkeypatch)
     controller, cleanup = _load_controller(monkeypatch)
     logs = []
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
     class StubLogger:
         def error(self, msg, *args, **kwargs):
             logs.append({"msg": msg, "args": args, "kwargs": kwargs})
@@ -114,6 +121,7 @@ def test_edit_exclusions_delegates(monkeypatch):
     _install_tk(monkeypatch)
     controller, cleanup = _load_controller(monkeypatch)
     called = []
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
 
     def fake_dialog(root, service, tid):
         service.load_exclusions(tid)
@@ -125,5 +133,26 @@ def test_edit_exclusions_delegates(monkeypatch):
         app = controller.SingleWindowApp()
         app.edit_exclusions(7)
         assert called == [7]
+    finally:
+        cleanup()
+
+
+def test_options_menu_accelerators_bound(monkeypatch):
+    _install_tk(monkeypatch)
+    controller, cleanup = _load_controller(monkeypatch)
+    called = []
+
+    def fake_configure(root, *a, **k):
+        root.menu = "menubar"
+        return {"<Control-x>": lambda: called.append("x")}
+
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", fake_configure)
+    try:
+        app = controller.SingleWindowApp()
+        assert getattr(app.root, "menu") == "menubar"
+        assert "<Control-x>" in app.root.bound
+        result = app.root.bound["<Control-x>"](None)
+        assert called == ["x"]
+        assert result == (None, "break")
     finally:
         cleanup()
