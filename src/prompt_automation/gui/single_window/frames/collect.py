@@ -49,7 +49,7 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         name = ph.get("name") if isinstance(ph, dict) else None
         if not name:
             continue
-        tk.Label(inner, text=name, anchor="w").grid(
+        tk.Label(inner, text=ph.get("label", name), anchor="w").grid(
             row=row, column=0, sticky="w", padx=6, pady=4
         )
         ctor, bind = variable_form_factory(ph)
