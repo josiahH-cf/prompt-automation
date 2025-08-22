@@ -18,6 +18,7 @@ from .collector import collect_variables_gui
 from .review_window import review_output_gui
 from . import single_window
 from .file_append import _append_to_files
+from .error_dialogs import show_error
 
 
 class PromptGUI:
@@ -91,11 +92,10 @@ class PromptGUI:
             self._log.error("GUI workflow failed: %s", e, exc_info=True)
             try:
                 import tkinter as tk
-                from tkinter import messagebox
 
                 root = tk.Tk()
                 root.withdraw()
-                messagebox.showerror(
+                show_error(
                     "Error",
                     f"An error occurred in the GUI:\n\n{e}\n\nCheck logs for details.",
                 )

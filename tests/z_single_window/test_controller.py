@@ -8,8 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 def _install_tk(monkeypatch):
-    """Install a minimal tkinter stub capturing messagebox calls."""
-    calls = []
+    """Install a minimal tkinter stub for headless tests."""
     class DummyTk:
         def __init__(self):
             self.children = {}
@@ -42,9 +41,13 @@ def _install_tk(monkeypatch):
             self.bound[seq] = func
     stub = types.ModuleType("tkinter")
     stub.Tk = DummyTk
-    stub.messagebox = types.SimpleNamespace(showerror=lambda *a, **k: calls.append((a, k)))
+    stub.messagebox = types.SimpleNamespace(
+        showerror=lambda *a, **k: None,
+        showinfo=lambda *a, **k: None,
+        askyesno=lambda *a, **k: False,
+    )
     monkeypatch.setitem(sys.modules, "tkinter", stub)
-    return stub, calls
+    return stub
 
 
 def _load_controller(monkeypatch):
@@ -91,7 +94,7 @@ def test_stage_swap_persists_geometry(monkeypatch):
 
 
 def test_service_exception_triggers_dialog_and_log(monkeypatch):
-    stub, calls = _install_tk(monkeypatch)
+    _install_tk(monkeypatch)
     controller, cleanup = _load_controller(monkeypatch)
     logs = []
     monkeypatch.setattr(controller.options_menu, "configure_options_menu", lambda *a, **k: {})
@@ -105,12 +108,14 @@ def test_service_exception_triggers_dialog_and_log(monkeypatch):
     def bad_collect(app, t):
         raise RuntimeError("boom")
     monkeypatch.setattr(controller.collect, "build", bad_collect)
+    called = []
+    monkeypatch.setattr(controller, "show_error", lambda *a, **k: called.append((a, k)))
     try:
         app = controller.SingleWindowApp()
         app.start()
         with pytest.raises(RuntimeError):
             app.advance_to_collect({})
-        assert calls and "boom" in calls[0][0][1]
+        assert called and "boom" in called[0][0][1]
         assert logs and logs[0]["kwargs"].get("exc_info")
         assert len(saves) == 1
     finally:

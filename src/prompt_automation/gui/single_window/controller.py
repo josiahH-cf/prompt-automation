@@ -22,6 +22,7 @@ from ...services import exclusions as exclusions_service
 from ...services import overrides as selector_service
 from ..selector import view as selector_view_module
 from .. import options_menu
+from ..error_dialogs import show_error
 
 
 class SingleWindowApp:
@@ -72,9 +73,7 @@ class SingleWindowApp:
             select.build(self)
         except Exception as e:
             self._log.error("Template selection failed: %s", e, exc_info=True)
-            from tkinter import messagebox
-
-            messagebox.showerror("Error", f"Failed to open template selector:\n{e}")
+            show_error("Error", f"Failed to open template selector:\n{e}")
             raise
         else:
             try:
@@ -90,9 +89,7 @@ class SingleWindowApp:
             collect.build(self, template)
         except Exception as e:
             self._log.error("Variable collection failed: %s", e, exc_info=True)
-            from tkinter import messagebox
-
-            messagebox.showerror("Error", f"Failed to collect variables:\n{e}")
+            show_error("Error", f"Failed to collect variables:\n{e}")
             raise
         else:
             try:
@@ -111,9 +108,7 @@ class SingleWindowApp:
             review.build(self, self.template, variables)
         except Exception as e:
             self._log.error("Review window failed: %s", e, exc_info=True)
-            from tkinter import messagebox
-
-            messagebox.showerror("Error", f"Failed to open review window:\n{e}")
+            show_error("Error", f"Failed to open review window:\n{e}")
             raise
         else:
             try:
@@ -131,9 +126,7 @@ class SingleWindowApp:
                 exclusions_dialog(self.root, exclusions_service)  # type: ignore[misc]
         except Exception as e:
             self._log.error("Exclusions editor failed: %s", e, exc_info=True)
-            from tkinter import messagebox
-
-            messagebox.showerror("Error", f"Failed to edit exclusions:\n{e}")
+            show_error("Error", f"Failed to edit exclusions:\n{e}")
 
     def finish(self, final_text: str) -> None:
         self.final_text = final_text
