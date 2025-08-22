@@ -89,7 +89,9 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
     frame.pack(fill="both", expand=True)
 
     instr_var = tk.StringVar(value=INSTR_FINISH_COPY_CLOSE)
-    tk.Label(frame, textvariable=instr_var, anchor="w").pack(fill="x", pady=(12, 4), padx=12)
+    tk.Label(frame, textvariable=instr_var, anchor="w", fg="#444").pack(
+        fill="x", pady=(12, 4), padx=12
+    )
 
     text_frame = tk.Frame(frame)
     text_frame.pack(fill="both", expand=True, padx=12, pady=8)
