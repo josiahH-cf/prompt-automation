@@ -16,6 +16,7 @@ def _install_tk(monkeypatch):
         def __init__(self):
             self.children = {}
             self._geom = "200x100"
+            self.bound = {}
 
         def title(self, *_a, **_k):
             pass
@@ -51,6 +52,9 @@ def _install_tk(monkeypatch):
 
         def mainloop(self):
             pass
+
+        def bind(self, seq, func):
+            self.bound[seq] = func
 
     stub = types.ModuleType("tkinter")
     stub.Tk = DummyTk

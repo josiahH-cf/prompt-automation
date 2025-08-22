@@ -23,6 +23,7 @@ from ...services import overrides as selector_service
 from ..selector import view as selector_view_module
 from .. import options_menu
 from ..error_dialogs import show_error
+from ...shortcuts import load_shortcuts
 
 
 class SingleWindowApp:
@@ -44,6 +45,9 @@ class SingleWindowApp:
         )
         for seq, func in self._accelerators.items():
             self.root.bind(seq, lambda e, f=func: (f(), "break"))
+
+        # Global shortcut help (F1)
+        self.root.bind("<F1>", lambda e: (self._show_shortcuts(), "break"))
 
         self.template: Optional[Dict[str, Any]] = None
         self.variables: Optional[Dict[str, Any]] = None
@@ -127,6 +131,18 @@ class SingleWindowApp:
         except Exception as e:
             self._log.error("Exclusions editor failed: %s", e, exc_info=True)
             show_error("Error", f"Failed to edit exclusions:\n{e}")
+
+    def _show_shortcuts(self) -> None:
+        """Display configured template shortcuts in a simple dialog."""
+        from tkinter import messagebox
+
+        mapping = load_shortcuts()
+        if not mapping:
+            msg = "No shortcuts configured."
+        else:
+            lines = [f"{k}: {v}" for k, v in sorted(mapping.items())]
+            msg = "\n".join(lines)
+        messagebox.showinfo("Shortcuts", msg)
 
     def finish(self, final_text: str) -> None:
         self.final_text = final_text

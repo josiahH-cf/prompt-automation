@@ -161,3 +161,23 @@ def test_options_menu_accelerators_bound(monkeypatch):
         assert result == (None, "break")
     finally:
         cleanup()
+
+
+def test_f1_binding_opens_shortcuts_dialog(monkeypatch):
+    tk = _install_tk(monkeypatch)
+    controller, cleanup = _load_controller(monkeypatch)
+    called = []
+
+    def fake_configure(root, *a, **k):
+        return {}
+
+    monkeypatch.setattr(controller.options_menu, "configure_options_menu", fake_configure)
+    monkeypatch.setattr(controller, "load_shortcuts", lambda: {"1": "a.json"})
+    tk.messagebox.showinfo = lambda title, msg: called.append((title, msg))
+    try:
+        app = controller.SingleWindowApp()
+        assert "<F1>" in app.root.bound
+        app.root.bound["<F1>"](None)
+        assert called and called[0][0] == "Shortcuts"
+    finally:
+        cleanup()
