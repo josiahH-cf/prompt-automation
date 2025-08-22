@@ -121,3 +121,23 @@ def test_shortcut_keys(monkeypatch, review_module):
     assert finished["text"] == "bye"
     view.bindings["<Escape>"]()
     assert cancelled["called"]
+
+
+def test_finish_copies_to_clipboard(monkeypatch, review_module):
+    review, tkstub = review_module
+    events = []
+    app = types.SimpleNamespace(
+        root=object(),
+        finish=lambda text: events.append(("finish", text)),
+        cancel=lambda: None,
+    )
+    template = {"template": ["hi"]}
+    monkeypatch.setattr(review, "log_usage", lambda *a, **k: None)
+    monkeypatch.setattr(review, "_append_to_files", lambda *a, **k: None)
+    tkstub.messagebox.askyesno = lambda *a, **k: False
+    monkeypatch.setattr(
+        review, "copy_to_clipboard", lambda txt: events.append(("copy", txt))
+    )
+    view = review.build(app, template, {})
+    view.finish()
+    assert events == [("copy", "hi"), ("finish", "hi")]
