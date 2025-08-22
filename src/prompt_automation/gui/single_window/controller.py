@@ -19,6 +19,9 @@ from .geometry import load_geometry, save_geometry
 from .frames import select, collect, review
 from ..selector.view.exclusions import edit_exclusions as exclusions_dialog
 from ...services import exclusions as exclusions_service
+from ...services import overrides as selector_service
+from ..selector import view as selector_view_module
+from .. import options_menu
 
 
 class SingleWindowApp:
@@ -34,6 +37,12 @@ class SingleWindowApp:
         self.root.geometry(load_geometry())
         self.root.minsize(960, 640)
         self.root.resizable(True, True)
+
+        self._accelerators = options_menu.configure_options_menu(
+            self.root, selector_view_module, selector_service
+        )
+        for seq, func in self._accelerators.items():
+            self.root.bind(seq, lambda e, f=func: (f(), "break"))
 
         self.template: Optional[Dict[str, Any]] = None
         self.variables: Optional[Dict[str, Any]] = None
