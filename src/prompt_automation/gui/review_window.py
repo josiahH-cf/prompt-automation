@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..menus import render_template
 from .. import paste
+from ..variables.storage import is_auto_copy_enabled_for_template, get_setting_auto_copy_review  # type: ignore
 from .constants import INSTR_FINISH_COPY_CLOSE, INSTR_FINISH_COPY_AGAIN
 
 
@@ -66,6 +67,27 @@ def review_output_gui(template, variables):
     # Insert rendered text
     text_widget.insert("1.0", rendered_text)
     text_widget.focus_set()
+
+    # --- Auto-copy feature (global + per-template) -------------------------
+    try:  # best effort, never raise
+        tid = None
+        try:
+            tid = template.get("id") if isinstance(template, dict) else None
+        except Exception:
+            tid = None
+        if is_auto_copy_enabled_for_template(tid):
+            did = False
+            try:
+                paste.copy_to_clipboard(rendered_text); did = True
+            except Exception:
+                pass
+            if did:
+                status_var.set("Copied to clipboard ✔")
+                instructions_var.set(
+                    "Copied automatically. You can keep editing. " + INSTR_FINISH_COPY_AGAIN
+                )
+    except Exception:
+        pass
 
     # Button frame
     button_frame = tk.Frame(main_frame)

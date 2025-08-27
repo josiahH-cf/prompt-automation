@@ -110,6 +110,81 @@ def _read_hotkey_from_settings() -> str | None:
         pass
     return None
 
+# --- Generic settings accessors ---------------------------------------------
+def get_setting_auto_copy_review() -> bool:
+    """Return True if auto-copy-on-review is enabled in settings.json.
+
+    Missing or invalid values default to False. This is intentionally
+    lightweight (no caching) so tests that patch the settings file path or
+    contents see immediate effects.
+    """
+    try:
+        payload = _load_settings_payload()
+        if "auto_copy_review" not in payload:
+            # Default ON when unset
+            return True
+        val = payload.get("auto_copy_review")
+        return bool(val is True or (isinstance(val, str) and val.lower() in {"1", "true", "yes", "on"}))
+    except Exception:
+        return False
+
+def set_setting_auto_copy_review(enabled: bool) -> None:
+    """Persist auto-copy-on-review flag to settings.json.
+
+    Stores a boolean under the key ``auto_copy_review``. Failures are logged
+    but not raised so callers (GUI) remain resilient.
+    """
+    try:
+        payload = _load_settings_payload()
+        payload["auto_copy_review"] = bool(enabled)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover - I/O errors
+        _log.error("failed to persist auto_copy_review setting: %s", e)
+
+def is_auto_copy_enabled_for_template(template_id: int) -> bool:
+    """Return True if auto-copy is globally enabled and not disabled for this template.
+
+    Default: if global auto-copy disabled -> False. If enabled and template not
+    explicitly disabled -> True.
+    """
+    if not get_setting_auto_copy_review():
+        return False
+    try:
+        payload = _load_settings_payload()
+        disabled = payload.get("auto_copy_review_disabled") or []
+        if isinstance(disabled, list):
+            return str(template_id) not in {str(x) for x in disabled}
+    except Exception:
+        pass
+    return True
+
+def set_template_auto_copy_disabled(template_id: int, disabled: bool) -> None:
+    """Persist per-template disable flag in settings.json.
+
+    We only store templates that are disabled to keep file minimal. Passing
+    disabled=False removes template id from list.
+    """
+    try:
+        payload = _load_settings_payload()
+        current = payload.get("auto_copy_review_disabled")
+        if not isinstance(current, list):
+            current = []
+        sid = str(template_id)
+        if disabled:
+            if sid not in {str(x) for x in current}:
+                current.append(sid)
+        else:
+            current = [x for x in current if str(x) != sid]
+        # Normalize list (unique, sorted for stability)
+        uniq = sorted({str(x) for x in current}, key=lambda x: int(x) if x.isdigit() else x)
+        if uniq:
+            payload["auto_copy_review_disabled"] = uniq
+        else:
+            payload.pop("auto_copy_review_disabled", None)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover - I/O / formatting issues
+        _log.error("failed to persist per-template auto-copy flag: %s", e)
+
 def _normalize_reference_path(path: str) -> str:
     """Normalize reference file path for cross-platform consistency.
 

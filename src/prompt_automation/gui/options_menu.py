@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict
 
 from ..errorlog import get_logger
 from .constants import INFO_CLOSE_SAVE
+from ..variables import storage as _storage
 
 _log = get_logger(__name__)
 
@@ -71,6 +72,72 @@ def configure_options_menu(
             _log.error("Edit exclusions failed: %s", e)
     opt.add_command(label="Edit global exclusions", command=_edit_exclusions)
     opt.add_separator()
+
+    # Auto-copy on review toggle (copies rendered output immediately when entering review stage)
+    def _toggle_auto_copy():
+        try:
+            current = _storage.get_setting_auto_copy_review()
+            _storage.set_setting_auto_copy_review(not current)
+            # If enabling while currently in review, perform immediate copy
+            try:
+                ctrl = getattr(root, '_controller', None)
+                if ctrl and getattr(ctrl, '_stage', None) == 'review' and not current:
+                    view = getattr(ctrl, '_current_view', None)
+                    if view and hasattr(view, 'copy'):
+                        try: view.copy()  # type: ignore[attr-defined]
+                        except Exception: pass
+                    # Rebuild menu to refresh labels
+                    if hasattr(ctrl, '_rebuild_menu'):
+                        try: ctrl._rebuild_menu()
+                        except Exception: pass
+            except Exception:
+                pass
+        except Exception as e:
+            _log.error("toggle auto_copy_review failed: %s", e)
+    # Present current state in label for quick visibility
+    try:
+        if _storage.get_setting_auto_copy_review():
+            ac_label = "Disable auto-copy on review"
+        else:
+            ac_label = "Enable auto-copy on review"
+    except Exception:
+        ac_label = "Toggle auto-copy on review"
+    opt.add_command(label=ac_label, command=_toggle_auto_copy)
+    # Per-template toggle appears only when a template is active in review stage (controller injects Stage label afterwards)
+    try:
+        # Controller sets root._controller with template attr; best-effort introspection
+        ctrl = getattr(root, '_controller', None)
+        tmpl = getattr(ctrl, 'template', None)
+        tid = tmpl.get('id') if isinstance(tmpl, dict) else None
+        if tid is not None:
+            if _storage.is_auto_copy_enabled_for_template(tid):
+                tlabel = 'Disable auto-copy for this template'
+            else:
+                tlabel = 'Enable auto-copy for this template'
+            def _toggle_template():
+                try:
+                    dis = _storage.is_auto_copy_enabled_for_template(tid)
+                    # Passing current state disables if enabled, enables if disabled
+                    _storage.set_template_auto_copy_disabled(tid, dis)
+                    # If enabling now (previously disabled), perform immediate copy
+                    if dis is False:  # it was disabled, now being enabled
+                        try:
+                            ctrl2 = getattr(root, '_controller', None)
+                            view2 = getattr(ctrl2, '_current_view', None)
+                            if view2 and hasattr(view2, 'copy'):
+                                view2.copy()  # type: ignore[attr-defined]
+                        except Exception:
+                            pass
+                    # Refresh menu labels
+                    ctrl3 = getattr(root, '_controller', None)
+                    if ctrl3 and hasattr(ctrl3, '_rebuild_menu'):
+                        try: ctrl3._rebuild_menu()
+                        except Exception: pass
+                except Exception as e:
+                    _log.error('toggle per-template auto-copy failed: %s', e)
+            opt.add_command(label=tlabel, command=_toggle_template)
+    except Exception:
+        pass
 
     # New template wizard
     def _open_wizard():

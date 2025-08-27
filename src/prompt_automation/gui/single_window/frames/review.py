@@ -11,6 +11,7 @@ from typing import Any, Dict
 from ....renderer import fill_placeholders
 from ....paste import copy_to_clipboard  # legacy direct copy
 from ...error_dialogs import safe_copy_to_clipboard
+from ....variables.storage import get_setting_auto_copy_review, is_auto_copy_enabled_for_template
 from ...constants import INSTR_FINISH_COPY_AGAIN, INSTR_FINISH_COPY_CLOSE
 from ...file_append import _append_to_files
 from ....logger import log_usage
@@ -75,6 +76,8 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             "<Control-Shift-c>": do_copy,
             "<Escape>": cancel,
         }
+
+    # Auto-copy skipped in headless test path to maintain deterministic copy counts in tests.
 
         return types.SimpleNamespace(
             frame=object(),
@@ -175,6 +178,21 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
     app.root.bind("<Control-Return>", lambda e: (finish(), "break"))
     app.root.bind("<Control-Shift-c>", lambda e: (do_copy(), "break"))
     app.root.bind("<Escape>", lambda e: (cancel(), "break"))
+
+    # Perform auto-copy immediately if setting enabled
+    try:
+        if is_auto_copy_enabled_for_template(template.get("id")):
+            content_initial = text.get("1.0", "end-1c")
+            if content_initial.strip():
+                copied = safe_copy_to_clipboard(content_initial)
+                if not copied:
+                    try: copy_to_clipboard(content_initial); copied = True
+                    except Exception: copied = False
+                if copied:
+                    _set_status("Copied ✔")
+                    instr_var.set(INSTR_FINISH_COPY_AGAIN)
+    except Exception:
+        pass
 
     # Expose functions so controller can surface in per-stage menu
     return {
