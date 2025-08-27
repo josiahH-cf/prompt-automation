@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 from ...errorlog import get_logger
 from .geometry import load_geometry, save_geometry
 from .frames import select, collect, review
+from . import singleton
 from ..selector.view.exclusions import edit_exclusions as exclusions_dialog
 from ...services import exclusions as exclusions_service
 from ...services import overrides as selector_service
@@ -40,6 +41,16 @@ class SingleWindowApp:
         self.root.minsize(960, 640)
         self.root.resizable(True, True)
 
+        # Launch lightweight singleton server so subsequent invocations
+        # (e.g. global hotkey) can focus this instance instead of
+        # spawning duplicates. Best effort only; failures are silent.
+        try:  # pragma: no cover - thread / socket runtime
+            # When a new invocation (hotkey) signals this instance to focus,
+            # also attempt to focus the template list if we're on the select stage.
+            singleton.start_server(lambda: (self._focus_and_raise(), self._focus_first_template_widget()))
+        except Exception:
+            pass
+
         # Current stage name (select|collect|review) and view object returned
         # by the frame builder (namespace or dict). Kept for per-stage menu
         # dynamic commands.
@@ -60,6 +71,7 @@ class SingleWindowApp:
         self.template: Optional[Dict[str, Any]] = None
         self.variables: Optional[Dict[str, Any]] = None
         self.final_text: Optional[str] = None
+        self._cycling: bool = False  # guard against concurrent cycle attempts
 
         def _on_close() -> None:
             try:
@@ -150,6 +162,11 @@ class SingleWindowApp:
                 save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+        # Defer focus so nested widgets are realized
+        try:
+            self.root.after(40, self._focus_first_template_widget)
+        except Exception:
+            pass
         self._rebuild_menu()
 
     def advance_to_collect(self, template: Dict[str, Any]) -> None:
@@ -215,11 +232,63 @@ class SingleWindowApp:
         messagebox.showinfo("Shortcuts", msg)
 
     def finish(self, final_text: str) -> None:
+        # Cycle back asynchronously to avoid re-entrancy freezes on
+        # some Tk builds when destroying widgets inside the original
+        # event callback (e.g. Ctrl+Enter binding).
         self.final_text = final_text
+
+        def _do_cycle():  # pragma: no cover - trivial logic
+            if self._cycling:
+                return
+            self._cycling = True
+            try:
+                self.template = None
+                self.variables = None
+                # Proactively remove any stale bindings that may reference
+                # destroyed widgets before we rebuild.
+                try:
+                    for seq in list(getattr(self, "_accelerators", {}).keys()):
+                        self.root.unbind(seq)
+                except Exception:
+                    pass
+                # Rebuild select stage
+                self.start()
+                try:
+                    self.root.update_idletasks()
+                except Exception:
+                    pass
+                # Small delayed focus to allow geometry/layout settle
+                try:
+                    self.root.after(50, lambda: (self._focus_and_raise(), self._attempt_initial_focus(), self._focus_first_template_widget()))
+                except Exception:
+                    self._focus_and_raise(); self._attempt_initial_focus(); self._focus_first_template_widget()
+            except Exception:
+                try:
+                    self.root.quit()
+                finally:
+                    try:
+                        self.root.destroy()
+                    except Exception:
+                        pass
+            finally:
+                # Allow future cycles after loop returns to idle
+                def _clear_flag():
+                    self._cycling = False
+                try:
+                    self.root.after(10, _clear_flag)
+                except Exception:
+                    self._cycling = False
+
+        # Schedule with a short delay to ensure the originating Ctrl+Enter
+        # binding callback has fully unwound across platforms (avoids some
+        # rare focus / event queue stalls observed on Windows/macOS).
         try:
-            self.root.quit()
-        finally:
-            self.root.destroy()
+            self.root.after(75, _do_cycle)
+        except Exception:
+            try:
+                self.root.after(0, _do_cycle)
+            except Exception:
+                _do_cycle()
 
     def cancel(self) -> None:
         self.final_text = None
@@ -240,6 +309,79 @@ class SingleWindowApp:
                     save_geometry(self.root.winfo_geometry())
             except Exception:
                 pass
+
+    # --- Focus helpers ----------------------------------------------------
+    def _focus_and_raise(self) -> None:
+        """Force the window to foreground (best effort)."""
+        try:  # pragma: no cover - GUI runtime
+            self.root.lift()
+            self.root.focus_force()
+            try:
+                self.root.attributes('-topmost', True)
+                # after delay drop topmost so normal stacking resumes
+                self.root.after(150, lambda: self.root.attributes('-topmost', False))
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _attempt_initial_focus(self) -> None:  # pragma: no cover - GUI runtime
+        """Give initial keyboard focus to first suitable widget after cycle.
+
+        The select frame may auto-select the first template; ensuring the
+        listbox (or any widget with focus_set) receives focus avoids the
+        appearance of a frozen window where keystrokes are ignored.
+        """
+        try:
+            # Heuristic: focus first child widget that has focus_set
+            for child in self.root.children.values():
+                if hasattr(child, "focus_set"):
+                    try:
+                        child.focus_set()
+                        break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    def _focus_first_template_widget(self) -> None:  # pragma: no cover - GUI runtime
+        """Focus the first template listbox (selection stage) if present.
+
+        Recursively searches descendants for a Tk Listbox and sets focus.
+        Safe to call in any stage; no-op if not found.
+        """
+        if self._stage != "select":
+            return
+        try:
+            # Prefer the search query entry if available for immediate typing
+            entry = getattr(self, '_select_query_entry', None)
+            if entry is not None and hasattr(entry, 'focus_set'):
+                try:
+                    entry.focus_set()
+                    return
+                except Exception:
+                    pass
+            def _recurse(w):
+                try:
+                    children = w.winfo_children()
+                except Exception:
+                    return False
+                for c in children:
+                    try:
+                        if getattr(c, 'winfo_class', lambda: '')() == 'Listbox':
+                            try:
+                                c.focus_set()
+                            except Exception:
+                                pass
+                            return True
+                    except Exception:
+                        pass
+                    if _recurse(c):
+                        return True
+                return False
+            _recurse(self.root)
+        except Exception:
+            pass
 
 
 __all__ = ["SingleWindowApp"]

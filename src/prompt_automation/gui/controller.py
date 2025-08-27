@@ -55,6 +55,14 @@ class PromptGUI:
             if os.environ.get("PROMPT_AUTOMATION_FORCE_LEGACY") != "1":
                 # --- Single-window path (default) ------------------------------------
                 self._log.info("Starting GUI workflow (single-window mode)")
+                # If another instance is running, request focus & exit
+                try:
+                    from .single_window import singleton as _sw_singleton
+                    if _sw_singleton.connect_and_focus_if_running():
+                        self._log.info("Existing GUI instance focused (singleton)")
+                        return
+                except Exception:
+                    pass
                 single_started = False
                 try:
                     app = single_window.SingleWindowApp(); single_started = True

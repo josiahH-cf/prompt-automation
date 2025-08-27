@@ -22,8 +22,8 @@ def _update_linux(hotkey: str) -> None:
         f"matches:\n"
         f"  - trigger: \"{trigger}\"\n"
         f"    run: |\n"
-        f"      # Try GUI first, fall back to terminal\n"
-        f"      prompt-automation --gui || prompt-automation --terminal\n"
+        f"      # Focus existing window if present; else launch GUI; fallback terminal\n"
+        f"      prompt-automation --focus || prompt-automation --gui || prompt-automation --terminal\n"
         f"    propagate: false\n"
     )
     yaml_path.write_text(yaml_content)

@@ -97,5 +97,136 @@ def __getattr__(name):  # pragma: no cover - dynamic export
         return SelectorView
     raise AttributeError(name)
 
+# ---------------------------------------------------------------------------
+# Backwards compatibility shims expected by options_menu.configure_options_menu
+# These lightweight implementations are only invoked in GUI environments; they
+# fail silently (logged) if tkinter unavailable. Keeping them here avoids
+# circular imports with legacy controller code that previously provided them.
+
+def _manage_shortcuts(root, service):  # pragma: no cover - GUI heavy
+    try:
+        import tkinter as tk  # type: ignore
+        from tkinter import ttk, messagebox  # ttk provides Treeview
+        from ....shortcuts import load_shortcuts, save_shortcuts, renumber_templates
+    except Exception:
+        # silently abort if GUI not available
+        return
+
+    win = tk.Toplevel(root)
+    win.title("Shortcut Manager")
+    win.geometry("620x420")
+    frame = tk.Frame(win, padx=10, pady=10)
+    frame.pack(fill="both", expand=True)
+    tk.Label(frame, text="Configure digit -> template shortcuts (double click digit to edit)").pack(anchor="w")
+
+    shortcuts = load_shortcuts()
+
+    # Fallback to simple listbox if ttk.Treeview missing
+    has_tree = hasattr(ttk, "Treeview")
+    tree = None
+    listbox = None
+    if has_tree:
+        cols = ("digit", "template")
+        tree = ttk.Treeview(frame, columns=cols, show="headings")  # type: ignore
+        tree.heading("digit", text="Digit")
+        tree.heading("template", text="Template (relative path)")
+        tree.column("digit", width=60, anchor="center")
+        tree.column("template", width=440, anchor="w")
+        vs = tk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vs.set)
+        tree.pack(side="left", fill="both", expand=True, pady=(6,4))
+        vs.pack(side="right", fill="y", pady=(6,4))
+    else:  # pragma: no cover - unlikely path
+        listbox = tk.Listbox(frame)
+        listbox.pack(fill="both", expand=True, pady=(6,4))
+
+    def _refresh():
+        ordered = sorted(shortcuts.items(), key=lambda kv: (len(kv[0]), kv[0]))
+        if tree:
+            tree.delete(*tree.get_children())  # type: ignore
+            for d, path in ordered:
+                tree.insert("", "end", values=(d, path))  # type: ignore
+        elif listbox:
+            listbox.delete(0, 'end')
+            for d, path in ordered:
+                listbox.insert('end', f"{d}: {path}")
+    _refresh()
+
+    def _edit(event=None):
+        if tree:
+            sel = tree.selection()  # type: ignore
+            if not sel:
+                return
+            item = tree.item(sel[0])  # type: ignore
+            digit, path = item["values"]
+        else:
+            cur = listbox.curselection() if listbox else []
+            if not cur:
+                return
+            line = listbox.get(cur[0])  # type: ignore
+            digit, path = line.split(':',1)
+            path = path.strip()
+        dlg = tk.Toplevel(win)
+        dlg.title(f"Edit Shortcut {digit}")
+        tk.Label(dlg, text=f"Digit {digit}").pack(padx=8, pady=(8,4))
+        var = tk.StringVar(value=path)
+        ent = tk.Entry(dlg, textvariable=var, width=50)
+        ent.pack(padx=8, pady=4)
+        def _ok():
+            new = var.get().strip()
+            if new:
+                shortcuts[str(digit)] = new
+                save_shortcuts(shortcuts)
+                _refresh()
+            dlg.destroy()
+        tk.Button(dlg, text="Save", command=_ok).pack(side="left", padx=8, pady=8)
+        tk.Button(dlg, text="Cancel", command=dlg.destroy).pack(side="left", padx=4, pady=8)
+        ent.focus_set()
+        dlg.bind('<Return>', lambda e: (_ok(),'break'))
+        dlg.bind('<Escape>', lambda e: (dlg.destroy(),'break'))
+    if tree:
+        tree.bind('<Double-1>', _edit)  # type: ignore
+    elif listbox:
+        listbox.bind('<Double-1>', _edit)  # type: ignore
+
+    def _add():
+        for i in range(1,10):
+            if str(i) not in shortcuts:
+                shortcuts[str(i)] = ''
+                break
+        save_shortcuts(shortcuts); _refresh()
+
+    def _remove():
+        if tree:
+            sel = tree.selection()  # type: ignore
+            if not sel:
+                return
+            digit = tree.item(sel[0])["values"][0]  # type: ignore
+        else:
+            sel = listbox.curselection() if listbox else []
+            if not sel:
+                return
+            digit = listbox.get(sel[0]).split(':',1)[0]  # type: ignore
+        if digit in shortcuts:
+            shortcuts.pop(str(digit), None)
+            save_shortcuts(shortcuts); _refresh()
+
+    def _renumber():
+        try:
+            updated, applied = renumber_templates(shortcuts)
+            shortcuts.clear(); shortcuts.update(updated)
+            _refresh()
+            messagebox.showinfo("Renumber", f"Applied IDs: {len(applied)}")
+        except Exception as e:
+            messagebox.showerror("Renumber", f"Failed: {e}")
+
+    btns = tk.Frame(win); btns.pack(fill='x', pady=(4,2))
+    tk.Button(btns, text="Add", command=_add).pack(side='left')
+    tk.Button(btns, text="Remove", command=_remove).pack(side='left', padx=(6,0))
+    tk.Button(btns, text="Renumber", command=_renumber).pack(side='left', padx=(6,0))
+    tk.Button(btns, text="Close", command=win.destroy).pack(side='right')
+    win.bind('<Escape>', lambda e: (win.destroy(),'break'))
+
+
 
 __all__ = ["open_template_selector", "SelectorView"]

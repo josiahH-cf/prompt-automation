@@ -108,7 +108,6 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     entry = tk.Entry(search_bar, textvariable=query)
     entry.pack(side="left", fill="x", expand=True)
     recursive_var = tk.BooleanVar(value=True)
-    tk.Checkbutton(search_bar, text="Recursive", variable=recursive_var, command=lambda: refresh()).pack(side="right")
 
     main = tk.Frame(frame)
     main.pack(fill="both", expand=True)
@@ -170,6 +169,8 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     next_btn = tk.Button(btn_bar, text="Next ▶", command=proceed)
     next_btn.pack(side="right", padx=4)
     tk.Button(btn_bar, text="Combine ▶", command=combine_action).pack(side="right", padx=4)
+    # Moved from search bar: easier tab navigation entry -> listbox without checkbox in between.
+    tk.Checkbutton(btn_bar, text="Recursive Search", variable=recursive_var, command=lambda: refresh()).pack(side="right", padx=8)
 
     entry.bind("<KeyRelease>", refresh)
     listbox.bind("<Return>", proceed)
@@ -209,6 +210,11 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
         preview.config(state="disabled")
 
     refresh()
+    # Expose search entry on app for focus preference when snapping back
+    try:
+        setattr(app, '_select_query_entry', entry)
+    except Exception:
+        pass
     if rel_map:
         listbox.selection_set(0)
         listbox.activate(0)

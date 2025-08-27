@@ -93,6 +93,9 @@ class PromptCLI:
             "--terminal", action="store_true", help="Force terminal mode instead of GUI"
         )
         parser.add_argument(
+            "--focus", action="store_true", help="Focus existing GUI instance if running (no new window)"
+        )
+        parser.add_argument(
             "--update", "-u", action="store_true", help="Check for and apply updates"
         )
         parser.add_argument(
@@ -213,7 +216,7 @@ class PromptCLI:
             return
 
         gui_mode = not args.terminal and (
-            args.gui or os.environ.get("PROMPT_AUTOMATION_GUI") != "0"
+            args.gui or os.environ.get("PROMPT_AUTOMATION_GUI") != "0" or args.focus
         )
 
         self._log.info("running on %s", platform.platform())
@@ -226,8 +229,15 @@ class PromptCLI:
         manifest_update.check_and_prompt()
 
         if gui_mode:
+            # Fast path: --focus attempts to bring existing singleton window to front
+            if args.focus:
+                try:
+                    from ..gui.single_window import singleton as _sw_singleton
+                    if _sw_singleton.connect_and_focus_if_running():
+                        return
+                except Exception:
+                    pass
             from .. import gui
-
             gui.run()
             return
 

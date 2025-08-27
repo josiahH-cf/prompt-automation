@@ -10,6 +10,12 @@ from typing import List
 from .linux import _update_linux
 from .macos import _update_macos
 from .windows import _update_windows
+try:
+    # Lazy import so that tests can patch storage internals; optional at runtime
+    from ..variables.storage import _read_hotkey_from_settings  # type: ignore
+except Exception:  # pragma: no cover - defensive
+    def _read_hotkey_from_settings():  # type: ignore
+        return None
 
 CONFIG_DIR = Path.home() / ".prompt-automation"
 HOTKEY_FILE = CONFIG_DIR / "hotkey.json"
@@ -177,9 +183,17 @@ class HotkeyManager:
     def get_current_hotkey() -> str:
         """Get the currently configured hotkey."""
         if not HOTKEY_FILE.exists():
-            return "ctrl+shift+j"  # Default
+            # Fall back to settings.json provided default hotkey or project default
+            hk = _read_hotkey_from_settings()
+            return hk or "ctrl+shift+j"
         try:
             config = json.loads(HOTKEY_FILE.read_text())
-            return config.get("hotkey", "ctrl+shift+j")
+            hk = config.get("hotkey")
+            if isinstance(hk, str) and hk.strip():
+                return hk.strip()
+            # If file malformed / blank, fallback to settings-defined default
+            settings_default = _read_hotkey_from_settings()
+            return settings_default or "ctrl+shift+j"
         except Exception:
-            return "ctrl+shift+j"
+            settings_default = _read_hotkey_from_settings()
+            return settings_default or "ctrl+shift+j"

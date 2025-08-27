@@ -40,39 +40,75 @@ def _write_settings_payload(payload: Dict[str, Any]) -> None:
         _log.error("failed to write settings file: %s", e)
 
 def _sync_settings_from_overrides(overrides: Dict[str, Any]) -> None:
-    """Persist override template entries into settings file.
+    """Persist selected override data into settings file.
 
-    Layout inside settings.json::
-      {
-        "file_overrides": {"templates": { "<id>": {"<name>": {"path":...,"skip":bool}}}},
-        "generated": true
-      }
+    We intentionally mirror only *stable* user editable sections so that
+    version controlled settings can provide defaults while local runtime
+    state (placeholder-overrides.json) remains the source of truth for
+    ephemeral fields. Currently mirrored:
+
+    - file_overrides.templates
+    - global_files (reference file selections)
+
+    A future extension may include additional explicit keys; keep this
+    focused to avoid surprising churn in user-maintained settings.
     """
     payload = _load_settings_payload()
     file_overrides = payload.setdefault("file_overrides", {})
     file_overrides["templates"] = overrides.get("templates", {})
+    # Mirror global reference file selections (if any)
+    gfiles = overrides.get("global_files") or {}
+    if gfiles:
+        payload["global_files"] = {k: v for k, v in gfiles.items() if k == "reference_file" and isinstance(v, str)}
     payload.setdefault("metadata", {})["last_sync"] = platform.platform()
     _write_settings_payload(payload)
 
 def _merge_overrides_with_settings(overrides: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge settings file values into overrides (settings take precedence for path/skip).
+    """Merge editable settings values into overrides object.
 
-    Returns merged dict (does not mutate original input).
+    Precedence rules:
+      - settings.json "file_overrides.templates" entries override local
+        placeholder path/skip for each template/placeholder.
+      - settings.json "global_files.reference_file" overrides local
+        global reference file selection (useful to provide a default
+        checked into a repo without touching user state).
     """
     settings_payload = _load_settings_payload()
-    settings_templates = settings_payload.get("file_overrides", {}).get("templates", {})
-    if not settings_templates:
-        return overrides
     merged = json.loads(json.dumps(overrides))  # deep copy via json
-    tmap = merged.setdefault("templates", {})
-    for tid, entries in settings_templates.items():
-        target = tmap.setdefault(tid, {})
-        for name, info in entries.items():
-            if isinstance(info, dict):
-                filtered = {k: info[k] for k in ("path", "skip") if k in info}
-                if filtered:
-                    target[name] = {**target.get(name, {}), **filtered}
+    # --- Merge file overrides -------------------------------------------------
+    settings_templates = settings_payload.get("file_overrides", {}).get("templates", {})
+    if isinstance(settings_templates, dict):
+        tmap = merged.setdefault("templates", {})
+        for tid, entries in settings_templates.items():
+            if not isinstance(entries, dict):
+                continue
+            target = tmap.setdefault(tid, {})
+            for name, info in entries.items():
+                if isinstance(info, dict):
+                    filtered = {k: info[k] for k in ("path", "skip") if k in info}
+                    if filtered:
+                        target[name] = {**target.get(name, {}), **filtered}
+    # --- Merge global reference file -----------------------------------------
+    gfiles_settings = settings_payload.get("global_files", {})
+    if isinstance(gfiles_settings, dict) and isinstance(gfiles_settings.get("reference_file"), str):
+        merged.setdefault("global_files", {})["reference_file"] = gfiles_settings["reference_file"]
     return merged
+
+def _read_hotkey_from_settings() -> str | None:
+    """Return hotkey value from settings.json if defined.
+
+    This accessor is intentionally kept lightweight (no caching) so that
+    test patches of _SETTINGS_FILE take effect immediately. Returns None
+    if file missing or key absent/invalid.
+    """
+    try:
+        payload = _load_settings_payload()
+        hk = payload.get("hotkey")
+        if isinstance(hk, str) and hk.strip():
+            return hk.strip()
+    except Exception:
+        pass
+    return None
 
 def _normalize_reference_path(path: str) -> str:
     """Normalize reference file path for cross-platform consistency.

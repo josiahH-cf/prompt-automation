@@ -11,7 +11,7 @@ def _update_macos(hotkey: str) -> None:  # pragma: no cover - macOS specific
     applescript_content = (
         'on run\n'
         '    try\n'
-        '        do shell script "prompt-automation --gui &"\n'
+    '        do shell script "prompt-automation --focus || prompt-automation --gui &"\n'
         '    on error\n'
         '        try\n'
         '            do shell script "prompt-automation --terminal &"\n'
