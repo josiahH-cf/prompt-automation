@@ -45,13 +45,14 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         fill="x", padx=12
     )
 
-    canvas = tk.Canvas(frame, borderwidth=0)
+    canvas = tk.Canvas(frame, borderwidth=0, highlightthickness=0)
     inner = tk.Frame(canvas)
     vsb = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=vsb.set)
     canvas.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=8)
     vsb.pack(side="right", fill="y", padx=(0, 12), pady=8)
-    canvas.create_window((0, 0), window=inner, anchor="nw")
+    # Keep window id so we can stretch inner frame to canvas width on resize
+    inner_win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
 
     widgets: Dict[str, tk.Widget] = {}
     bindings: Dict[str, Dict[str, Any]] = {}
@@ -59,33 +60,69 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     if not isinstance(placeholders, list):
         placeholders = []
 
+    label_widgets = []  # track to update wraplength on resize
+
+    focus_chain = []  # ordered list of focusable input widgets
     for row, ph in enumerate(placeholders):
         name = ph.get("name") if isinstance(ph, dict) else None
         if not name:
             continue
-        tk.Label(inner, text=ph.get("label", name), anchor="w").grid(
-            row=row, column=0, sticky="w", padx=6, pady=4
-        )
+        lbl = tk.Label(inner, text=ph.get("label", name), anchor="w", justify="left")
+        lbl.grid(row=row, column=0, sticky="nw", padx=6, pady=4)
+        label_widgets.append(lbl)
+
         ctor, bind = variable_form_factory(ph)
         widget = ctor(inner)
         widgets[name] = widget
         bindings[name] = bind
 
-        if bind.get("path_var") is not None:
+        # Determine widget type/layout
+        is_text = False
+        try:  # pragma: no cover
+            import tkinter as _tk
+            is_text = isinstance(widget, _tk.Text)
+        except Exception:
+            pass
+
+        if is_text:
+            label_lines = (ph.get("label", "") or "").count("\n") + 1
+            base_height = max(6, min(18, label_lines + 6))
+            try:
+                widget.configure(wrap="word", height=base_height)
+            except Exception:
+                pass
+            try:
+                sb = _tk.Scrollbar(inner, orient="vertical", command=widget.yview)
+                widget.configure(yscrollcommand=sb.set)
+                widget.grid(row=row, column=1, sticky="nsew", padx=(6, 0), pady=4)
+                sb.grid(row=row, column=2, sticky="ns", padx=(0, 6), pady=4)
+                inner.rowconfigure(row, weight=1)
+                inner.columnconfigure(1, weight=1)
+            except Exception:
+                widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
+            focus_chain.append(widget)
+        elif bind.get("path_var") is not None:
             widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
             entry = getattr(widget, "entry", None)
             browse_btn = getattr(widget, "browse_btn", None)
             skip_btn = getattr(widget, "skip_btn", None)
             if entry:
                 entry.pack(side="left", fill="x", expand=True)
+                focus_chain.append(entry)
             if browse_btn:
                 browse_btn.pack(side="left", padx=2)
             if skip_btn:
                 skip_btn.pack(side="left", padx=2)
             if bind.get("view") and hasattr(widget, "view_btn"):
                 widget.view_btn.pack(side="left", padx=2)  # type: ignore[attr-defined]
-        else:
+        else:  # single-line entry
             widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
+            try:
+                import tkinter as _tk2
+                if isinstance(widget, _tk2.Entry):
+                    focus_chain.append(widget)
+            except Exception:
+                pass
             if bind.get("remember_var") is not None:
                 tk.Checkbutton(
                     inner,
@@ -93,6 +130,7 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                     variable=bind.get("remember_var"),
                 ).grid(row=row, column=2, padx=6, pady=4, sticky="w")
 
+        # Override reset (applies to file placeholders currently)
         if ph.get("override"):
             tk.Label(inner, text="*", fg="red").grid(row=row, column=3, padx=2)
 
@@ -104,19 +142,58 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                 b.get("persist", lambda: None)()
 
             bind["reset"] = _reset
-            tk.Button(inner, text="Reset", command=_reset).grid(
-                row=row, column=4, padx=2
-            )
+            tk.Button(inner, text="Reset", command=_reset).grid(row=row, column=4, padx=2)
 
         if row == 0 and hasattr(widget, "focus_set"):
             widget.focus_set()
 
-    inner.columnconfigure(1, weight=1)
+    # Allow both columns to stretch; col1 (inputs) gets higher weight
+    inner.columnconfigure(0, weight=1)
+    inner.columnconfigure(1, weight=3)
 
     def _on_config(event=None):
+        # Update scroll region and ensure inner frame spans canvas width
         canvas.configure(scrollregion=canvas.bbox("all"))
+        try:
+            cwidth = canvas.winfo_width()
+            canvas.itemconfigure(inner_win_id, width=cwidth)
+        except Exception:
+            pass
+
+    def _update_label_wrap(event=None):  # pragma: no cover - resizing logic
+        """Dynamically size label wrap so text is never visually clipped.
+
+        Previous logic used a fixed percentage (45%) of the outer frame width
+        which could exceed the actual allocated grid column width (since
+        column 0 only has weight=1 vs column 1 weight=3). That caused the
+        label to request more horizontal pixels than the column owned; Tk
+        then clipped the rendered text producing the appearance of truncated
+        labels.  We instead derive a wrap length from the *actual* inner frame
+        width and the column weight ratios so the requested wrap never
+        exceeds available width.
+        """
+        try:
+            # Force geometry update so winfo_width() is current
+            frame.update_idletasks()
+            inner_w = max(1, inner.winfo_width())
+            # Column weight ratio: col0=1, col1=3 -> total=4
+            col0_width = inner_w * (1 / 4.0)
+            # Leave some padding so text doesn't butt up against the entry
+            usable = max(40, col0_width - 24)
+            # Clamp within sensible bounds; allow shrink below previous 180
+            # if window extremely narrow to avoid clipping.
+            wrap = int(min(640, usable))
+            for l in label_widgets:
+                try:
+                    l.configure(wraplength=wrap)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     inner.bind("<Configure>", lambda e: _on_config())
+    canvas.bind("<Configure>", lambda e: (_on_config(), _update_label_wrap()))
+    frame.bind("<Configure>", lambda e: _update_label_wrap())
 
     btn_bar = tk.Frame(frame)
     btn_bar.pack(fill="x", pady=(0, 8))
@@ -208,6 +285,43 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     widgets["_global_reference"] = ref_frame
 
     tk.Button(btn_bar, text="Review ▶", command=review).pack(side="right", padx=12)
+
+    # --- Focus traversal (Tab across all inputs incl. Text) -----------------
+    def _bind_tab_traversal(chain):  # pragma: no cover - runtime behaviour
+        if not chain:
+            return
+        # Normalize: replace container frames that hold an 'entry' attribute
+        # (file placeholders) with that entry widget so focus goes directly
+        # into the text field.
+        norm = []
+        for w in chain:
+            entry = getattr(w, "entry", None)
+            norm.append(entry if entry is not None else w)
+        chain = norm
+        for idx, w in enumerate(chain):
+            try:
+                # Forward Tab
+                def _next(event, i=idx):
+                    try:
+                        nxt = chain[(i + 1) % len(chain)]
+                        nxt.focus_set()
+                    except Exception:
+                        pass
+                    return "break"  # prevent Text from inserting tab
+                # Reverse (Shift+Tab)
+                def _prev(event, i=idx):
+                    try:
+                        prv = chain[(i - 1) % len(chain)]
+                        prv.focus_set()
+                    except Exception:
+                        pass
+                    return "break"
+                w.bind("<Tab>", _next)
+                w.bind("<Shift-Tab>", _prev)
+                w.bind("<ISO_Left_Tab>", _prev)  # some X11 platforms
+            except Exception:
+                pass
+    _bind_tab_traversal(focus_chain)
 
     # Key bindings (stage-level): Ctrl+Enter = Review, Esc = Back
     try:

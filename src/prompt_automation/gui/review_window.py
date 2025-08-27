@@ -37,6 +37,8 @@ def review_output_gui(template, variables):
     # Main frame
     main_frame = tk.Frame(root, padx=20, pady=20)
     main_frame.pack(fill="both", expand=True)
+    main_frame.rowconfigure(2, weight=1)
+    main_frame.columnconfigure(0, weight=1)
 
     # Instructions / status area (updated dynamically)
     instructions_var = tk.StringVar()
@@ -44,27 +46,22 @@ def review_output_gui(template, variables):
         "Edit the prompt below (this text is fully editable & will be copied). "
         + INSTR_FINISH_COPY_CLOSE
     )
-    instructions = tk.Label(
-        main_frame,
-        textvariable=instructions_var,
-        font=("Arial", 11),
-        justify="left",
-        anchor="w",
-        wraplength=760,
-    )
-    instructions.pack(fill="x", pady=(0, 8))
+    instructions = tk.Label(main_frame, textvariable=instructions_var, font=("Arial", 11), justify="left", anchor="w")
+    instructions.grid(row=0, column=0, sticky="we", pady=(0,8))
 
     # Text editor
     text_frame = tk.Frame(main_frame)
-    text_frame.pack(fill="both", expand=True, pady=(0, 10))
+    text_frame.grid(row=2, column=0, sticky="nsew", pady=(0,10))
+    text_frame.rowconfigure(0, weight=1)
+    text_frame.columnconfigure(0, weight=1)
 
     from .fonts import get_display_font
     text_widget = tk.Text(text_frame, font=get_display_font(master=root), wrap="word")
     scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
     text_widget.config(yscrollcommand=scrollbar.set)
 
-    text_widget.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+    text_widget.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=0, column=1, sticky="ns")
 
     # Insert rendered text
     text_widget.insert("1.0", rendered_text)
@@ -72,11 +69,12 @@ def review_output_gui(template, variables):
 
     # Button frame
     button_frame = tk.Frame(main_frame)
-    button_frame.pack(fill="x", pady=(4, 0))
+    button_frame.grid(row=3, column=0, sticky="we", pady=(4,0))
+    button_frame.columnconfigure(10, weight=1)
 
     status_var = tk.StringVar(value="")
     status_label = tk.Label(button_frame, textvariable=status_var, font=("Arial", 9), fg="#2d6a2d")
-    status_label.pack(side="right")
+    status_label.grid(row=0, column=10, sticky="e")
 
     def on_copy_only(event=None):
         text = text_widget.get("1.0", "end-1c")
@@ -117,7 +115,7 @@ def review_output_gui(template, variables):
         font=("Arial", 10),
         padx=16,
     )
-    copy_btn.pack(side="left", padx=(0, 8))
+    copy_btn.grid(row=0, column=0, padx=(0,8), sticky="w")
 
     confirm_btn = tk.Button(
         button_frame,
@@ -126,7 +124,7 @@ def review_output_gui(template, variables):
         font=("Arial", 10),
         padx=18,
     )
-    confirm_btn.pack(side="left", padx=(0, 8))
+    confirm_btn.grid(row=0, column=1, padx=(0,8), sticky="w")
 
     cancel_btn = tk.Button(
         button_frame,
@@ -135,7 +133,17 @@ def review_output_gui(template, variables):
         font=("Arial", 10),
         padx=18,
     )
-    cancel_btn.pack(side="left")
+    cancel_btn.grid(row=0, column=2, sticky="w")
+
+    # Responsive wraplength adjustments
+    def _on_resize(event=None):  # pragma: no cover - GUI runtime
+        try:
+            wrap = max(360, root.winfo_width() - 120)
+            instructions.configure(wraplength=wrap)
+        except Exception:
+            pass
+    root.bind("<Configure>", lambda e: _on_resize())
+    _on_resize()
 
     # Keyboard bindings
     root.bind("<Control-Return>", on_confirm)

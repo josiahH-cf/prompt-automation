@@ -93,27 +93,31 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
     # ------------------------------------------------------------------
     frame = tk.Frame(app.root)
     frame.pack(fill="both", expand=True)
+    frame.rowconfigure(1, weight=1)  # text area expands
+    frame.columnconfigure(0, weight=1)
 
     instr_var = tk.StringVar(value=INSTR_FINISH_COPY_CLOSE)
-    tk.Label(frame, textvariable=instr_var, anchor="w", fg="#444").pack(
-        fill="x", pady=(12, 4), padx=12
-    )
+    instr_lbl = tk.Label(frame, textvariable=instr_var, anchor="w", fg="#444", justify="left")
+    instr_lbl.grid(row=0, column=0, sticky="we", pady=(12,4), padx=12)
 
     text_frame = tk.Frame(frame)
-    text_frame.pack(fill="both", expand=True, padx=12, pady=8)
+    text_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
+    text_frame.rowconfigure(0, weight=1)
+    text_frame.columnconfigure(0, weight=1)
 
-    text = tk.Text(text_frame, wrap="word")
+    text = tk.Text(text_frame, wrap="word", undo=True)
     scroll = tk.Scrollbar(text_frame, command=text.yview)
     text.configure(yscrollcommand=scroll.set)
-    text.pack(side="left", fill="both", expand=True)
-    scroll.pack(side="right", fill="y")
+    text.grid(row=0, column=0, sticky="nsew")
+    scroll.grid(row=0, column=1, sticky="ns")
     text.insert("1.0", rendered)
     text.focus_set()
 
     status_var = tk.StringVar(value="")
     btn_bar = tk.Frame(frame)
-    btn_bar.pack(fill="x", pady=(0, 8))
-    tk.Label(btn_bar, textvariable=status_var, anchor="w").pack(side="left", padx=12)
+    btn_bar.grid(row=2, column=0, sticky="we", pady=(0,8))
+    btn_bar.columnconfigure(0, weight=1)
+    tk.Label(btn_bar, textvariable=status_var, anchor="w").grid(row=0, column=0, sticky="w", padx=12)
 
     def _set_status(msg: str) -> None:
         status_var.set(msg)
@@ -149,14 +153,24 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
         app.cancel()
 
     copy_btn = tk.Button(btn_bar, text="Copy", command=do_copy)
-    copy_btn.pack(side="right", padx=4)
+    copy_btn.grid(row=0, column=99, sticky="e", padx=4)
     if has_paths:
         copy_paths_btn = tk.Button(btn_bar, text="Copy Paths", command=copy_paths)
-        copy_paths_btn.pack(side="right", padx=4)
+        copy_paths_btn.grid(row=0, column=98, sticky="e", padx=4)
     else:
         copy_paths_btn = None
-    tk.Button(btn_bar, text="Finish", command=finish).pack(side="right", padx=4)
-    tk.Button(btn_bar, text="Cancel", command=cancel).pack(side="right", padx=12)
+    tk.Button(btn_bar, text="Finish", command=finish).grid(row=0, column=97, sticky="e", padx=4)
+    tk.Button(btn_bar, text="Cancel", command=cancel).grid(row=0, column=96, sticky="e", padx=12)
+
+    # Responsive adjustments (instruction wraplength)
+    def _on_resize(event=None):  # pragma: no cover - GUI behaviour
+        try:
+            wrap = max(300, frame.winfo_width() - 200)
+            instr_lbl.configure(wraplength=wrap)
+        except Exception:
+            pass
+    frame.bind("<Configure>", lambda e: _on_resize())
+    _on_resize()
 
     app.root.bind("<Control-Return>", lambda e: (finish(), "break"))
     app.root.bind("<Control-Shift-c>", lambda e: (do_copy(), "break"))

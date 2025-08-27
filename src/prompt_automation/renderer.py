@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Union, Any, TYPE_CHECKING
+import re
 
 from .errorlog import get_logger
 
@@ -166,7 +167,7 @@ def load_template(path: Path) -> "Template":
         raise FileNotFoundError(path)
     with path.open(encoding="utf-8") as fh:
         data = json.load(fh)
-    try:
+    try:  # pragma: no cover - simple injection
         inject_share_flag(data, path)
     except Exception as e:  # pragma: no cover
         _log.warning("failed to inject share flag for %s: %s", path, e)
@@ -182,34 +183,41 @@ def validate_template(data: Dict) -> bool:
 def fill_placeholders(
     lines: Iterable[str], vars: Dict[str, Union[str, Sequence[str], None]]
 ) -> str:
-    """Replace ``{{name}}`` placeholders with values with indentation-aware expansion.
+    """Replace ``{{name}}`` placeholders with values.
 
-    Behaviour improvements:
-      - Multi-line replacements maintain the indentation level of the original
-        placeholder line (when the placeholder token was the only non-whitespace
-        content on that line). Subsequent lines are prefixed with the same indent.
-      - Sequence values are joined by newlines (unchanged from prior behaviour).
-      - Empty / None values remove the entire line containing the placeholder.
+    Features:
+      - Multi-line replacements keep indentation when placeholder line only had the token.
+      - Sequence values join with newlines.
+      - Lines whose placeholders all resolve to empty/whitespace are removed.
+      - If a *section header* line (e.g. begins with a dash ``-`` or bullet) is
+        immediately followed by a placeholder-only line that is removed due to
+        emptiness, the header line is also removed. This prevents empty sections
+        caused by tabbing past unused fields.
     """
 
-    out: List[str] = []
-    for line in lines:
+    # Convert to list for look-ahead logic
+    src_lines = list(lines)
+    processed: List[str] = []
+    skip_indices: set[int] = set()
+    placeholder_only_removed: set[int] = set()  # indices of lines removed because only empty placeholders
+
+    for idx, line in enumerate(src_lines):
+        if idx in skip_indices:
+            continue
         original_line = line
         placeholders_in_line: List[str] = []
         replacement_map: Dict[str, str] = {}
         empty_tokens: set[str] = set()
 
-        # First pass: detect tokens present
         for k in vars.keys():
             token = f"{{{{{k}}}}}"
             if token in line:
                 placeholders_in_line.append(token)
 
         if not placeholders_in_line:
-            out.append(line)
+            processed.append(line)
             continue
 
-        # Gather replacements
         for token in placeholders_in_line:
             key = token[2:-2]
             v = vars.get(key)
@@ -224,7 +232,6 @@ def fill_placeholders(
             if not repl.strip():
                 empty_tokens.add(token)
                 repl = ""
-            # Indentation handling if token alone on its line
             if original_line.strip() == token and repl and "\n" in repl:
                 indent = original_line[: len(original_line) - len(original_line.lstrip())]
                 parts = repl.split("\n")
@@ -234,21 +241,51 @@ def fill_placeholders(
                     repl = first + ("\n" + "\n".join(rest) if rest else "")
             replacement_map[token] = repl
 
-        # Decide skipping: skip only if all placeholders empty AND removing them leaves no other visible text
         non_empty_tokens = [t for t in placeholders_in_line if t not in empty_tokens]
         if not non_empty_tokens:
-            # Remove tokens to inspect residual text
             residual = original_line
             for t in placeholders_in_line:
                 residual = residual.replace(t, "")
             if not residual.strip():
-                # Entire line was just empty placeholders
+                placeholder_only_removed.add(idx)
                 continue
-        # Apply replacements (including empty strings) sequentially
+
+        # Apply replacements
         for token, repl in replacement_map.items():
             line = line.replace(token, repl)
-        out.append(line)
-    return "\n".join(out)
+        processed.append(line)
+
+    # Second pass: remove headers preceding removed placeholder-only lines
+    final_out: List[str] = []
+    i = 0
+    total = len(src_lines)
+    # Build mapping from original index to whether kept and its processed text
+    # Simplify by iterating original indices and referencing processed iteratively
+    processed_iter = iter(processed)
+    kept_line_by_index: Dict[int, str] = {}
+    for idx, line in enumerate(src_lines):
+        if idx in placeholder_only_removed:
+            continue
+        kept_line_by_index[idx] = next(processed_iter)
+
+    idx = 0
+    bullet_header_re = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+    while idx < total:
+        if idx in placeholder_only_removed:
+            idx += 1
+            continue
+        line = kept_line_by_index[idx]
+        if bullet_header_re.match(line) and (idx + 1) in placeholder_only_removed:
+            header_indent = len(line) - len(line.lstrip())
+            removed_line = src_lines[idx + 1]
+            removed_indent = len(removed_line) - len(removed_line.lstrip())
+            if removed_indent > header_indent:
+                idx += 2
+                continue
+        final_out.append(line)
+        idx += 1
+
+    return "\n".join(final_out)
 
 
 __all__ = [
