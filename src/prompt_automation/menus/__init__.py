@@ -40,6 +40,7 @@ from .render_pipeline import (
     apply_file_placeholders,
     apply_formatting,
     apply_global_placeholders,
+    apply_markdown_rendering,
     apply_post_render,
 )
 
@@ -108,6 +109,11 @@ def render_template(
     apply_defaults(raw_vars, vars, placeholders)
     apply_global_placeholders(tmpl, vars, exclude_globals)
     apply_formatting(vars, placeholders)
+    # Convert markdown placeholders (e.g., reference_file) into sanitized HTML and wrappers
+    try:
+        apply_markdown_rendering(tmpl, vars, placeholders)
+    except Exception:
+        pass
 
     rendered = fill_placeholders(tmpl["template"], vars)
     rendered = apply_post_render(rendered, tmpl, placeholders, vars, exclude_globals)

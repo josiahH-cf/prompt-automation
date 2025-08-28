@@ -18,7 +18,11 @@ def _lock_db() -> None:
         print("[prompt-automation] Warning: usage.db in use by another process")
         return
     lock_path = DB_PATH.with_suffix(".lock")
-    fh = open(lock_path, "w")
+    try:
+        fh = open(lock_path, "w")
+    except Exception:
+        # Sandbox/no permission: skip locking
+        return
     try:
         if os.name == "nt":
             import msvcrt
@@ -54,7 +58,10 @@ def _unlock_db() -> None:
 
 def _connect() -> sqlite3.Connection:
     _lock_db()
-    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn = sqlite3.connect(DB_PATH)
+    except Exception:  # pragma: no cover - permission/sandbox fallback
+        conn = sqlite3.connect(":memory:")
     conn.execute(
         "CREATE TABLE IF NOT EXISTS logs (ts TEXT, prompt_id TEXT, style TEXT, length INTEGER, tokens INTEGER)"
     )
@@ -62,16 +69,23 @@ def _connect() -> sqlite3.Connection:
 
 
 def log_usage(template: Dict, length: int) -> None:
-    conn = _connect()
-    tokens = length // 4
-    conn.execute(
-        "INSERT INTO logs VALUES (?, ?, ?, ?, ?)",
-        (datetime.now().isoformat(), template["id"], template["style"], length, tokens),
-    )
-    conn.commit()
-    conn.close()
-    _unlock_db()
-    rotate_db()
+    try:
+        conn = _connect()
+        tokens = length // 4
+        conn.execute(
+            "INSERT INTO logs VALUES (?, ?, ?, ?, ?)",
+            (datetime.now().isoformat(), template["id"], template["style"], length, tokens),
+        )
+        conn.commit()
+        conn.close()
+        _unlock_db()
+        rotate_db()
+    except Exception:
+        # Logging is best-effort; ignore failures in restricted environments
+        try:
+            _unlock_db()
+        except Exception:
+            pass
 
 
 def usage_counts(days: int = 7) -> Dict[Tuple[str, str], int]:
@@ -105,5 +119,3 @@ def clear_usage_log() -> None:
     """Remove the usage database file."""
     if DB_PATH.exists():
         DB_PATH.unlink()
-
-

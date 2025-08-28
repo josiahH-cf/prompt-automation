@@ -48,8 +48,20 @@ def _socket_path() -> str:
 
 
 def _port_file() -> Path:
+    # If a custom socket path is provided (tests), place the port file alongside it
+    override = os.environ.get("PROMPT_AUTOMATION_SINGLETON_SOCKET")
+    if override and os.environ.get("PROMPT_AUTOMATION_SINGLETON_FORCE_TCP") == "1":
+        p = Path(override).expanduser().resolve().parent / "gui.port"
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        return p
     base = Path.home() / ".prompt-automation"
-    base.mkdir(parents=True, exist_ok=True)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     return base / "gui.port"
 
 
@@ -143,11 +155,32 @@ def start_server(focus_callback: Callable[[], None]) -> Optional[threading.Threa
 
     # TCP fallback path
     try:
+        # Pre-flight: some sandboxes deny creating client sockets entirely.
+        try:
+            _tmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            _tmp.close()
+        except Exception:
+            try:
+                pf = _port_file()
+                if pf.exists():
+                    pf.unlink()
+            except Exception:
+                pass
+            return None
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.bind(("127.0.0.1", 0))  # ephemeral port
         srv.listen(1)
+        # Validate that clients are permitted to connect in this environment.
+        port = srv.getsockname()[1]
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.05) as _probe:
+                pass
+        except Exception:
+            # Connection attempts are blocked; avoid creating a dangling port file
+            srv.close()
+            return None
         pf = _port_file()
-        pf.write_text(str(srv.getsockname()[1]))
+        pf.write_text(str(port))
     except Exception:
         return None
 

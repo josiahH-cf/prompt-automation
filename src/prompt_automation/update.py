@@ -50,13 +50,19 @@ from typing import Dict, Iterable
 # ---------------------------------------------------------------------------
 # Logging setup
 LOG_DIR = Path.home() / ".prompt-automation" / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 LOG_FILE = LOG_DIR / "update.log"
 
 _log = logging.getLogger("prompt_automation.update")
 if not _log.handlers:
     _log.setLevel(logging.INFO)
-    _log.addHandler(logging.FileHandler(LOG_FILE))
+    try:
+        _log.addHandler(logging.FileHandler(LOG_FILE))
+    except Exception:  # pragma: no cover - sandbox/file permission
+        _log.addHandler(logging.StreamHandler())
 
 
 # ---------------------------------------------------------------------------
@@ -268,4 +274,3 @@ __all__ = [
     "fetch_manifest",
     "apply_update",
 ]
-

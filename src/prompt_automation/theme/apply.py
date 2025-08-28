@@ -27,7 +27,7 @@ def apply_to_root(root, theme: Dict[str, str], *, initial: bool = False, enable:
         ('*selectBackground', theme['selectionBackground']),
         ('*selectForeground', theme['selectionForeground']),
         ('*highlightColor', theme['focusOutline']),
-        ('*insertbackground', theme['textPrimary']),
+        ('*insertbackground', get_cursor_color(theme)),
         ('*troughColor', theme['surfaceAlt']),
     ]
     count = 0
@@ -67,4 +67,18 @@ def format_heading(text: str, theme: Dict[str, str], *, force_tty: bool | None =
     r, g, b = _hex_to_rgb(theme.get('accentPrimary', '#5AA9E6'))
     return f"\033[1;38;2;{r};{g};{b}m{text}\033[0m"
 
+
+def get_cursor_color(theme: Dict[str, str]) -> str:
+    """Return high-contrast insertion cursor color for the given theme.
+
+    Policy: for dark themes use white ``#FFFFFF`` for maximum contrast.
+    For all others fall back to the primary text color.
+    """
+    try:
+        name = (theme.get('name') or '').lower()
+        if name == 'dark':
+            return '#FFFFFF'
+        return theme.get('textPrimary', '#000000')
+    except Exception:
+        return '#FFFFFF'
 

@@ -13,30 +13,52 @@ from typing import Dict, Tuple, List, Callable, Optional
 
 from .errorlog import get_logger
 
-from .config import PROMPTS_DIR
+from .config import PROMPTS_DIR, HOME_DIR
 
 SETTINGS_DIR = PROMPTS_DIR / "Settings"
 SHORTCUT_FILE = SETTINGS_DIR / "template-shortcuts.json"
+LOCAL_SHORTCUT_FILE = HOME_DIR / "template-shortcuts.json"
 _log = get_logger(__name__)
 
 
 def load_shortcuts() -> Dict[str, str]:
-    if not SHORTCUT_FILE.exists():
-        return {}
+    """Return merged shortcut mapping with local overrides taking precedence.
+
+    Layering (highest to lowest):
+      - ``LOCAL_SHORTCUT_FILE`` (machine-local, not under VCS)
+      - ``SHORTCUT_FILE`` (repo defaults)
+    """
+    base: Dict[str, str] = {}
     try:
-        data = json.loads(SHORTCUT_FILE.read_text())
-        if isinstance(data, dict):
-            return {str(k): str(v) for k, v in data.items()}
+        if SHORTCUT_FILE.exists():
+            data = json.loads(SHORTCUT_FILE.read_text())
+            if isinstance(data, dict):
+                base = {str(k): str(v) for k, v in data.items()}
     except Exception:
         pass
-    return {}
+    try:
+        if LOCAL_SHORTCUT_FILE.exists():
+            data_l = json.loads(LOCAL_SHORTCUT_FILE.read_text())
+            if isinstance(data_l, dict):
+                # Local values override repo defaults
+                base.update({str(k): str(v) for k, v in data_l.items()})
+    except Exception:
+        pass
+    return base
 
 
 def save_shortcuts(mapping: Dict[str, str]) -> None:
-    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = SHORTCUT_FILE.with_suffix('.tmp')
-    tmp.write_text(json.dumps(mapping, indent=2), encoding='utf-8')
-    tmp.replace(SHORTCUT_FILE)
+    """Persist mapping to the local machine layer.
+
+    Writes to ``LOCAL_SHORTCUT_FILE`` to avoid churn in version-controlled repos.
+    """
+    try:
+        LOCAL_SHORTCUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = LOCAL_SHORTCUT_FILE.with_suffix('.tmp')
+        tmp.write_text(json.dumps(mapping, indent=2), encoding='utf-8')
+        tmp.replace(LOCAL_SHORTCUT_FILE)
+    except Exception as e:
+        _log.error("failed to save local shortcuts: %s", e)
 
 
 def build_shortcut_options(base: Path | None = None) -> List[Dict[str, str]]:

@@ -35,12 +35,18 @@ class PromptCLI:
 
     def __init__(self) -> None:
         self.log_dir = Path.home() / ".prompt-automation" / "logs"
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         self.log_file = self.log_dir / "cli.log"
         self._log = logging.getLogger("prompt_automation.cli")
         if not self._log.handlers:
             self._log.setLevel(logging.INFO)
-            self._log.addHandler(logging.FileHandler(self.log_file))
+            try:
+                self._log.addHandler(logging.FileHandler(self.log_file))
+            except Exception:
+                self._log.addHandler(logging.StreamHandler())
 
     # Expose helper functions as methods for convenience
     check_dependencies = staticmethod(check_dependencies)

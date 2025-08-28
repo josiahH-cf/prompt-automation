@@ -20,7 +20,13 @@ from .storage import (
 _log = get_logger(__name__)
 
 # Single-level undo snapshot for dangerous resets
-_PERSIST_UNDO_FILE = _PERSIST_FILE.with_name('placeholder-overrides.undo.json')
+def _persist_undo_file() -> Path:
+    """Return path to undo snapshot alongside current overrides file.
+
+    Computed at call time so tests that monkeypatch ``_PERSIST_FILE`` see
+    the correct sibling path.
+    """
+    return _PERSIST_FILE.with_name('placeholder-overrides.undo.json')
 
 
 def load_template_value_memory(template_id: int) -> Dict[str, Any]:
@@ -108,7 +114,7 @@ def reset_file_overrides_with_backup(confirm_cb=None) -> bool:
         # Snapshot for undo
         try:
             raw = _PERSIST_FILE.read_text(encoding='utf-8')
-            _PERSIST_UNDO_FILE.write_text(raw, encoding='utf-8')
+            _persist_undo_file().write_text(raw, encoding='utf-8')
         except Exception:
             # If snapshot fails we still proceed with reset to honour user intent,
             # but log the error for visibility.
@@ -126,15 +132,16 @@ def undo_last_reset_file_overrides() -> bool:
     Returns True if restored, False otherwise.
     """
     try:
-        if not _PERSIST_UNDO_FILE.exists():
+        undo_path = _persist_undo_file()
+        if not undo_path.exists():
             return False
         try:
-            data = json.loads(_PERSIST_UNDO_FILE.read_text(encoding='utf-8'))
+            data = json.loads(undo_path.read_text(encoding='utf-8'))
         except Exception:
             return False
         _save_overrides(data)
         try:
-            _PERSIST_UNDO_FILE.unlink()
+            undo_path.unlink()
         except Exception:
             pass
         return True

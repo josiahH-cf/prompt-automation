@@ -4,12 +4,24 @@ from .config import LOG_DIR, LOG_FILE
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Return logger writing to ``error.log``."""
+    """Return logger preferring file output, with safe fallback.
+
+    Attempts to log to ``LOG_FILE``; if file I/O is not permitted (e.g. sandboxed
+    test runner), falls back to a plain ``StreamHandler`` to stderr. Ensures we
+    never crash tests due to logging setup.
+    """
     logger = logging.getLogger(name)
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(LOG_FILE) for h in logger.handlers):
+    if logger.handlers:
+        return logger
+    logger.setLevel(logging.INFO)
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        # LOG_DIR is created by config on import; handle permission errors here
         handler = logging.FileHandler(LOG_FILE)
-        fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         handler.setFormatter(fmt)
         logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+    except Exception:  # pragma: no cover - permission or path errors
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        logger.addHandler(sh)
     return logger
