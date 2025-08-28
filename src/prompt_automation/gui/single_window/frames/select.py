@@ -181,6 +181,15 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     listbox.bind("<<ListboxSelect>>", lambda e: update_preview())
 
     def on_key(event):
+        # Only suppress/ignore digits when actively inside a template
+        # (collect/review stages). When stage is unknown (e.g., standalone
+        # selector usage), allow digits to function normally.
+        try:
+            st = getattr(app, '_stage', 'select')
+            if st in ('collect', 'review'):
+                return None
+        except Exception:
+            pass
         # Normalize key value across platforms. On Windows, numpad digits often
         # arrive with an empty event.char and keysym like "KP_1"; in that case
         # derive the digit so shortcuts and quick-select work consistently.

@@ -27,7 +27,11 @@ def apply_to_root(root, theme: Dict[str, str], *, initial: bool = False, enable:
         ('*selectBackground', theme['selectionBackground']),
         ('*selectForeground', theme['selectionForeground']),
         ('*highlightColor', theme['focusOutline']),
-        ('*insertbackground', get_cursor_color(theme)),
+        # Insertion cursor (caret) color; include multiple patterns for cross-platform Tk variants
+        ('*insertbackground', get_cursor_color(theme)),  # common lowercase option name
+        ('*insertBackground', get_cursor_color(theme)),  # resource name form used by option database
+        ('*Text.insertBackground', get_cursor_color(theme)),  # widget-specific override (Text)
+        ('*Entry.insertBackground', get_cursor_color(theme)),  # widget-specific override (Entry)
         ('*troughColor', theme['surfaceAlt']),
     ]
     count = 0
@@ -81,4 +85,3 @@ def get_cursor_color(theme: Dict[str, str]) -> str:
         return theme.get('textPrimary', '#000000')
     except Exception:
         return '#FFFFFF'
-
