@@ -49,6 +49,10 @@ class HotkeyManager:
     def update_system_hotkey(hotkey: str) -> None:
         """Update platform-specific hotkey configuration."""
         system = platform.system()
+        if os.environ.get("PROMPT_AUTOMATION_DEBUG"):
+            print(
+                f"[prompt-automation] hotkey_registration_start os={system} hotkey={hotkey}"
+            )
         if system == "Windows":
             _update_windows(hotkey)
         elif system == "Linux":

@@ -10,10 +10,14 @@ from pathlib import Path
 from typing import Dict, Any
 
 from ....config import PROMPTS_DIR
+from ....errorlog import get_logger
 from ....renderer import load_template
 from ....services.template_search import list_templates, resolve_shortcut
 from ....services import multi_select as multi_select_service
 from ...constants import INSTR_SELECT_SHORTCUTS
+
+
+_log = get_logger(__name__)
 
 
 def build(app) -> Any:  # pragma: no cover - Tk runtime
@@ -177,7 +181,20 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     listbox.bind("<<ListboxSelect>>", lambda e: update_preview())
 
     def on_key(event):
+        # Normalize key value across platforms. On Windows, numpad digits often
+        # arrive with an empty event.char and keysym like "KP_1"; in that case
+        # derive the digit so shortcuts and quick-select work consistently.
         key = event.char
+        if not key:
+            ks = getattr(event, 'keysym', '')
+            if ks.startswith('KP_') and len(ks) == 4 and ks[-1].isdigit():
+                key = ks[-1]
+                try:
+                    _log.debug("select.on_key normalized keysym %s -> %s", ks, key)
+                except Exception:
+                    pass
+            elif ks.isdigit():
+                key = ks
         # 1. Shortcut mapping (takes precedence over positional index selection)
         tmpl = resolve_shortcut(key)
         if tmpl:

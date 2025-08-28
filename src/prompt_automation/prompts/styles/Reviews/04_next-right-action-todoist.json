@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": 4,
+  "id": 51,
   "title": "Next Right Action Todoist",
   "style": "Reviews",
   "placeholders": [
@@ -39,7 +39,7 @@
     }
   ],
   "template": [
-    "I will {{next_action}} so that {{so_that}}. ⏳{{time_estimate}}."
+    "I will {{next_action}} so that {{so_that}}. \u23f3{{time_estimate}}."
   ],
   "metadata": {
     "path": "Reviews/next-right-action-todoist.json",

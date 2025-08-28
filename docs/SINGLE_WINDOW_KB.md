@@ -40,3 +40,19 @@ Review Auto-Open Toggle
 -----------------------
 The Review window auto-opens the reference viewer once when a `reference_file` value is present.
 - Disable this auto-open via `PA_REVIEW_AUTO_OPEN_REFERENCE=0` (the "View Reference" button remains available).
+
+Windows Global Hotkey (Ctrl+Shift+J)
+------------------------------------
+- Default hotkey: `Ctrl+Shift+J` focuses or launches the GUI.
+- Generated script path (Windows Startup): `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\prompt-automation.ahk`
+- Status check: `prompt-automation --hotkey-status` shows whether the script exists and the current hotkey.
+- Enable verbose logs: set `PROMPT_AUTOMATION_DEBUG=1` and run `prompt-automation --assign-hotkey` or `prompt-automation --hotkey-status` to see `hotkey_registration_*` messages.
+- CLI event logs: with `PROMPT_AUTOMATION_DEBUG=1`, invoking `prompt-automation --focus` writes `hotkey_event_received` and `hotkey_handler_invoked` entries to `~/.prompt-automation/logs/cli.log`.
+
+Troubleshooting Checklist (Windows)
+-----------------------------------
+- Ensure AutoHotkey is installed and on PATH (`AutoHotkey` executable).
+- Verify the Startup script exists at the path above; reassign via `prompt-automation --assign-hotkey` if missing.
+- Conflicts: temporarily disable other global hotkey tools (e.g., Espanso, AHK scripts) that may capture `Ctrl+Shift+J`.
+- Re-run with debug: set `PROMPT_AUTOMATION_DEBUG=1` and check for `hotkey_registration_success` and `hotkey_handler_invoked` logs.
+- As a quick test, run `prompt-automation --focus`; if it logs focus and returns, the handler path is healthy.

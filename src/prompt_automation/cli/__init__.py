@@ -42,7 +42,9 @@ class PromptCLI:
         self.log_file = self.log_dir / "cli.log"
         self._log = logging.getLogger("prompt_automation.cli")
         if not self._log.handlers:
-            self._log.setLevel(logging.INFO)
+            # Elevate to DEBUG when troubleshooting is enabled via env var
+            level = logging.DEBUG if os.environ.get("PROMPT_AUTOMATION_DEBUG") else logging.INFO
+            self._log.setLevel(level)
             try:
                 self._log.addHandler(logging.FileHandler(self.log_file))
             except Exception:
@@ -272,6 +274,15 @@ class PromptCLI:
             args.gui or os.environ.get("PROMPT_AUTOMATION_GUI") != "0" or args.focus
         )
 
+        # Observability: log the incoming event and intended mode
+        try:
+            self._log.debug(
+                "hotkey_event_received source=CLI focus=%s gui=%s terminal=%s",
+                bool(args.focus), bool(args.gui), bool(args.terminal),
+            )
+        except Exception:
+            pass
+
         self._log.info("running on %s", platform.platform())
         if not check_dependencies(require_fzf=not gui_mode):
             return
@@ -295,16 +306,30 @@ class PromptCLI:
             # Attempt to focus an existing instance first (fast path), even without --focus
             try:
                 from ..gui.single_window import singleton as _sw_singleton
+                self._log.debug("hotkey_handler_invoked action=focus_app_attempt")
                 if _sw_singleton.connect_and_focus_if_running():
+                    try:
+                        self._log.debug("hotkey_handler_invoked action=focus_app")
+                    except Exception:
+                        pass
                     return
             except Exception:
                 pass
             from .. import gui
+            try:
+                self._log.debug("hotkey_handler_invoked action=show_app")
+            except Exception:
+                pass
             gui.run()
             return
 
         banner = Path(__file__).resolve().parent.parent / "resources" / "banner.txt"
         print(banner.read_text())
+
+        try:
+            self._log.debug("hotkey_handler_invoked action=terminal")
+        except Exception:
+            pass
 
         tmpl: dict[str, Any] | None = select_template_cli()
         if not tmpl:
