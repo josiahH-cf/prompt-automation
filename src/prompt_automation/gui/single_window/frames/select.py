@@ -178,7 +178,13 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
 
     def on_key(event):
         key = event.char
-        if key.isdigit():
+        # 1. Shortcut mapping (takes precedence over positional index selection)
+        tmpl = resolve_shortcut(key)
+        if tmpl:
+            app.advance_to_collect(tmpl)
+            return "break"
+        # 2. Fallback: quick-select nth visible template by digit (1..9)
+        if key.isdigit() and key != "0":
             idx = int(key) - 1
             if 0 <= idx < listbox.size():
                 listbox.selection_clear(0, "end")
@@ -186,10 +192,6 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
                 listbox.activate(idx)
                 proceed()
                 return "break"
-        tmpl = resolve_shortcut(key)
-        if tmpl:
-            app.advance_to_collect(tmpl)
-            return "break"
 
     frame.bind_all("<Key>", on_key)
 

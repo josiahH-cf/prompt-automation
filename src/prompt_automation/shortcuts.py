@@ -51,17 +51,28 @@ def build_shortcut_options(base: Path | None = None) -> List[Dict[str, str]]:
     base = base or PROMPTS_DIR
     out: List[Dict[str, str]] = []
     for p in sorted(base.rglob('*.json')):
+        # Skip settings control files or known non-template metadata lists
         if p.name.lower() == 'settings.json':
             continue
         try:
             data = load_template(p)
+        except Exception:  # pragma: no cover - defensive
+            continue
+        # Some JSON files (e.g. Settings/starred.json) are lists of relative paths
+        # rather than template objects; ignore anything that is not a dict.
+        if not isinstance(data, dict):
+            continue
+        template_id = data.get('id')
+        if not isinstance(template_id, int):
+            continue
+        if 'template' not in data:  # minimal schema gate
+            continue
+        try:
+            rel = str(p.relative_to(base))
         except Exception:
-            continue
-        if not isinstance(data.get('id'), int) or 'template' not in data:
-            continue
-        rel = str(p.relative_to(base))
+            rel = p.name
         title = str(data.get('title') or p.stem)
-        tid = str(data.get('id'))
+        tid = str(template_id)
         label = f"[{tid}] {title} — {rel}"
         out.append({'id': tid, 'title': title, 'rel': rel, 'label': label})
     return out
