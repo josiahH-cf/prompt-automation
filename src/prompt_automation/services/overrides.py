@@ -23,6 +23,9 @@ from ..variables import (
     list_file_overrides,
     list_template_value_overrides,
     reset_file_overrides,
+    # New safe reset helpers
+    reset_file_overrides_with_backup,
+    undo_last_reset_file_overrides,
 )
 
 
@@ -155,4 +158,6 @@ __all__ = [
     "list_file_overrides",
     "list_template_value_overrides",
     "reset_file_overrides",
+    "reset_file_overrides_with_backup",
+    "undo_last_reset_file_overrides",
 ]

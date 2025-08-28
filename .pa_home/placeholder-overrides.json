@@ -1,0 +1,56 @@
+{
+  "templates": {
+    "3": {
+      "reference_file": {
+        "path": "C:/Users/JosiahHunter/Documents/Josiah Hunter Sync Vault/Josiah Hunter Sync Vault/01 - Master Sheets/Systems/Goals - OKRs - KPIs.md",
+        "skip": false
+      }
+    }
+  },
+  "reminders": {},
+  "template_globals": {
+    "1": {
+      "hallucinate": "",
+      "think_deeply": "",
+      "reference_file": "",
+      "reminders": [
+        ""
+      ]
+    },
+    "99": {
+      "hallucinate": "",
+      "think_deeply": "",
+      "reference_file": "",
+      "reminders": [
+        ""
+      ]
+    },
+    "5": {
+      "hallucinate": "",
+      "think_deeply": "",
+      "reference_file": "",
+      "reminders": [
+        ""
+      ]
+    },
+    "2": {
+      "hallucinate": "",
+      "think_deeply": "",
+      "reference_file": "",
+      "reminders": [
+        ""
+      ]
+    },
+    "-1": {
+      "hallucinate": "",
+      "think_deeply": "",
+      "reference_file": "",
+      "reminders": [
+        ""
+      ]
+    }
+  },
+  "template_values": {},
+  "session": {},
+  "global_files": {}
+}

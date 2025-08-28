@@ -166,7 +166,7 @@ Add to template metadata:
 |------|--------|
 | Clear one file override | Options → Manage overrides → remove row (kind=file) |
 | Clear one simple value | Same dialog (kind=value) |
-| Reset all file overrides | Options → Reset reference files (or CLI flag) |
+| Reset all file overrides | Options → Reset reference files (now asks to confirm; undo available) |
 | Refresh global values for one template | Delete its entry under `template_globals` in overrides file |
 | Suppress a global for one template | Add it to `metadata.exclude_globals` |
 | Re-enable a suppressed global | Remove from `exclude_globals` & delete snapshot if you want latest root value |
@@ -698,3 +698,15 @@ prompt-automation --update
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup. For a summary of the selector, collector, and review window features, see the [GUI parity spec](docs/PARITY_SPEC.md).
+### Mapping Digit Shortcuts (Guided)
+
+- Open Options → Manage shortcuts / renumber.
+- Double‑click a row to edit a digit. A structured picker lists all templates with ID, title, and relative path; you can double‑click to select instead of typing a free path.
+- If you overwrite an existing mapping for a digit, the UI asks for confirmation.
+- The “Renumber” action updates template IDs and file prefixes to match any numeric digit shortcuts.
+
+### Reset Overrides with Undo
+
+- Options → Reset reference files now shows a confirmation dialog and creates a one‑level undo snapshot.
+- To restore, use Options → Undo last reset.
+- Scope: includes file path/skip overrides and template value overrides stored in `placeholder-overrides.json`. The undo snapshot is single‑level and is cleared after restore.

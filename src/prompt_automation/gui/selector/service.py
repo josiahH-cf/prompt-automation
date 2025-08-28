@@ -52,6 +52,12 @@ def search(query: str, recursive: bool = True):
 def reset_file_overrides():
     return overrides_service.reset_file_overrides()
 
+def reset_file_overrides_with_backup(confirm_cb=None):
+    return overrides_service.reset_file_overrides_with_backup(confirm_cb)
+
+def undo_last_reset_file_overrides():
+    return overrides_service.undo_last_reset_file_overrides()
+
 
 def list_file_overrides():
     return overrides_service.list_file_overrides()
@@ -111,6 +117,8 @@ __all__ = [
     "TemplateEntry",
     "BrowserState",
     "reset_file_overrides",
+    "reset_file_overrides_with_backup",
+    "undo_last_reset_file_overrides",
     "list_file_overrides",
     "reset_single_file_override",
     "list_template_value_overrides",
@@ -136,4 +144,3 @@ __all__ = [
     "remove_exclusion",
     "reset_exclusions",
 ]
-

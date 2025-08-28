@@ -16,6 +16,8 @@ from .values import (
     reset_file_overrides,
     reset_single_file_override,
     list_file_overrides,
+    reset_file_overrides_with_backup,
+    undo_last_reset_file_overrides,
 )
 from .storage import (
     get_remembered_context,
@@ -43,6 +45,8 @@ __all__ = [
     "reset_file_overrides",
     "reset_single_file_override",
     "list_file_overrides",
+    "reset_file_overrides_with_backup",
+    "undo_last_reset_file_overrides",
     "get_remembered_context",
     "set_remembered_context",
     "get_template_global_overrides",

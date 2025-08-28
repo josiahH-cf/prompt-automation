@@ -168,19 +168,56 @@ def _manage_shortcuts(root, service):  # pragma: no cover - GUI heavy
             path = path.strip()
         dlg = tk.Toplevel(win)
         dlg.title(f"Edit Shortcut {digit}")
-        tk.Label(dlg, text=f"Digit {digit}").pack(padx=8, pady=(8,4))
+        body = tk.Frame(dlg); body.pack(fill='both', expand=True, padx=8, pady=8)
+        tk.Label(body, text=f"Digit {digit}").pack(anchor='w')
         var = tk.StringVar(value=path)
-        ent = tk.Entry(dlg, textvariable=var, width=50)
-        ent.pack(padx=8, pady=4)
+        entry_row = tk.Frame(body); entry_row.pack(fill='x', pady=(6,4))
+        ent = tk.Entry(entry_row, textvariable=var, width=50)
+        ent.pack(side='left', fill='x', expand=True)
+
+        # Guided picker: list available templates with id/title/rel
+        picker = tk.Listbox(body, height=8)
+        try:
+            from ....shortcuts import build_shortcut_options, update_shortcut_digit
+            options = build_shortcut_options()
+        except Exception:
+            options = []
+            update_shortcut_digit = None  # type: ignore
+        labels = [o.get('label','') for o in options]
+        for lab in labels:
+            picker.insert('end', lab)
+        def _apply_pick(event=None):
+            sel = picker.curselection()
+            if not sel:
+                return
+            rel = options[sel[0]].get('rel','')
+            var.set(rel)
+        picker.bind('<Double-1>', _apply_pick)
+        picker.pack(fill='both', expand=True, pady=(6,2))
+
+        info = tk.Label(body, text='Tip: Double-click a template above to select. Overwrites will ask to confirm.', fg='#555')
+        info.pack(anchor='w', pady=(2,6))
+
         def _ok():
             new = var.get().strip()
             if new:
-                shortcuts[str(digit)] = new
+                def _confirm_overwrite(d, old, newp):
+                    try:
+                        return messagebox.askyesno('Overwrite', f'Replace mapping for digit {d}?\n\n{old}\n→ {newp}')
+                    except Exception:
+                        return True
+                if update_shortcut_digit:
+                    updated = update_shortcut_digit(shortcuts, str(digit), new, confirm_cb=_confirm_overwrite)  # type: ignore[arg-type]
+                else:
+                    updated = dict(shortcuts); updated[str(digit)] = new
+                shortcuts.clear(); shortcuts.update(updated)
                 save_shortcuts(shortcuts)
                 _refresh()
             dlg.destroy()
-        tk.Button(dlg, text="Save", command=_ok).pack(side="left", padx=8, pady=8)
-        tk.Button(dlg, text="Cancel", command=dlg.destroy).pack(side="left", padx=4, pady=8)
+        from tkinter import messagebox
+        btns = tk.Frame(dlg); btns.pack(fill='x', pady=(6,6))
+        tk.Button(btns, text="Save", command=_ok).pack(side="left", padx=8)
+        tk.Button(btns, text="Cancel", command=dlg.destroy).pack(side="left", padx=4)
         ent.focus_set()
         dlg.bind('<Return>', lambda e: (_ok(),'break'))
         dlg.bind('<Escape>', lambda e: (dlg.destroy(),'break'))

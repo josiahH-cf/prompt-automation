@@ -19,6 +19,9 @@ from .storage import (
 
 _log = get_logger(__name__)
 
+# Single-level undo snapshot for dangerous resets
+_PERSIST_UNDO_FILE = _PERSIST_FILE.with_name('placeholder-overrides.undo.json')
+
 
 def load_template_value_memory(template_id: int) -> Dict[str, Any]:
     """Return previously persisted simple values for template or empty dict."""
@@ -81,6 +84,63 @@ def reset_file_overrides() -> bool:
     except Exception as e:
         _log.error("failed to reset overrides: %s", e)
     return False
+
+
+def reset_file_overrides_with_backup(confirm_cb=None) -> bool:
+    """Reset overrides with confirmation and one-level undo snapshot.
+
+    - If ``_PERSIST_FILE`` exists, copy its contents into ``_PERSIST_UNDO_FILE``.
+    - Then perform the normal reset (deleting the overrides file and syncing
+      settings).
+    - Returns True if a reset occurred; False if declined or nothing to reset.
+    """
+    try:
+        # Nothing to do
+        if not _PERSIST_FILE.exists():
+            return False
+        # Confirmation gate (GUI provides a callback; tests can stub it)
+        if callable(confirm_cb):
+            try:
+                if not bool(confirm_cb()):
+                    return False
+            except Exception:
+                return False
+        # Snapshot for undo
+        try:
+            raw = _PERSIST_FILE.read_text(encoding='utf-8')
+            _PERSIST_UNDO_FILE.write_text(raw, encoding='utf-8')
+        except Exception:
+            # If snapshot fails we still proceed with reset to honour user intent,
+            # but log the error for visibility.
+            _log.warning("failed to create undo snapshot")
+        # Perform reset
+        return reset_file_overrides()
+    except Exception as e:  # pragma: no cover - defensive
+        _log.error("reset with backup failed: %s", e)
+        return False
+
+
+def undo_last_reset_file_overrides() -> bool:
+    """Restore overrides from the last reset snapshot, if available.
+
+    Returns True if restored, False otherwise.
+    """
+    try:
+        if not _PERSIST_UNDO_FILE.exists():
+            return False
+        try:
+            data = json.loads(_PERSIST_UNDO_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            return False
+        _save_overrides(data)
+        try:
+            _PERSIST_UNDO_FILE.unlink()
+        except Exception:
+            pass
+        return True
+    except Exception as e:  # pragma: no cover - defensive
+        _log.error("undo reset failed: %s", e)
+        return False
 
 
 def reset_single_file_override(template_id: int, name: str) -> bool:

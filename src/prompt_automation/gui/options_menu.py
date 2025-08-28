@@ -42,18 +42,37 @@ def configure_options_menu(
     opt = tk.Menu(new_menubar, tearoff=0)
     accelerators: Dict[str, Callable[[], None]] = {}
 
-    # Reset reference files
+    # Reset reference files (with confirmation + undo support)
     def _reset_refs():
         try:
             from tkinter import messagebox
-            if selector_service.reset_file_overrides():
-                messagebox.showinfo("Reset", "Reference file prompts will reappear.")
+            def _confirm():
+                return messagebox.askyesno(
+                    "Reset Overrides",
+                    "This will clear stored file/skip overrides. You can undo via\n"
+                    "Options → Undo last reset. Proceed?",
+                )
+            changed = selector_service.reset_file_overrides_with_backup(_confirm)
+            if changed:
+                messagebox.showinfo("Reset", "Overrides cleared. Use Options → Undo last reset to restore.")
             else:
-                messagebox.showinfo("Reset", "No overrides found.")
+                messagebox.showinfo("Reset", "No changes made.")
         except Exception as e:
             _log.error("Reset refs failed: %s", e)
     opt.add_command(label="Reset reference files", command=_reset_refs, accelerator="Ctrl+Shift+R")
     accelerators['<Control-Shift-R>'] = _reset_refs
+
+    def _undo_reset():
+        try:
+            from tkinter import messagebox
+            if selector_service.undo_last_reset_file_overrides():
+                messagebox.showinfo("Undo", "Overrides restored from last reset snapshot.")
+            else:
+                messagebox.showinfo("Undo", "No reset snapshot available.")
+        except Exception as e:
+            _log.error("Undo reset failed: %s", e)
+    opt.add_command(label="Undo last reset", command=_undo_reset, accelerator="Ctrl+Shift+U")
+    accelerators['<Control-Shift-U>'] = _undo_reset
 
     # Manage overrides
     def _manage_overrides():

@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List, Callable, Optional
+
+from .errorlog import get_logger
 
 from .config import PROMPTS_DIR
 
 SETTINGS_DIR = PROMPTS_DIR / "Settings"
 SHORTCUT_FILE = SETTINGS_DIR / "template-shortcuts.json"
+_log = get_logger(__name__)
 
 
 def load_shortcuts() -> Dict[str, str]:
@@ -34,6 +37,65 @@ def save_shortcuts(mapping: Dict[str, str]) -> None:
     tmp = SHORTCUT_FILE.with_suffix('.tmp')
     tmp.write_text(json.dumps(mapping, indent=2), encoding='utf-8')
     tmp.replace(SHORTCUT_FILE)
+
+
+def build_shortcut_options(base: Path | None = None) -> List[Dict[str, str]]:
+    """Return structured options for mapping digits to templates.
+
+    Each entry contains: ``id`` (str), ``title`` (str), ``rel`` (relative path),
+    and a human-friendly ``label`` combining those fields. Intended for UI use
+    but testable in headless environments.
+    """
+    from .renderer import load_template
+
+    base = base or PROMPTS_DIR
+    out: List[Dict[str, str]] = []
+    for p in sorted(base.rglob('*.json')):
+        if p.name.lower() == 'settings.json':
+            continue
+        try:
+            data = load_template(p)
+        except Exception:
+            continue
+        if not isinstance(data.get('id'), int) or 'template' not in data:
+            continue
+        rel = str(p.relative_to(base))
+        title = str(data.get('title') or p.stem)
+        tid = str(data.get('id'))
+        label = f"[{tid}] {title} — {rel}"
+        out.append({'id': tid, 'title': title, 'rel': rel, 'label': label})
+    return out
+
+
+def update_shortcut_digit(
+    mapping: Dict[str, str],
+    digit: str,
+    rel: str,
+    *,
+    confirm_cb: Optional[Callable[[str, str, str], bool]] = None,
+) -> Dict[str, str]:
+    """Set ``digit`` -> ``rel`` mapping with optional overwrite confirmation.
+
+    Parameters
+    ----------
+    mapping: current shortcut mapping (will be shallow-copied)
+    digit: key to set (e.g. '1'..'9' or '0')
+    rel: relative template path to assign
+    confirm_cb: optional callback ``(digit, old_rel, new_rel) -> bool``.
+        Called when overwriting an existing mapping. If absent or returns True,
+        the overwrite proceeds; otherwise the existing mapping is kept.
+    """
+    new = dict(mapping)
+    old = new.get(str(digit))
+    if old and old != rel:
+        if confirm_cb and not confirm_cb(str(digit), old, rel):
+            _log.info("shortcut overwrite declined: %s stays %s", digit, old)
+            return new
+        _log.info("shortcut overwrite: %s %s -> %s", digit, old, rel)
+    else:
+        _log.info("shortcut set: %s -> %s", digit, rel)
+    new[str(digit)] = rel
+    return new
 
 
 def _load_template_json(path: Path) -> dict:
