@@ -115,6 +115,11 @@ class PromptCLI:
             help="Interactively set or change the global GUI hotkey",
         )
         parser.add_argument(
+            "--hotkey-status",
+            action="store_true",
+            help="Show current hotkey and platform integration status",
+        )
+        parser.add_argument(
             "--theme",
             choices=["light", "dark", "system"],
             help="Override theme for this run (does not persist)",
@@ -135,6 +140,38 @@ class PromptCLI:
             from .. import hotkeys
 
             hotkeys.assign_hotkey()
+            return
+
+        if args.hotkey_status:
+            from ..hotkeys.base import HotkeyManager
+            hk = HotkeyManager.get_current_hotkey()
+            print(f"Current hotkey: {hk}")
+            system = platform.system()
+            if system == "Windows":
+                startup = (
+                    Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+                    / "Microsoft"
+                    / "Windows"
+                    / "Start Menu"
+                    / "Programs"
+                    / "Startup"
+                    / "prompt-automation.ahk"
+                )
+                print(f"Windows AHK script: {'OK' if startup.exists() else 'MISSING'} -> {startup}")
+            elif system == "Linux":
+                yaml_path = Path.home() / ".config" / "espanso" / "match" / "prompt-automation.yml"
+                print(f"Espanso YAML: {'OK' if yaml_path.exists() else 'MISSING'} -> {yaml_path}")
+            elif system == "Darwin":
+                script_path = (
+                    Path.home()
+                    / "Library"
+                    / "Application Scripts"
+                    / "prompt-automation"
+                    / "macos.applescript"
+                )
+                print(f"AppleScript: {'OK' if script_path.exists() else 'MISSING'} -> {script_path}")
+            else:
+                print("Unknown platform: status not available")
             return
 
         if args.update:

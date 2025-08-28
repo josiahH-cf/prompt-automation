@@ -181,12 +181,46 @@ def start_server(focus_callback: Callable[[], None]) -> Optional[threading.Threa
             return None
         pf = _port_file()
         pf.write_text(str(port))
+        # Compatibility: when tests (or future callers) supply an override socket
+        # path while forcing TCP, earlier logic (and existing tests) still expect
+        # the port file at the legacy home location. Write a duplicate there so
+        # external focus attempts remain compatible. (Best effort; ignore errors.)
+        try:  # pragma: no cover - simple file IO
+            override = os.environ.get("PROMPT_AUTOMATION_SINGLETON_SOCKET")
+            if override and os.environ.get("PROMPT_AUTOMATION_SINGLETON_FORCE_TCP") == "1":
+                legacy_pf = Path.home() / ".prompt-automation" / "gui.port"
+                if legacy_pf != pf:
+                    try:
+                        legacy_pf.parent.mkdir(parents=True, exist_ok=True)
+                    except Exception:
+                        pass
+                    legacy_pf.write_text(str(port))
+        except Exception:
+            pass
     except Exception:
         return None
 
     def _loop_tcp():
         with contextlib.ExitStack() as stack:
-            stack.callback(lambda: (srv.close(), _port_file().exists() and _port_file().unlink()))
+            def _cleanup():  # pragma: no cover - shutdown path
+                try:
+                    srv.close()
+                except Exception:
+                    pass
+                try:
+                    p = _port_file()
+                    if p.exists():
+                        p.unlink()
+                except Exception:
+                    pass
+                # Also remove legacy duplicate if present
+                try:
+                    legacy_pf = Path.home() / ".prompt-automation" / "gui.port"
+                    if legacy_pf.exists():
+                        legacy_pf.unlink()
+                except Exception:
+                    pass
+            stack.callback(_cleanup)
             while True:
                 try:
                     conn, _ = srv.accept()

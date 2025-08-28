@@ -28,7 +28,7 @@ def _check_unique_id(pid: int, exclude: Path | None = None) -> None:
         if exclude and p.resolve() == (exclude.resolve()):
             continue
         try:
-            data = json.loads(p.read_text())
+            data = json.loads(p.read_text(encoding="utf-8"))
             if data.get("id") == pid:
                 raise ValueError(f"Duplicate id {pid} in {p}")
         except Exception:
@@ -98,7 +98,7 @@ def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
 
     for path in paths:
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             templates.append((path, data))
             if isinstance(data.get("id"), int) and data["id"] > 0:
                 if data["id"] in used:
@@ -125,7 +125,7 @@ def ensure_unique_ids(base: Path = PROMPTS_DIR) -> None:
             seen.add(next_id)
             next_id += 1
             try:
-                path.write_text(json.dumps(data, indent=2))
+                path.write_text(json.dumps(data, indent=2), encoding="utf-8")
             except Exception as e:
                 problems.append(f"Failed writing updated id for {path}: {e}")
         else:
@@ -145,7 +145,7 @@ def create_new_template() -> None:
     style = input("Style: ") or "Misc"
     dir_path = PROMPTS_DIR / style
     dir_path.mkdir(parents=True, exist_ok=True)
-    used = {json.loads(p.read_text())["id"] for p in dir_path.glob("*.json")}
+    used = {json.loads(p.read_text(encoding="utf-8"))["id"] for p in dir_path.glob("*.json")}
     pid = input("Two digit ID (01-98): ")
     while not pid.isdigit() or not (1 <= int(pid) <= 98) or int(pid) in used:
         pid = input("ID taken or invalid, choose another: ")
@@ -174,7 +174,7 @@ def create_new_template() -> None:
     # New creation now uses plain id-based filename only.
     pad_width = 2 if int(pid) < 100 else len(str(int(pid)))
     fname = f"{int(pid):0{pad_width}d}.json"
-    (dir_path / fname).write_text(json.dumps(data, indent=2))
+    (dir_path / fname).write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"Created {fname}")
 
 
