@@ -380,14 +380,22 @@ class SingleWindowApp:
         if self._stage != "select":
             return
         try:
-            # Prefer the search query entry if available for immediate typing
-            entry = getattr(self, '_select_query_entry', None)
-            if entry is not None and hasattr(entry, 'focus_set'):
+            # Prefer the listbox so arrow keys / Enter work immediately.
+            lst = getattr(self, '_select_listbox', None)
+            if lst is not None and hasattr(lst, 'focus_set'):
                 try:
-                    entry.focus_set()
-                    return
+                    lst.focus_set()
                 except Exception:
                     pass
+            else:
+                # Fallback to search entry if listbox missing
+                entry = getattr(self, '_select_query_entry', None)
+                if entry is not None and hasattr(entry, 'focus_set'):
+                    try:
+                        entry.focus_set()
+                        return
+                    except Exception:
+                        pass
             def _recurse(w):
                 try:
                     children = w.winfo_children()
@@ -407,6 +415,47 @@ class SingleWindowApp:
                         return True
                 return False
             _recurse(self.root)
+            # Bind type-to-search once per select stage entry.
+            self.enable_type_to_search()
+        except Exception:
+            pass
+
+    def enable_type_to_search(self) -> None:  # pragma: no cover - GUI runtime
+        """Enable typing while listbox focused to jump to search box.
+
+        When on the select stage, if a printable character is typed while the
+        listbox (selector) has focus, focus shifts to the search entry and the
+        character is inserted, initiating an immediate search workflow.
+        """
+        if self._stage != 'select':
+            return
+        try:
+            root = self.root
+            if getattr(self, '_type_search_bound', False):
+                return
+            entry = getattr(self, '_select_query_entry', None)
+            lst = getattr(self, '_select_listbox', None)
+            if not (entry and lst):
+                return
+            def _on_key(ev):
+                try:
+                    ch = getattr(ev, 'char', '')
+                    if len(ch) == 1 and ch.isprintable():
+                        try:
+                            entry.focus_set()
+                            if hasattr(entry, 'delete') and hasattr(entry, 'index') and entry.index('insert') == 0:
+                                pass  # leave existing search text
+                            if hasattr(entry, 'insert'):
+                                entry.insert('end', ch)
+                            if hasattr(entry, 'event_generate'):
+                                entry.event_generate('<KeyRelease>')
+                            return 'break'
+                        except Exception:
+                            return None
+                except Exception:
+                    return None
+            root.bind('<Key>', _on_key)
+            self._type_search_bound = True
         except Exception:
             pass
 

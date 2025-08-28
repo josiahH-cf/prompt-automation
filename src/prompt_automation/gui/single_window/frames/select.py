@@ -213,6 +213,7 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     # Expose search entry on app for focus preference when snapping back
     try:
         setattr(app, '_select_query_entry', entry)
+        setattr(app, '_select_listbox', listbox)
     except Exception:
         pass
     if rel_map:
