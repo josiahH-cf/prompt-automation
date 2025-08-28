@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Added Dark Mode & theming infrastructure:
+  - New `dark` theme with accessible palette (AA contrast).
+  - Runtime toggle `Ctrl+Alt+D` with persistence.
+  - CLI override `--theme=<light|dark|system>` and `--persist-theme`.
+  - Safe defaults: light remains unchanged; disable via `enable_theming=false`.
+  - Minimal Tk-based applier (no heavy deps) + ANSI formatter for CLI headings.
+  - Extension guide for registering additional themes.
 - Unified single-window UI now matches legacy feature set and is the default
   experience. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` to restore the old
   multi-window dialogs.

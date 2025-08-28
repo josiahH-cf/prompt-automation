@@ -72,6 +72,11 @@ When launched via the global hotkey the GUI opens focused on the search box:
 
 After template selection the single-window workflow swaps to variable collection (auto-focused inputs, inline reference file viewer) and then to an embedded review (Ctrl+Enter confirm, Ctrl+Shift+C copy without close). Legacy modal windows still appear for non-inline file placeholders.
 
+## In-App Theme Toggle
+
+- Toggle Dark/Light: `Ctrl+Alt+D` (applies immediately; persists your choice)
+- CLI one-off override: `--theme=dark` (does not persist unless `--persist-theme` is also passed)
+
 ### Variable Collection (Single Window) Keys
 
 | Placeholder Type | Keys |

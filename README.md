@@ -10,7 +10,14 @@ Recent feature highlights:
  - Multi-file reference placeholders with per‑placeholder persistence via `override: true`, plus lazy `{{name_path}}` tokens for any file variable.
  - Opt‑in value persistence using `"persist": true` (replaces legacy always‑persist behavior) with clear override management UI & CLI.
  - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
- - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
+- Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
+
+### Dark Mode & Theming
+
+- Default is light (unchanged visuals). Toggle at runtime with `Ctrl+Alt+D`.
+- Persist your choice automatically; disable theming entirely by setting `enable_theming` to `false` in `Settings/settings.json`.
+- One-off override from CLI: `prompt-automation --theme=dark` (does not persist). To persist: add `--persist-theme`.
+- Theming is implemented via Tk’s option database (no heavy dependencies). Additional themes can be registered via JSON—see `docs/THEME_EXTENSION_GUIDE.md`.
 
 ### Default Value Hints & Fallback (Feature A)
 
@@ -691,4 +698,3 @@ prompt-automation --update
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup. For a summary of the selector, collector, and review window features, see the [GUI parity spec](docs/PARITY_SPEC.md).
-

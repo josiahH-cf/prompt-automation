@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict
 from ..errorlog import get_logger
 from .constants import INFO_CLOSE_SAVE
 from ..variables import storage as _storage
+from ..theme import resolve as _theme_resolve, model as _theme_model, apply as _theme_apply
 
 _log = get_logger(__name__)
 
@@ -226,6 +227,35 @@ def configure_options_menu(
                 pass
     opt.add_command(label="Manage shortcuts / renumber", command=_open_shortcut_manager, accelerator="Ctrl+Shift+S")
     accelerators['<Control-Shift-S>'] = _open_shortcut_manager
+
+    # Theme status + toggle (appears for both selector and stages)
+    try:
+        resolver = _theme_resolve.ThemeResolver(_theme_resolve.get_registry())
+        current_name = resolver.resolve()
+        opt.add_separator()
+        opt.add_command(label=f"Theme: {current_name}", state='disabled')
+    except Exception:
+        pass
+
+    # Toggle
+    def _toggle_theme_menu():
+        try:
+            resolver = _theme_resolve.ThemeResolver(_theme_resolve.get_registry())
+            new_name = resolver.toggle()
+            tokens = _theme_model.get_theme(new_name)
+            _theme_apply.apply_to_root(root, tokens, initial=False, enable=_theme_resolve.get_enable_theming())
+            # Refresh menu so the Theme: label updates
+            try:
+                ctrl = getattr(root, '_controller', None)
+                if ctrl and hasattr(ctrl, '_rebuild_menu'):
+                    ctrl._rebuild_menu()
+            except Exception:
+                pass
+        except Exception as e:
+            _log.error("Toggle theme failed: %s", e)
+    opt.add_separator()
+    opt.add_command(label="Toggle Theme (Ctrl+Alt+D)", command=_toggle_theme_menu)
+    accelerators['<Control-Alt-d>'] = _toggle_theme_menu
 
     # Global reference file manager
     if include_global_reference:

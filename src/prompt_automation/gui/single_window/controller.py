@@ -25,6 +25,9 @@ from ..selector import view as selector_view_module
 from .. import options_menu
 from ..error_dialogs import show_error, safe_copy_to_clipboard
 from ...shortcuts import load_shortcuts
+from ...theme import model as _theme_model
+from ...theme import resolve as _theme_resolve
+from ...theme import apply as _theme_apply
 
 
 class SingleWindowApp:
@@ -40,6 +43,14 @@ class SingleWindowApp:
         self.root.geometry(load_geometry())
         self.root.minsize(960, 640)
         self.root.resizable(True, True)
+        # Apply theme at startup (best effort)
+        try:
+            self._theme_resolver = _theme_resolve.ThemeResolver(_theme_resolve.get_registry())
+            name = self._theme_resolver.resolve()
+            tokens = _theme_model.get_theme(name)
+            _theme_apply.apply_to_root(self.root, tokens, initial=True, enable=_theme_resolve.get_enable_theming())
+        except Exception:
+            pass
         # Expose controller on root for menu helpers (introspection of current template)
         try:
             setattr(self.root, '_controller', self)
@@ -72,6 +83,8 @@ class SingleWindowApp:
 
         # Global shortcut help (F1)
         self.root.bind("<F1>", lambda e: (self._show_shortcuts(), "break"))
+        # Theme toggle (Ctrl+Alt+D)
+        self.root.bind("<Control-Alt-d>", lambda e: (self._toggle_theme(), "break"))
 
         self.template: Optional[Dict[str, Any]] = None
         self.variables: Optional[Dict[str, Any]] = None
@@ -86,6 +99,15 @@ class SingleWindowApp:
                 self.root.destroy()
 
         self.root.protocol("WM_DELETE_WINDOW", _on_close)
+
+    def _toggle_theme(self) -> None:
+        try:
+            new_name = self._theme_resolver.toggle()
+            tokens = _theme_model.get_theme(new_name)
+            _theme_apply.apply_to_root(self.root, tokens, initial=False, enable=_theme_resolve.get_enable_theming())
+            self._rebuild_menu()
+        except Exception:
+            pass
 
     # --- Stage orchestration -------------------------------------------------
     def _clear_content(self) -> None:

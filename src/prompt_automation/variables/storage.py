@@ -39,6 +39,54 @@ def _write_settings_payload(payload: Dict[str, Any]) -> None:
     except Exception as e:  # pragma: no cover - I/O errors
         _log.error("failed to write settings file: %s", e)
 
+# --- Theme settings accessors ----------------------------------------------
+def get_setting_theme() -> str | None:
+    """Return the preferred theme name from settings.json (light/dark/system)."""
+    try:
+        payload = _load_settings_payload()
+        val = payload.get("theme")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    except Exception:
+        pass
+    return None
+
+
+def set_setting_theme(name: str) -> None:
+    """Persist preferred theme name to settings.json."""
+    try:
+        payload = _load_settings_payload()
+        if name:
+            payload["theme"] = str(name)
+        else:
+            payload.pop("theme", None)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover - I/O errors
+        _log.error("failed to persist theme: %s", e)
+
+
+def get_setting_enable_theming() -> bool:
+    """Return global enable_theming flag (default True)."""
+    try:
+        payload = _load_settings_payload()
+        val = payload.get("enable_theming")
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            return val.strip().lower() in {"1", "true", "yes", "on"}
+    except Exception:
+        pass
+    return True
+
+
+def set_setting_enable_theming(enabled: bool) -> None:
+    try:
+        payload = _load_settings_payload()
+        payload["enable_theming"] = bool(enabled)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover - I/O errors
+        _log.error("failed to persist enable_theming: %s", e)
+
 def _sync_settings_from_overrides(overrides: Dict[str, Any]) -> None:
     """Persist selected override data into settings file.
 

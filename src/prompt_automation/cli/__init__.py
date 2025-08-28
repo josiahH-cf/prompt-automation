@@ -108,6 +108,16 @@ class PromptCLI:
             action="store_true",
             help="Interactively set or change the global GUI hotkey",
         )
+        parser.add_argument(
+            "--theme",
+            choices=["light", "dark", "system"],
+            help="Override theme for this run (does not persist)",
+        )
+        parser.add_argument(
+            "--persist-theme",
+            action="store_true",
+            help="Persist the provided --theme value to settings.json",
+        )
         args = parser.parse_args(argv)
 
         if args.prompt_dir:
@@ -227,6 +237,16 @@ class PromptCLI:
         except Exception:
             pass
         manifest_update.check_and_prompt()
+        # Theme resolution: allow CLI override and optional persistence
+        try:
+            if args.theme:
+                if args.persist_theme:
+                    from ..theme import resolve as _tres
+                    _tres.set_user_theme_preference(args.theme)
+                else:
+                    os.environ['PROMPT_AUTOMATION_THEME'] = args.theme
+        except Exception:
+            pass
 
         if gui_mode:
             # Fast path: --focus attempts to bring existing singleton window to front
@@ -252,7 +272,14 @@ class PromptCLI:
         if res:
             text, var_map = res
             print("\n" + "=" * 60)
-            print("RENDERED OUTPUT:")
+            try:
+                from ..theme import resolve as _tres, model as _tmodel, apply as _tapply
+                _name = _tres.ThemeResolver(_tres.get_registry()).resolve()
+                _theme = _tmodel.get_theme(_name)
+                heading = _tapply.format_heading("RENDERED OUTPUT:", _theme)
+            except Exception:
+                heading = "RENDERED OUTPUT:"
+            print(heading)
             print("=" * 60)
             print(text)
             print("=" * 60)
@@ -267,4 +294,3 @@ class PromptCLI:
 
 
 __all__ = ["PromptCLI"]
-

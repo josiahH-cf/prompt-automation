@@ -9,6 +9,12 @@ Variable collection and review now occur in a single window. Set
 `PROMPT_AUTOMATION_FORCE_LEGACY=1` before launching to restore the
 multi-window dialogs.
 
+### Theming Settings (New)
+
+- `theme`: `light` (default), `dark`, or `system` (reserved for future auto-detect). Stored in `prompts/styles/Settings/settings.json`.
+- `enable_theming`: `true` (default) or `false`. When `false`, the application behaves exactly as before (light visuals, no theme toggling).
+- CLI override (session only): `--theme=<light|dark|system>`; persist with `--persist-theme`.
+
 ---
 ## 1. High-Level Flow
 
