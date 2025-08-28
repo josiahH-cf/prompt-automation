@@ -122,6 +122,12 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             try:
                 if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
                     widget.bind("<FocusIn>", lambda e, w=widget: ensure_visible(canvas, inner, w))
+                    # Snap outer scroll to follow the insertion cursor after key movement
+                    from ..scroll_helpers import ensure_insert_visible as _ens_cursor
+                    widget.bind("<KeyRelease>", lambda e, w=widget: _ens_cursor(canvas, inner, w))
+                    # Also handle Enter on some platforms where release may differ
+                    widget.bind("<Return>", lambda e, w=widget: (_ens_cursor(canvas, inner, w), None))
+                    widget.bind("<KP_Enter>", lambda e, w=widget: (_ens_cursor(canvas, inner, w), None))
             except Exception:
                 pass
             grid_row += 1

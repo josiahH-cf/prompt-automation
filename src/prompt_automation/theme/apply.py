@@ -32,6 +32,10 @@ def apply_to_root(root, theme: Dict[str, str], *, initial: bool = False, enable:
         ('*insertBackground', get_cursor_color(theme)),  # resource name form used by option database
         ('*Text.insertBackground', get_cursor_color(theme)),  # widget-specific override (Text)
         ('*Entry.insertBackground', get_cursor_color(theme)),  # widget-specific override (Entry)
+        # Insertion cursor width for better visibility on dark backgrounds
+        ('*insertWidth', '2'),
+        ('*Text.insertWidth', '2'),
+        ('*Entry.insertWidth', '2'),
         ('*troughColor', theme['surfaceAlt']),
     ]
     count = 0

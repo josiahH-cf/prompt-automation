@@ -66,4 +66,41 @@ def ensure_visible(canvas, inner, widget) -> None:  # pragma: no cover - Tk runt
         pass
 
 
-__all__ = ["compute_scroll_adjustment", "ensure_visible"]
+def ensure_insert_visible(canvas, inner, text_widget) -> None:  # pragma: no cover - Tk runtime
+    """Scroll the outer canvas so the Text widget's insertion cursor is visible.
+
+    This accounts for the caret location within a scrolled Text widget by
+    querying ``text_widget.bbox('insert')`` and translating to the canvas
+    coordinate system, then applying the same adjustment policy used by
+    :func:`ensure_visible`.
+    """
+    try:
+        # Make sure layout metrics are up-to-date
+        canvas.update_idletasks()
+        inner.update_idletasks()
+        text_widget.update_idletasks()
+        bbox = text_widget.bbox("insert")
+        if not bbox:
+            # Fallback: ensure entire widget visibility if caret bbox missing
+            return ensure_visible(canvas, inner, text_widget)
+        # bbox is (x, y, width, height) relative to the Text widget's visible area
+        _, by, _, bh = bbox
+        # Convert to inner frame coordinates
+        w_top_abs = text_widget.winfo_rooty() - inner.winfo_rooty()
+        caret_top = int(w_top_abs + by)
+        caret_bottom = int(caret_top + bh)
+        v_top = int(canvas.canvasy(0))
+        v_bot = int(v_top + canvas.winfo_height())
+        new_top = compute_scroll_adjustment(caret_top, caret_bottom, v_top, v_bot)
+        if new_top is None:
+            return
+        total_h = max(1, inner.winfo_height())
+        cv_h = max(1, canvas.winfo_height())
+        denom = max(1, total_h - cv_h)
+        frac = max(0.0, min(1.0, new_top / denom))
+        canvas.yview_moveto(frac)
+    except Exception:
+        pass
+
+
+__all__ = ["compute_scroll_adjustment", "ensure_visible", "ensure_insert_visible"]
