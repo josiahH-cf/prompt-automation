@@ -7,8 +7,9 @@ verified without a real ``tkinter`` environment.
 from __future__ import annotations
 
 from typing import Any, Dict
+import os
 
-from ....renderer import fill_placeholders
+from ....renderer import fill_placeholders, read_file_safe
 from ....paste import copy_to_clipboard  # legacy direct copy
 from ...error_dialogs import safe_copy_to_clipboard
 from ....variables.storage import get_setting_auto_copy_review, is_auto_copy_enabled_for_template
@@ -32,6 +33,15 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
     needs_append = any(
         k == "append_file" or k.endswith("_append_file") for k in variables
     )
+
+    # Determine if reference file is present in variables
+    ref_path = None
+    try:
+        val = variables.get("reference_file")
+        if isinstance(val, str) and val.strip():
+            ref_path = val.strip()
+    except Exception:
+        ref_path = None
 
     # ------------------------------------------------------------------
     # Headless test environment: tkinter stub without Label class
@@ -68,6 +78,14 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
                 copy_to_clipboard(rendered)
             app.finish(rendered)
 
+        def view_reference() -> None:
+            # Headless no-op viewer; ensure content can be read without raising
+            try:
+                if ref_path:
+                    _ = read_file_safe(ref_path)
+            except Exception:
+                pass
+
         def cancel() -> None:
             app.cancel()
 
@@ -89,6 +107,7 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             finish=finish,
             cancel=cancel,
             bindings=bindings,
+            view_reference=view_reference if ref_path else None,
         )
 
     # ------------------------------------------------------------------
@@ -141,6 +160,32 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
                 copy_to_clipboard(payload)
             _set_status("Paths Copied ✔")
 
+    def _open_reference() -> None:
+        # Show reference file content in a simple viewer window
+        try:
+            if not ref_path:
+                return
+            win = tk.Toplevel(app.root)
+            from pathlib import Path as _P
+            try: win.title(f"Reference File: {_P(ref_path).name}")
+            except Exception: win.title("Reference File")
+            win.geometry("900x680")
+            text_frame = tk.Frame(win)
+            text_frame.pack(fill="both", expand=True)
+            txt = tk.Text(text_frame, wrap="word")
+            vs = tk.Scrollbar(text_frame, orient="vertical", command=txt.yview)
+            txt.configure(yscrollcommand=vs.set)
+            txt.pack(side="left", fill="both", expand=True)
+            vs.pack(side="right", fill="y")
+            try:
+                content = read_file_safe(ref_path).replace("\r", "")
+            except Exception:
+                content = "(Error reading file)"
+            txt.insert("1.0", content)
+            txt.config(state="disabled")
+        except Exception:
+            pass
+
     def finish() -> None:
         final_text = text.get("1.0", "end-1c")
         if needs_append and messagebox.askyesno(
@@ -162,8 +207,11 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
         copy_paths_btn.grid(row=0, column=98, sticky="e", padx=4)
     else:
         copy_paths_btn = None
-    tk.Button(btn_bar, text="Finish", command=finish).grid(row=0, column=97, sticky="e", padx=4)
-    tk.Button(btn_bar, text="Cancel", command=cancel).grid(row=0, column=96, sticky="e", padx=12)
+    if ref_path:
+        view_ref_btn = tk.Button(btn_bar, text="View Reference", command=_open_reference)
+        view_ref_btn.grid(row=0, column=97, sticky="e", padx=4)
+    tk.Button(btn_bar, text="Finish", command=finish).grid(row=0, column=96, sticky="e", padx=4)
+    tk.Button(btn_bar, text="Cancel", command=cancel).grid(row=0, column=95, sticky="e", padx=12)
 
     # Responsive adjustments (instruction wraplength)
     def _on_resize(event=None):  # pragma: no cover - GUI behaviour
@@ -191,6 +239,15 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
                 if copied:
                     _set_status("Copied ✔")
                     instr_var.set(INSTR_FINISH_COPY_AGAIN)
+    except Exception:
+        pass
+
+    # If reference file present, auto-open once after layout unless disabled
+    try:
+        if ref_path:
+            auto_open = os.environ.get("PA_REVIEW_AUTO_OPEN_REFERENCE", "1") != "0"
+            if auto_open:
+                app.root.after(80, _open_reference)
     except Exception:
         pass
 

@@ -249,14 +249,13 @@ class PromptCLI:
             pass
 
         if gui_mode:
-            # Fast path: --focus attempts to bring existing singleton window to front
-            if args.focus:
-                try:
-                    from ..gui.single_window import singleton as _sw_singleton
-                    if _sw_singleton.connect_and_focus_if_running():
-                        return
-                except Exception:
-                    pass
+            # Attempt to focus an existing instance first (fast path), even without --focus
+            try:
+                from ..gui.single_window import singleton as _sw_singleton
+                if _sw_singleton.connect_and_focus_if_running():
+                    return
+            except Exception:
+                pass
             from .. import gui
             gui.run()
             return

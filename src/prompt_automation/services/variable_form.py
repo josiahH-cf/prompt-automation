@@ -21,9 +21,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Tuple
+import os
 
 import tkinter as tk  # type: ignore
 from tkinter import filedialog  # type: ignore
+
+from ..errorlog import get_logger
+from ..gui.single_window.formatting_helpers import next_line_prefix
 
 from ..variables.storage import (
     _get_template_entry,
@@ -96,6 +100,31 @@ def build_widget(placeholder_spec: Dict[str, Any]) -> Tuple[Callable[[tk.Widget]
                 text = var.get()
                 if text:
                     widget.insert("1.0", text)
+                # Optional bullet/checklist auto-prefix on Enter
+                fmt = str(placeholder_spec.get("format") or "").strip().lower()
+                disabled = os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") == "1"
+                if fmt in {"bullet", "checklist"} and not disabled:
+                    log = get_logger("prompt_automation.gui.single_window")
+
+                    def _on_return(ev, w=widget, format_type=fmt):  # pragma: no cover - runtime bind
+                        try:
+                            line_start = w.index("insert linestart")
+                            line_end = w.index("insert lineend")
+                            prev_line = w.get(line_start, line_end)
+                            prefix = next_line_prefix(prev_line, format_type)  # type: ignore[arg-type]
+                            w.insert("insert", "\n" + prefix)
+                            try:
+                                log.debug("bullet_insert", extra={"format": format_type, "inserted": prefix})
+                            except Exception:
+                                pass
+                            return "break"
+                        except Exception:
+                            return None
+
+                    try:
+                        widget.bind("<Return>", _on_return)
+                    except Exception:
+                        pass
                 text_ref["widget"] = widget
                 return widget
             widget = tk.Entry(master, textvariable=var)

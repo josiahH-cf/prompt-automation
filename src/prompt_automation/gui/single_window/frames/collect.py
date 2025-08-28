@@ -17,6 +17,9 @@ from ...collector.persistence import get_global_reference_file
 from ...collector.overrides import load_overrides, save_overrides
 from ....renderer import read_file_safe
 from ...constants import INSTR_COLLECT_SHORTCUTS
+import os
+from ..scroll_helpers import ensure_visible
+from ....errorlog import get_logger
 
 
 def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
@@ -31,6 +34,11 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         def _review_stub():
             return None
         bindings["<Control-Return>"] = _review_stub
+        # Conditional reference file binding visibility (headless test aid)
+        placeholders = template.get("placeholders") or []
+        has_ref = any(isinstance(ph, dict) and ph.get("name") == "reference_file" for ph in placeholders)
+        if has_ref:
+            bindings["_global_reference"] = {"get": lambda: "", "persist": lambda: None}
         return types.SimpleNamespace(instructions=instr, bindings=bindings)
 
     frame = tk.Frame(app.root)
@@ -63,12 +71,21 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     label_widgets = []  # track to update wraplength on resize
 
     focus_chain = []  # ordered list of focusable input widgets
-    for row, ph in enumerate(placeholders):
+    grid_row = 0
+    created_global_ref = False
+    for ph in placeholders:
         name = ph.get("name") if isinstance(ph, dict) else None
         if not name:
             continue
+        # Ensure per-template uniqueness for reference_file path
+        try:
+            if name == "reference_file":
+                ph["override"] = True
+                ph["template_id"] = template.get("id")
+        except Exception:
+            pass
         lbl = tk.Label(inner, text=ph.get("label", name), anchor="w", justify="left")
-        lbl.grid(row=row, column=0, sticky="nw", padx=6, pady=4)
+        lbl.grid(row=grid_row, column=0, sticky="nw", padx=6, pady=4)
         label_widgets.append(lbl)
 
         ctor, bind = variable_form_factory(ph)
@@ -94,35 +111,54 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             try:
                 sb = _tk.Scrollbar(inner, orient="vertical", command=widget.yview)
                 widget.configure(yscrollcommand=sb.set)
-                widget.grid(row=row, column=1, sticky="nsew", padx=(6, 0), pady=4)
-                sb.grid(row=row, column=2, sticky="ns", padx=(0, 6), pady=4)
-                inner.rowconfigure(row, weight=1)
+                widget.grid(row=grid_row, column=1, sticky="nsew", padx=(6, 0), pady=4)
+                sb.grid(row=grid_row, column=2, sticky="ns", padx=(0, 6), pady=4)
+                inner.rowconfigure(grid_row, weight=1)
                 inner.columnconfigure(1, weight=1)
             except Exception:
-                widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
+                widget.grid(row=grid_row, column=1, sticky="we", padx=6, pady=4)
             focus_chain.append(widget)
+            # Ensure focused widget is visible when tabbing/clicking
+            try:
+                if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
+                    widget.bind("<FocusIn>", lambda e, w=widget: ensure_visible(canvas, inner, w))
+            except Exception:
+                pass
+            grid_row += 1
         elif bind.get("path_var") is not None:
-            widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
+            widget.grid(row=grid_row, column=1, sticky="we", padx=6, pady=4)
             entry = getattr(widget, "entry", None)
             browse_btn = getattr(widget, "browse_btn", None)
             skip_btn = getattr(widget, "skip_btn", None)
             if entry:
                 entry.pack(side="left", fill="x", expand=True)
                 focus_chain.append(entry)
+                try:
+                    if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
+                        entry.bind("<FocusIn>", lambda e, w=entry: ensure_visible(canvas, inner, w))
+                except Exception:
+                    pass
             if browse_btn:
                 browse_btn.pack(side="left", padx=2)
             if skip_btn:
                 skip_btn.pack(side="left", padx=2)
             if bind.get("view") and hasattr(widget, "view_btn"):
                 widget.view_btn.pack(side="left", padx=2)  # type: ignore[attr-defined]
+            grid_row += 1
         else:  # single-line entry
-            widget.grid(row=row, column=1, sticky="we", padx=6, pady=4)
+            widget.grid(row=grid_row, column=1, sticky="we", padx=6, pady=4)
             try:
                 import tkinter as _tk2
                 if isinstance(widget, _tk2.Entry):
                     focus_chain.append(widget)
+                    try:
+                        if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
+                            widget.bind("<FocusIn>", lambda e, w=widget: ensure_visible(canvas, inner, w))
+                    except Exception:
+                        pass
             except Exception:
                 pass
+            grid_row += 1
             if bind.get("remember_var") is not None:
                 tk.Checkbutton(
                     inner,
@@ -132,7 +168,7 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
 
         # Override reset (applies to file placeholders currently)
         if ph.get("override"):
-            tk.Label(inner, text="*", fg="red").grid(row=row, column=3, padx=2)
+            tk.Label(inner, text="*", fg="red").grid(row=grid_row - 1, column=3, padx=2)
 
             def _reset(b=bind):
                 if b.get("path_var") is not None:
@@ -142,9 +178,9 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                 b.get("persist", lambda: None)()
 
             bind["reset"] = _reset
-            tk.Button(inner, text="Reset", command=_reset).grid(row=row, column=4, padx=2)
+            tk.Button(inner, text="Reset", command=_reset).grid(row=grid_row - 1, column=4, padx=2)
 
-        if row == 0 and hasattr(widget, "focus_set"):
+        if grid_row == 1 and hasattr(widget, "focus_set"):
             widget.focus_set()
 
     # Allow both columns to stretch; col1 (inputs) gets higher weight
@@ -221,10 +257,9 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         side="left", padx=4
     )
 
-    # --- Global reference file picker ------------------------------------
-    ref_frame = tk.Frame(btn_bar)
-    ref_frame.pack(side="left", padx=4)
+    # Prebuild global reference frame and bindings (kept hidden unless legacy flag)
     ref_path_var = tk.StringVar(value=get_global_reference_file() or "")
+    ref_frame = tk.Frame(btn_bar)
     ref_entry = tk.Entry(ref_frame, textvariable=ref_path_var, width=40)
     ref_entry.pack(side="left", fill="x", expand=True)
 
@@ -272,10 +307,10 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             gfiles.pop("reference_file", None)
         save_overrides(ov)
 
+    # Expose on frame for tests; do not pack unless legacy flag set
     ref_frame.entry = ref_entry  # type: ignore[attr-defined]
     ref_frame.browse_btn = browse_btn  # type: ignore[attr-defined]
     ref_frame.view_btn = view_btn  # type: ignore[attr-defined]
-
     bindings["_global_reference"] = {
         "get": lambda: ref_path_var.get(),
         "persist": _persist_ref,
@@ -305,6 +340,11 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                     try:
                         nxt = chain[(i + 1) % len(chain)]
                         nxt.focus_set()
+                        try:
+                            if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
+                                ensure_visible(canvas, inner, nxt)
+                        except Exception:
+                            pass
                     except Exception:
                         pass
                     return "break"  # prevent Text from inserting tab
@@ -313,6 +353,11 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                     try:
                         prv = chain[(i - 1) % len(chain)]
                         prv.focus_set()
+                        try:
+                            if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") != "1":
+                                ensure_visible(canvas, inner, prv)
+                        except Exception:
+                            pass
                     except Exception:
                         pass
                     return "break"
@@ -322,6 +367,70 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             except Exception:
                 pass
     _bind_tab_traversal(focus_chain)
+
+    # Legacy global reference picker (feature-flag fallback)
+    if os.environ.get("PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX") == "1" and not created_global_ref:
+        ref_frame = tk.Frame(btn_bar)
+        ref_frame.pack(side="left", padx=4)
+        ref_path_var = tk.StringVar(value=get_global_reference_file() or "")
+        ref_entry = tk.Entry(ref_frame, textvariable=ref_path_var, width=40)
+        ref_entry.pack(side="left", fill="x", expand=True)
+
+        def _browse_ref():
+            from tkinter import filedialog
+
+            fname = filedialog.askopenfilename()
+            if fname:
+                ref_path_var.set(fname)
+
+        browse_btn = tk.Button(ref_frame, text="Browse", command=_browse_ref)
+        browse_btn.pack(side="left", padx=2)
+
+        def _view_ref():
+            path = ref_path_var.get().strip()
+            if not path:
+                return
+            win = tk.Toplevel(app.root)
+            win.title(f"Reference File: {Path(path).name}")
+            win.geometry("900x680")
+            text_frame = tk.Frame(win)
+            text_frame.pack(fill="both", expand=True)
+            txt = tk.Text(text_frame, wrap="word")
+            vs = tk.Scrollbar(text_frame, orient="vertical", command=txt.yview)
+            txt.configure(yscrollcommand=vs.set)
+            txt.pack(side="left", fill="both", expand=True)
+            vs.pack(side="right", fill="y")
+            try:
+                content = read_file_safe(path).replace("\r", "")
+            except Exception:
+                content = "(Error reading file)"
+            txt.insert("1.0", content)
+            txt.config(state="disabled")
+
+        view_btn = tk.Button(ref_frame, text="View", command=_view_ref)
+        view_btn.pack(side="left", padx=2)
+
+        def _persist_ref():
+            ov = load_overrides()
+            gfiles = ov.setdefault("global_files", {})
+            pv = ref_path_var.get().strip()
+            if pv:
+                gfiles["reference_file"] = pv
+            else:
+                gfiles.pop("reference_file", None)
+            save_overrides(ov)
+
+        ref_frame.entry = ref_entry  # type: ignore[attr-defined]
+        ref_frame.browse_btn = browse_btn  # type: ignore[attr-defined]
+        ref_frame.view_btn = view_btn  # type: ignore[attr-defined]
+
+        bindings["_global_reference"] = {
+            "get": lambda: ref_path_var.get(),
+            "persist": _persist_ref,
+            "path_var": ref_path_var,
+            "view": _view_ref,
+        }
+        widgets["_global_reference"] = ref_frame
 
     # Key bindings (stage-level): Ctrl+Enter = Review, Esc = Back
     try:

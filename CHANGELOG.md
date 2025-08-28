@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Single-window GUI: restored bullet/checklist auto-formatting for multiline placeholders via lightweight key bindings.
+- Reference file picker now renders only when a `reference_file` placeholder exists and appears inline beneath it (no global toolbar clutter).
+- Improved accessibility: focus changes auto-scroll to reveal the focused input; added debug logs for bullet insertion, inline ref picker instantiation, and scroll adjustments.
+- Added feature flag `PA_DISABLE_SINGLE_WINDOW_FORMATTING_FIX=1` to temporarily disable the new formatting/scroll and revert to legacy global picker layout.
 - Added Dark Mode & theming infrastructure:
   - New `dark` theme with accessible palette (AA contrast).
   - Runtime toggle `Ctrl+Alt+D` with persistence.

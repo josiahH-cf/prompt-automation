@@ -32,6 +32,11 @@ from typing import Optional, Callable
 
 __all__ = ["connect_and_focus_if_running", "start_server"]
 
+# In-process flag used to acknowledge an already-running GUI within the
+# same Python process when IPC is unavailable (e.g., restricted sandboxes).
+_IN_PROCESS_RUNNING = False
+_INPROC_SOCKET_PATH = None  # type: ignore[var-annotated]
+
 
 def _socket_path() -> str:
     override = os.environ.get("PROMPT_AUTOMATION_SINGLETON_SOCKET")
@@ -76,10 +81,23 @@ def connect_and_focus_if_running() -> bool:
                     return True
     except Exception:
         pass
+    # Fallback for environments where IPC sockets/files are not available but
+    # the current process already has a running instance (e.g., under tests
+    # that start an instance then invoke CLI within the same process).
+    global _IN_PROCESS_RUNNING, _INPROC_SOCKET_PATH
+    if _IN_PROCESS_RUNNING and _INPROC_SOCKET_PATH == _socket_path():
+        return True
     return False
 
 
 def start_server(focus_callback: Callable[[], None]) -> Optional[threading.Thread]:  # pragma: no cover - runtime thread
+    global _IN_PROCESS_RUNNING, _INPROC_SOCKET_PATH
+    # Mark that a GUI instance exists in this process even if IPC cannot be established
+    _IN_PROCESS_RUNNING = True
+    try:
+        _INPROC_SOCKET_PATH = _socket_path()
+    except Exception:
+        _INPROC_SOCKET_PATH = None
     force_tcp = os.environ.get("PROMPT_AUTOMATION_SINGLETON_FORCE_TCP") == "1"
     use_unix = hasattr(socket, "AF_UNIX") and not force_tcp and os.name != "nt"
 
