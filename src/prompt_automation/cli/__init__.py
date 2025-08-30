@@ -125,6 +125,11 @@ class PromptCLI:
             help="Show current hotkey and platform integration status",
         )
         parser.add_argument(
+            "--hotkey-repair",
+            action="store_true",
+            help="Re-write hotkey integration files and verify (safe)",
+        )
+        parser.add_argument(
             "--theme",
             choices=["light", "dark", "system"],
             help="Override theme for this run (does not persist)",
@@ -185,6 +190,14 @@ class PromptCLI:
                 print(f"AppleScript: {'OK' if script_path.exists() else 'MISSING'} -> {script_path}")
             else:
                 print("Unknown platform: status not available")
+            return
+
+        if args.hotkey_repair:
+            from ..hotkeys.base import HotkeyManager
+            if not HotkeyManager.ensure_hotkey_dependencies():
+                print("[prompt-automation] Hotkey dependencies missing; see above for install instructions.")
+                return
+            HotkeyManager.update_hotkeys()
             return
 
         if args.update:
@@ -297,11 +310,13 @@ class PromptCLI:
         self._log.info("running on %s", platform.platform())
         if not check_dependencies(require_fzf=not gui_mode):
             return
-        try:  # never block startup
-            updater.check_for_update()
-        except Exception:
-            pass
-        manifest_update.check_and_prompt()
+        from ..dev import is_dev_mode
+        if not is_dev_mode():
+            try:  # never block startup
+                updater.check_for_update()
+            except Exception:
+                pass
+            manifest_update.check_and_prompt()
         # Theme resolution: allow CLI override and optional persistence
         try:
             if args.theme:

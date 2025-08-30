@@ -12,6 +12,26 @@ Recent feature highlights:
  - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
 - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
 
+---
+
+### Developer Install (One-Step)
+
+For local development where edits should take effect immediately and without re‑installing:
+
+- Windows (recommended): run `install/install-dev.ps1` in PowerShell.
+  - Installs in editable mode via pipx (or falls back to pip `--user -e`).
+  - Sets `PROMPT_AUTOMATION_DEV=1` and `PROMPT_AUTOMATION_AUTO_UPDATE=0` for your user.
+  - Assigns the standard hotkey (Ctrl+Shift+J) and writes the AHK script.
+- Linux/macOS: install in editable mode and assign hotkey
+  - `pipx install --editable .` or `python -m pip install --user -e .`
+  - `prompt-automation --assign-hotkey`
+
+Launch commands (any): `prompt-automation`, `prompt_automation`, `pa`, or `python -m prompt_automation`.
+
+Hotkey repair/verification: `prompt-automation --hotkey-repair` (re-writes AHK/Espanso config; safe to run anytime). Status: `prompt-automation --hotkey-status`.
+
+Run tests as a baseline: `pytest -q`.
+
 ### Dark Mode & Theming
 
 - Default is light (unchanged visuals). Toggle at runtime with `Ctrl+Alt+D`.
