@@ -28,6 +28,7 @@ from ...shortcuts import load_shortcuts
 from ...theme import model as _theme_model
 from ...theme import resolve as _theme_resolve
 from ...theme import apply as _theme_apply
+from ...prompts import parser_singlefield  # single-field capture parser
 
 
 class SingleWindowApp:
@@ -218,6 +219,26 @@ class SingleWindowApp:
         self.start()
 
     def advance_to_review(self, variables: Dict[str, Any]) -> None:
+        # Inject single-field logic outputs BEFORE building review view so fill_placeholders works.
+        try:
+            tmpl = self.template or {}
+            phs = tmpl.get("placeholders") or []
+            if (
+                isinstance(phs, list)
+                and len(phs) == 1
+                and isinstance(phs[0], dict)
+                and 'logic' in (tmpl or {})
+            ):
+                # Accept any single placeholder name; map to capture for parsing
+                only_name = phs[0].get('name')
+                cap_val = variables.get(only_name) or variables.get('capture') or ''
+                tz = (tmpl.get('logic') or {}).get('timezone') if isinstance(tmpl.get('logic'), dict) else None
+                parsed = parser_singlefield.parse_capture(cap_val, timezone=tz)
+                # Merge parsed outputs if not already supplied
+                for k, v in parsed.items():
+                    variables.setdefault(k, v)
+        except Exception:  # pragma: no cover - defensive
+            pass
         self.variables = variables
         self._clear_content()
         self._stage = "review"

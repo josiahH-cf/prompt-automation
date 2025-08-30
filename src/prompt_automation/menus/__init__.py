@@ -43,6 +43,7 @@ from .render_pipeline import (
     apply_markdown_rendering,
     apply_post_render,
 )
+from ..prompts import parser_singlefield
 
 
 # --- Rendering -------------------------------------------------------------
@@ -94,6 +95,23 @@ def render_template(
         )
     else:
         raw_vars = dict(values)
+
+    # If this template includes a single-field capture and a logic block, parse it
+    try:
+        if (
+            isinstance(placeholders, list)
+            and len(placeholders) == 1
+            and placeholders[0].get("name") == "capture"
+            and isinstance(tmpl.get("logic"), dict)
+        ):
+            capture_val = raw_vars.get("capture") or ""
+            tz = tmpl.get("logic", {}).get("timezone")
+            parsed = parser_singlefield.parse_capture(capture_val, timezone=tz)
+            # Update raw_vars with parsed outputs so downstream pipeline sees them
+            raw_vars.update(parsed)
+    except Exception:
+        pass
+
     vars = dict(raw_vars)
 
     context_path = raw_vars.get("context_append_file") or raw_vars.get("context_file")
@@ -117,6 +135,29 @@ def render_template(
 
     rendered = fill_placeholders(tmpl["template"], vars)
     rendered = apply_post_render(rendered, tmpl, placeholders, vars, exclude_globals)
+
+    # Fallback: if logic-driven tokens still present, attempt late parse & substitution
+    if (
+        isinstance(tmpl.get("logic"), dict)
+        and isinstance(placeholders, list)
+        and len(placeholders) == 1
+        and placeholders[0].get("name") == "capture"
+    and ("{{title}}" in rendered or "{{priority}}" in rendered or "{{due_display}}" in rendered or "{{acceptance_final}}" in rendered)
+    ):
+        try:
+            capture_val = raw_vars.get("capture") or ""
+            tz = tmpl.get("logic", {}).get("timezone")
+            parsed_late = parser_singlefield.parse_capture(capture_val, timezone=tz)
+            repl_map = {
+                "{{title}}": parsed_late.get("title", ""),
+                "{{priority}}": parsed_late.get("priority", ""),
+                "{{due_display}}": parsed_late.get("due_display", ""),
+                "{{acceptance_final}}": parsed_late.get("acceptance_final", ""),
+            }
+            for token, val in repl_map.items():
+                rendered = rendered.replace(token, val)
+        except Exception:
+            pass
 
     if return_vars:
         return rendered, raw_vars
