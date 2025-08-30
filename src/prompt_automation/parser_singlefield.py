@@ -16,8 +16,7 @@ PRIORITY_KEYWORDS = {
 
 
 RE_CAPTURE = re.compile(
-    r"(?i)^(?P<outcome>.*?)(?:\s+(?P<priority>p[1-4]))?(?:\s+due:\s*(?P<due>[^\n]+?))?(?:\s+ac:\s*(?P<ac>.+))?$"
-)
+    r"(?i)^(?P<outcome>.*?)(?:\s+(?P<priority>p[1-4]))?(?:\s+due:\s*(?P<due>[^\n]+?))?(?:\s+ac:\s*(?P<ac>.+))?$")
 
 
 def _infer_priority_from_outcome(outcome: str) -> Optional[str]:

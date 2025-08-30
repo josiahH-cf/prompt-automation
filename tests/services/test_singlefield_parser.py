@@ -1,5 +1,5 @@
 import re
-from prompt_automation.prompts import parser_singlefield as ps
+from prompt_automation import parser_singlefield as ps
 
 
 def _strip_time_markup(s: str) -> str:

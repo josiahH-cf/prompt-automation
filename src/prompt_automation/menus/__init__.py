@@ -43,7 +43,7 @@ from .render_pipeline import (
     apply_markdown_rendering,
     apply_post_render,
 )
-from ..prompts import parser_singlefield
+from .. import parser_singlefield
 
 
 # --- Rendering -------------------------------------------------------------

@@ -28,7 +28,7 @@ from ...shortcuts import load_shortcuts
 from ...theme import model as _theme_model
 from ...theme import resolve as _theme_resolve
 from ...theme import apply as _theme_apply
-from ...prompts import parser_singlefield  # single-field capture parser
+from ... import parser_singlefield  # single-field capture parser
 
 
 class SingleWindowApp:
