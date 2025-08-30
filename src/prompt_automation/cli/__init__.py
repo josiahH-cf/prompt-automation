@@ -74,6 +74,9 @@ class PromptCLI:
             "--troubleshoot", action="store_true", help="Show troubleshooting help and paths"
         )
         parser.add_argument(
+            "--version", action="store_true", help="Print version and exit"
+        )
+        parser.add_argument(
             "--prompt-dir", type=Path, help="Directory containing prompt templates"
         )
         parser.add_argument(
@@ -132,6 +135,14 @@ class PromptCLI:
             help="Persist the provided --theme value to settings.json",
         )
         args = parser.parse_args(argv)
+
+        if args.version:
+            try:
+                from importlib.metadata import version as _dist_version
+                print(f"prompt-automation { _dist_version('prompt-automation') }")
+            except Exception:
+                print("prompt-automation (version unknown)")
+            return
 
         if args.prompt_dir:
             path = args.prompt_dir.expanduser().resolve()
