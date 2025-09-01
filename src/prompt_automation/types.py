@@ -11,6 +11,11 @@ class Placeholder(TypedDict, total=False):
     default: NotRequired[str]
     multiline: NotRequired[bool]
     format: NotRequired[str]
+    # Extended types and display options
+    type: NotRequired[str]  # e.g. 'file', 'reminder', 'link'
+    url: NotRequired[str]
+    href: NotRequired[str]
+    link_text: NotRequired[str]
 
 
 class Template(TypedDict, total=False):

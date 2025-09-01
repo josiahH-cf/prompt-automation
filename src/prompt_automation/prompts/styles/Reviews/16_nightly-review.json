@@ -6,8 +6,7 @@
   "placeholders": [
     {
       "name": "reminder_open",
-      "label": "Open personal email, Todoist, and this app in a view",
-      "default": ""
+      "label": "Open personal email, Todoist, and this app in a view"
     },
     {
       "name": "time_available",

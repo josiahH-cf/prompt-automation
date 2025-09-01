@@ -30,16 +30,52 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     if not hasattr(tk, "Canvas"):
         instr = {"text": INSTR_COLLECT_SHORTCUTS}
         # Provide minimal bindings map for tests (Ctrl+Enter review stub)
-        bindings = {}
+        bindings: Dict[str, Dict[str, Any]] = {}
         def _review_stub():
             return None
         bindings["<Control-Return>"] = _review_stub
-        # Conditional reference file binding visibility (headless test aid)
-        placeholders = template.get("placeholders") or []
-        has_ref = any(isinstance(ph, dict) and ph.get("name") == "reference_file" for ph in placeholders)
+        # Classify placeholders for headless assertions and expose lightweight bindings
+        phs = template.get("placeholders") or []
+        if not isinstance(phs, list):
+            phs = []
+
+        def _classify(ph: Dict[str, Any]) -> str:
+            ptype = (ph.get("type") or "").lower()
+            name = ph.get("name", "")
+            # Explicit kinds first
+            if ptype in {"reminder", "note"}:
+                return "reminder"
+            if ptype == "link" or ph.get("url") or ph.get("href"):
+                return "link"
+            # Heuristic: names beginning with reminder_ and not multiline are reminders
+            if name.startswith("reminder_") and not ph.get("multiline"):
+                return "reminder"
+            return "input"
+
+        placeholders_meta: Dict[str, Dict[str, Any]] = {}
+        for ph in phs:
+            if not isinstance(ph, dict):
+                continue
+            name = ph.get("name")
+            if not name:
+                continue
+            kind = _classify(ph)
+            meta: Dict[str, Any] = {"kind": kind}
+            if kind == "link":
+                url = ph.get("url") or ph.get("href") or ph.get("default") or ""
+                meta["url"] = url
+                # Create a minimal binding for link fields so variable mapping includes the URL
+                bindings[name] = {"get": (lambda u=url: u), "persist": (lambda: None), "url": url}
+            elif kind == "reminder":
+                # Reminder-only fields have no input value; expose empty get/persist
+                bindings[name] = {"get": (lambda: ""), "persist": (lambda: None)}
+            placeholders_meta[name] = meta
+
+        # Conditional global reference binding visibility (headless test aid)
+        has_ref = any(isinstance(ph, dict) and ph.get("name") == "reference_file" for ph in phs)
         if has_ref:
             bindings["_global_reference"] = {"get": lambda: "", "persist": lambda: None}
-        return types.SimpleNamespace(instructions=instr, bindings=bindings)
+        return types.SimpleNamespace(instructions=instr, bindings=bindings, placeholders_meta=placeholders_meta)
 
     frame = tk.Frame(app.root)
     frame.pack(fill="both", expand=True)
@@ -68,11 +104,23 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     if not isinstance(placeholders, list):
         placeholders = []
 
-    label_widgets = []  # track to update wraplength on resize
+    label_widgets = []  # track normal labels to update wraplength on resize
+    full_line_labels = []  # track reminder-only labels spanning the full width
 
     focus_chain = []  # ordered list of focusable input widgets
     grid_row = 0
     created_global_ref = False
+    def _classify(ph: Dict[str, Any]) -> str:
+        ptype = (ph.get("type") or "").lower()
+        name = ph.get("name", "")
+        if ptype in {"reminder", "note"}:
+            return "reminder"
+        if ptype == "link" or ph.get("url") or ph.get("href"):
+            return "link"
+        if name.startswith("reminder_") and not ph.get("multiline"):
+            return "reminder"
+        return "input"
+
     for ph in placeholders:
         name = ph.get("name") if isinstance(ph, dict) else None
         if not name:
@@ -84,10 +132,44 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
                 ph["template_id"] = template.get("id")
         except Exception:
             pass
+        kind = _classify(ph)
+        if kind == "reminder":
+            # Render a full-line reminder label (no input widget)
+            note = tk.Label(inner, text=ph.get("label", name), anchor="w", justify="left")
+            note.grid(row=grid_row, column=0, columnspan=4, sticky="we", padx=6, pady=6)
+            full_line_labels.append(note)
+            # Optionally expose a binding returning empty string for symmetry
+            bindings[name] = {"get": (lambda: ""), "persist": (lambda: None)}
+            grid_row += 1
+            continue
+
+        # Normal label for non-reminder kinds
         lbl = tk.Label(inner, text=ph.get("label", name), anchor="w", justify="left")
         lbl.grid(row=grid_row, column=0, sticky="nw", padx=6, pady=4)
         label_widgets.append(lbl)
 
+        if kind == "link":
+            import webbrowser
+            url = ph.get("url") or ph.get("href") or ph.get("default") or ""
+            link_text = ph.get("link_text") or url or ph.get("label", name)
+            link = tk.Label(inner, text=link_text, fg="#1a0dab", cursor="hand2", anchor="w", justify="left")
+            def _open(u=url):  # pragma: no cover - Tk runtime
+                try:
+                    if u:
+                        webbrowser.open(u)
+                except Exception:
+                    pass
+            try:
+                link.bind("<Button-1>", lambda e: (_open(), "break"))
+            except Exception:
+                pass
+            link.grid(row=grid_row, column=1, sticky="w", padx=6, pady=4)
+            widgets[name] = link
+            bindings[name] = {"get": (lambda u=url: u), "persist": (lambda: None), "open": _open, "url": url}
+            grid_row += 1
+            continue
+
+        # Default behaviour: build standard input widget
         ctor, bind = variable_form_factory(ph)
         widget = ctor(inner)
         widgets[name] = widget
@@ -228,6 +310,14 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             for l in label_widgets:
                 try:
                     l.configure(wraplength=wrap)
+                except Exception:
+                    pass
+            # Full-line reminders use the entire inner width minus padding
+            full_usable = max(40, inner_w - 24)
+            full_wrap = int(min(1200, full_usable))
+            for l in full_line_labels:
+                try:
+                    l.configure(wraplength=full_wrap)
                 except Exception:
                     pass
         except Exception:
