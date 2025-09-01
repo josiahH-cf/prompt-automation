@@ -10,6 +10,7 @@ from typing import Any, Dict
 import os
 
 from ....renderer import fill_placeholders, read_file_safe
+from ..formatting_helpers import format_markdown_plain
 from ....paste import copy_to_clipboard  # legacy direct copy
 from ...error_dialogs import safe_copy_to_clipboard
 from ....variables.storage import get_setting_auto_copy_review, is_auto_copy_enabled_for_template
@@ -21,7 +22,7 @@ from ....logger import log_usage
 def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: no cover - Tk runtime
     """Build review frame and return a small namespace for tests."""
     import tkinter as tk
-    from tkinter import messagebox
+    # message dialogs imported lazily only in GUI path to keep headless tests simple
     import types
 
     raw_lines = template.get("template") or []
@@ -69,22 +70,30 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             _set_status("Paths Copied ✔")
 
         def finish() -> None:
-            if needs_append and messagebox.askyesno(
-                "Append Output", "Append rendered text to file(s)?"
-            ):
-                _append_to_files(variables, rendered)
+            # In headless tests, respect a stubbed tkinter.messagebox if provided
+            if needs_append:
+                try:
+                    import tkinter as _tk  # type: ignore
+                    mb = getattr(_tk, 'messagebox', None)
+                    do_append = bool(mb.askyesno("Append Output", "Append rendered text to file(s)?")) if mb else False
+                except Exception:
+                    do_append = False
+                if do_append:
+                    _append_to_files(variables, rendered)
             log_usage(template, len(rendered))
             if not safe_copy_to_clipboard(rendered):
                 copy_to_clipboard(rendered)
             app.finish(rendered)
 
-        def view_reference() -> None:
-            # Headless no-op viewer; ensure content can be read without raising
+        def view_reference() -> str | None:
+            # Headless viewer: return prettified plain text for assertions
             try:
-                if ref_path:
-                    _ = read_file_safe(ref_path)
+                if not ref_path:
+                    return None
+                raw = read_file_safe(ref_path)
+                return format_markdown_plain(raw)
             except Exception:
-                pass
+                return None
 
         def cancel() -> None:
             app.cancel()
@@ -178,9 +187,20 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             txt.pack(side="left", fill="both", expand=True)
             vs.pack(side="right", fill="y")
             try:
-                content = read_file_safe(ref_path).replace("\r", "")
+                raw = read_file_safe(ref_path).replace("\r", "")
             except Exception:
-                content = "(Error reading file)"
+                raw = "(Error reading file)"
+            # Prettify markdown for readability; fall back to raw on error
+            try:
+                content = format_markdown_plain(raw)
+            except Exception:
+                content = raw
+            # Basic emphasis: configure a slightly nicer font for display
+            try:
+                from ..fonts import get_display_font
+                txt.configure(font=get_display_font(master=app.root))
+            except Exception:
+                pass
             txt.insert("1.0", content)
             txt.config(state="disabled")
         except Exception:
@@ -188,10 +208,14 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
 
     def finish() -> None:
         final_text = text.get("1.0", "end-1c")
-        if needs_append and messagebox.askyesno(
-            "Append Output", "Append rendered text to file(s)?"
-        ):
-            _append_to_files(variables, final_text)
+        if needs_append:
+            try:
+                from tkinter import messagebox  # type: ignore
+                do_append = messagebox.askyesno("Append Output", "Append rendered text to file(s)?")
+            except Exception:
+                do_append = False
+            if do_append:
+                _append_to_files(variables, final_text)
         log_usage(template, len(final_text))
         if not safe_copy_to_clipboard(final_text):
             copy_to_clipboard(final_text)

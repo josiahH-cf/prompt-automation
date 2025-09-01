@@ -35,6 +35,12 @@ def _stub_tk(monkeypatch):
 
 
 def test_tcp_fallback_focus(monkeypatch, tmp_path):
+    # Some CI sandboxes disallow AF_INET sockets entirely; skip in that case
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.close()
+    except Exception:
+        pytest.skip('socket creation not permitted in sandbox')
     _stub_tk(monkeypatch)
     # Force TCP fallback even if AF_UNIX available
     monkeypatch.setenv('PROMPT_AUTOMATION_SINGLETON_FORCE_TCP', '1')
