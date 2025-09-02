@@ -54,12 +54,14 @@ Line becomes: 'Context:\n(none provided)'
 | Key | Type | Purpose | Notes |
 |-----|------|---------|-------|
 | name | string | Token `{{name}}`. | Unique per template. |
-| type | string | `file`, `list`, `number`; omit = text. | UI & processing. |
+| type | string | `file`, `list`, `number`, `reminder`, `link`; omit = text. | UI & processing (see Types). |
 | label | string | UI label. | Auto from `globals.json.notes` if missing. |
 | default | string/list | Fallback when empty. | Lists can be newline string. |
 | multiline | bool | Force multi-line box. | Implicit for list. |
 | options | list[str] | Dropdown choices. | Auto for `hallucinate` if missing. |
 | format / as | string | `list`, `checklist`, `auto`. | Adds bullets / boxes. |
+| url / href | string | For `type: "link"`. | URL to open; `href` alias of `url`. |
+| link_text | string | For `type: "link"`. | Display text; defaults to the URL. |
 | remove_if_empty(_phrases) | str/list | Phrases to strip when value empty. | Case-insensitive. |
 | persist | bool | Opt-in persistence (non-file). | File placeholders excluded. |
 | override | bool | For file placeholders: persist path + skip. | Needed for multi-file memory. |
@@ -94,6 +96,8 @@ If the user deletes all items, phrase removal strips the heading entirely.
 | file | chooser | path | content (plus optional path token) |
 | number | numeric entry | string | direct (invalid→"0") |
 | options | dropdown | string | direct |
+| reminder | none (display-only row) | empty string | empty string |
+| link | none (clickable link) | URL string | URL string |
 
 Edge cases:
 * Empty list placeholder lines (only whitespace) ⇒ treated as empty → default applied.
@@ -148,6 +152,40 @@ Design Notes Length:      (line removed if token line empty)
 --- DESIGN NOTES ---      (section header removed because placeholder line empty)
 ```
 (`| len` is ignored today—future enhancement could enable filters; shown to illustrate safe no-op.)
+
+---
+## 4a. Display‑Only Placeholders (Reminders & Links)
+
+Two UI-focused placeholder types help guide process without collecting input:
+
+- `type: "reminder"` → Full-width reminder line (no text box). Intended for checklists, nudges, or process steps shown during collection. If referenced in the body, it substitutes as an empty string.
+- `type: "link"` → Clickable link appears instead of an input. Clicking opens the URL. If referenced in the body, it substitutes the URL.
+
+Heuristics & keys:
+- Reminders can also be declared implicitly by naming convention: any placeholder whose name starts with `reminder_` and does not set `multiline: true` is treated as a reminder (no input). Use `type: "text"` or set `multiline: true` if you want an actual input field instead.
+- Link keys: `url` (preferred) or `href` (alias). Optional `link_text` controls the displayed text (defaults to the URL).
+
+Examples:
+```jsonc
+// Reminder-only using type
+{ "name": "reminder_open", "label": "Open email, Todoist, and this app", "type": "reminder" }
+
+// Reminder-only via naming convention
+{ "name": "reminder_realistic", "label": "Reschedule based on time available" }
+
+// Clickable link
+{ "name": "guide", "label": "Review Guide", "type": "link", "url": "https://example.com/review", "link_text": "Open Guide" }
+```
+
+Body usage:
+```
+Reference: {{guide}}
+```
+→ substitutes the URL string.
+
+Behavior in single-window UI:
+- Reminders span the full row width and wrap to fit; there is no input box.
+- Links appear where the input would normally be; the label remains on the left.
 
 ---
 ## 5. Special Names
@@ -330,6 +368,8 @@ Reminders:
 | Legacy reference content | `{{reference_file_content}}` still works |
 | Append reasoning directive | Provide global `think_deeply`; omit token |
 | Show overrides | `prompt-automation --list-overrides` |
+| Display-only reminder row | Add `"type": "reminder"` or name starts with `reminder_` |
+| Clickable link row | Add `"type": "link"`, and `"url": "https://..."` (optional `link_text`) |
 
 ---
 

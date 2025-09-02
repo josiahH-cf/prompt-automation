@@ -114,6 +114,17 @@ Management:
 * GUI: Options → Manage overrides (add/remove per-file entries or clear skips)
 * CLI: `--list-overrides`, `--reset-one-override <TID> <NAME>`, `--reset-file-overrides`
 
+### Display‑Only Placeholders: Reminders & Links
+
+The single-window variable collection view supports two UI-focused placeholder types that do not collect input:
+
+- `type: "reminder"` renders a full-width label (no entry). Use for process checks; if referenced in the body the value is an empty string.
+- `type: "link"` renders a clickable link. Clicking opens the URL via Python’s `webbrowser` module. If referenced in the body the value is the URL string.
+
+Heuristics: placeholders whose name starts with `reminder_` and are not `multiline` are treated as reminders automatically. Specify `type: "text"` or `multiline: true` to retain an input.
+
+Keys for links: `url` (preferred) or `href` (alias), with optional `link_text` for the displayed text.
+
 ## Hotkey System Architecture
 
 The hotkey system provides cross-platform global hotkey support with robust fallback mechanisms:
