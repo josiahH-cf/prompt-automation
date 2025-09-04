@@ -622,6 +622,24 @@ pipx upgrade prompt-automation
 This background updater is separate from the existing `--update` flow
 which applies manifest-based template/hotkey updates.
 
+### Windows auto-update safety
+
+On Windows, automatic background upgrades via `pipx` are disabled by default to
+avoid breaking the `pipx` shim in certain edge cases (e.g., installing from a
+temporary or WSL-backed path). You can opt in explicitly by setting:
+
+```powershell
+$env:PROMPT_AUTOMATION_WINDOWS_ALLOW_PIPX_UPDATE = '1'
+```
+
+Manual updates continue to work and are recommended on Windows:
+
+```powershell
+pipx upgrade prompt-automation
+# or
+prompt-automation --update
+```
+
 ### Handling Broken Local Path Specs (pipx)
 
 If you installed from a *temporary* local path (e.g. a copy in `%TEMP%`) and that folder was deleted, `pipx upgrade` may fail with the "Unable to parse package spec" error. The updater now detects this and transparently re-runs:

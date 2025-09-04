@@ -515,6 +515,14 @@ class SingleWindowApp:
             def _on_key(ev):
                 try:
                     ch = getattr(ev, 'char', '')
+                    # Only intercept when the listbox currently has focus.
+                    # This avoids double insertion when typing directly in the entry,
+                    # because Entry's own default handler will already insert the char.
+                    _fg = getattr(root, 'focus_get', None)
+                    if _fg is not None:
+                        if _fg() is not lst:
+                            return None
+                    # If focus_get is unavailable (test stubs), assume listbox-focused.
                     if len(ch) == 1 and ch.isprintable():
                         try:
                             entry.focus_set()
@@ -529,6 +537,9 @@ class SingleWindowApp:
                             return None
                 except Exception:
                     return None
+            # Bind at the root level so keypresses while the listbox has focus
+            # are captured, but the focus guard above prevents interference when
+            # the entry already has focus (avoids double insertion).
             root.bind('<Key>', _on_key)
             self._type_search_bound = True
         except Exception:

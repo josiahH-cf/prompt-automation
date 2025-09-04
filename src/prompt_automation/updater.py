@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 from typing import Optional
 from urllib import request, error
+import sys
 
 from .utils import safe_run
 
@@ -35,6 +36,9 @@ STATE_PATH = Path.home() / ".prompt-automation" / "auto-update.json"
 STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 RATE_LIMIT_SECONDS = 60 * 60 * 24  # 24h
+
+# Platform flag (indirectly patchable in tests)
+_PLATFORM = sys.platform
 
 
 @dataclass
@@ -147,7 +151,16 @@ def _upgrade_via_pipx() -> None:
 
 
 def check_for_update() -> None:
+    # Global opt-out
     if os.environ.get("PROMPT_AUTOMATION_AUTO_UPDATE", "1") == "0":
+        return
+
+    # Safety default on Windows: skip implicit pipx upgrades unless explicitly opted in.
+    # This avoids breaking pipx shims when installed from temporary/local specs
+    # (a common pattern on Windows when installing from a WSL path via PowerShell).
+    if _PLATFORM.startswith("win") and os.environ.get(
+        "PROMPT_AUTOMATION_WINDOWS_ALLOW_PIPX_UPDATE", "0"
+    ) != "1":
         return
 
     state = UpdateState.load()

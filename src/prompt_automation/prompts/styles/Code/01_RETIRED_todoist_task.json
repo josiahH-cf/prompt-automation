@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "_comment": [
+    "Single-field quick add: parse one capture line into structured outputs.",
+    "Implements: regex grammar, defaults, inference, normalization, and acceptance scaffold."
+  ],
+  "id": 1,
+  "title": "RETIRED: Ticket Quick Add (Single-Field)",
+  "style": "Code",
+  "placeholders": [
+    {
+      "name": "capture",
+  "label": "Task (single line)\nRegex Grammar: <Outcome> [p1|p2|p3|p4] [due: <natural language time>] [ac: <free text>]\nAffects output when you add: p1/p2/p3/p4 token, due:..., ac:...\nExamples:\n- Email board update p1 due: today 4pm ac: Include revenue\n- Ship login fix asap\n- Draft roadmap p2 due: next Fri",
+      "multiline": false,
+      "default": ""
+    }
+  ],
+  "template": [
+    "{{title}} — [{{priority}}]{{due_display}}\n{{acceptance_final}}"
+  ],
+  "logic": {
+  "timezone": "America/Chicago",
+    "parse": {
+      "regex": "(?i)^(?P<outcome>.*?)(?:\\s+(?P<priority>p[1-4]))?(?:\\s+due:\\s*(?P<due>[^\\n]+?))?(?:\\s+ac:\\s*(?P<ac>.+))?$",
+      "fields": {
+        "outcome": "The clear, verb-leading outcome/title",
+        "priority": "Optional explicit priority token p1..p4",
+        "due": "Optional natural-language due time (after 'due:' token)",
+        "ac": "Optional acceptance criteria free text (after 'ac:' token)"
+      },
+      "notes": [
+        "Outcome is required; everything else is optional.",
+        "Priority token can appear after outcome in any case (P1..p4).",
+        "Due is captured after 'due:' token; AC captured after 'ac:' token."
+      ]
+    },
+    "defaults": {
+      "priority": "p3",
+      "due": null
+    },
+    "inference": {
+      "priority_keywords": {
+        "p1": [
+          "asap",
+          "urgent",
+          "blocker",
+          "today"
+        ],
+        "p2": [
+          "soon",
+          "this week"
+        ]
+      },
+      "due_backfill_rules": [
+        {
+          "when": "priority==p1 and due is None",
+          "set_due": "today"
+        },
+        {
+          "when": "priority==p2 and due is None",
+          "set_due": "friday"
+        }
+      ]
+    },
+    "normalization": {
+      "title_rules": [
+        "Trim whitespace",
+        "Capitalize first letter",
+        "If no leading verb, prepend one of: Draft/Decide/Fix"
+      ]
+    },
+    "acceptance_scaffold": [
+      "Acceptance Criteria",
+      "- Given …",
+      "- When …",
+      "- Then …"
+    ],
+    "outputs": {
+      "title": "Normalized outcome text",
+      "priority": "One of p1,p2,p3,p4 after explicit token or keyword inference",
+      "due_display": "Empty if none; otherwise ' — due: <resolved time>'",
+      "acceptance_final": "User-provided AC if present, otherwise scaffold above"
+    }
+  },
+  "metadata": {
+    "path": "Code/01_todoist_task.json",
+    "tags": [],
+    "version": 2,
+    "render": "markdown",
+    "share_this_file_openly": true
+  }
+}

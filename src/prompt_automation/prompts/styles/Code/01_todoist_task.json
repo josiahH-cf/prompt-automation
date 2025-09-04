@@ -4,22 +4,22 @@
     "Single-field quick add: parse one capture line into structured outputs.",
     "Implements: regex grammar, defaults, inference, normalization, and acceptance scaffold."
   ],
-  "id": 1,
+  "id": 52,
   "title": "Ticket Quick Add (Single-Field)",
   "style": "Code",
   "placeholders": [
     {
       "name": "capture",
-  "label": "Task (single line)\nRegex Grammar: <Outcome> [p1|p2|p3|p4] [due: <natural language time>] [ac: <free text>]\nAffects output when you add: p1/p2/p3/p4 token, due:..., ac:...\nExamples:\n- Email board update p1 due: today 4pm ac: Include revenue\n- Ship login fix asap\n- Draft roadmap p2 due: next Fri",
+      "label": "Task (single line)\nRegex Grammar: <Outcome> [p1|p2|p3|p4] [due: <natural language time>] [ac: <free text>]\nAffects output when you add: p1/p2/p3/p4 token, due:..., ac:...\nExamples:\n- Email board update p1 due: today 4pm ac: Include revenue\n- Ship login fix asap\n- Draft roadmap p2 due: next Fri",
       "multiline": false,
       "default": ""
     }
   ],
   "template": [
-    "{{title}} — [{{priority}}]{{due_display}}\n{{acceptance_final}}"
+    "{{title}} \u2014 [{{priority}}]{{due_display}}\n{{acceptance_final}}"
   ],
   "logic": {
-  "timezone": "America/Chicago",
+    "timezone": "America/Chicago",
     "parse": {
       "regex": "(?i)^(?P<outcome>.*?)(?:\\s+(?P<priority>p[1-4]))?(?:\\s+due:\\s*(?P<due>[^\\n]+?))?(?:\\s+ac:\\s*(?P<ac>.+))?$",
       "fields": {
@@ -71,14 +71,14 @@
     },
     "acceptance_scaffold": [
       "Acceptance Criteria",
-      "- Given …",
-      "- When …",
-      "- Then …"
+      "- Given \u2026",
+      "- When \u2026",
+      "- Then \u2026"
     ],
     "outputs": {
       "title": "Normalized outcome text",
       "priority": "One of p1,p2,p3,p4 after explicit token or keyword inference",
-      "due_display": "Empty if none; otherwise ' — due: <resolved time>'",
+      "due_display": "Empty if none; otherwise ' \u2014 due: <resolved time>'",
       "acceptance_final": "User-provided AC if present, otherwise scaffold above"
     }
   },
