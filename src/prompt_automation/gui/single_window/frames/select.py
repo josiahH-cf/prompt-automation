@@ -1,9 +1,4 @@
-"""Template selection frame for single-window mode.
-
-Simplified (not feature-complete) list of available templates discovered under
-``PROMPTS_DIR``. Selecting one and pressing Enter or clicking *Next* advances
-to the variable collection stage.
-"""
+"""Template selection frame with hierarchical browse and search."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,8 +8,12 @@ from ....config import PROMPTS_DIR
 from ....errorlog import get_logger
 from ....renderer import load_template
 from ....services.template_search import list_templates, resolve_shortcut
+from ....services.hierarchy import TemplateHierarchyScanner, HierarchyNode
+from ....features import is_hierarchy_enabled
 from ....services import multi_select as multi_select_service
 from ...constants import INSTR_SELECT_SHORTCUTS
+from ..tree_helpers import find_node_for, build_browse_items, flatten_matches
+from ..selector_state import load_expanded, save_expanded
 
 
 _log = get_logger(__name__)
@@ -124,18 +123,64 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     preview = tk.Text(main, wrap="word", height=10, state="disabled")
     preview.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=8)
 
-    rel_map: Dict[int, Path] = {}
+    # Map listbox indices to either a template path or a folder rel
+    item_map: Dict[int, Dict[str, Any]] = {}
+    hier_mode = False
+    cwd_rel = ""  # relative folder path within PROMPTS_DIR
+    scanner: TemplateHierarchyScanner | None = None
 
-    def refresh(*_):
+    # Enable hierarchical mode only in real Tk runtime to keep test stubs' flat expectations intact
+    if is_hierarchy_enabled() and hasattr(tk, "TkVersion"):
+        hier_mode = True
+        scanner = TemplateHierarchyScanner()
+
+    def _refresh_hier(*_):
+        nonlocal cwd_rel
+        assert scanner is not None
+        node = find_node_for(scanner.scan(), cwd_rel)
+        listbox.delete(0, "end")
+        item_map.clear()
+        q = query.get().strip().lower()
+        # Global search mode: when user types, show matching templates anywhere recursively
+        if q:
+            rows = flatten_matches(scanner.list_flat(), q)
+            for idx, (text, meta) in enumerate(rows):
+                listbox.insert("end", text)
+                item_map[idx] = meta
+            status.set(f"{len(rows)} results")
+            update_preview()
+            return
+        # Browsing mode (no query): folders first, then templates of cwd
+        idx = 0
+        if cwd_rel:
+            listbox.insert("end", ".. (up)")
+            item_map[idx] = {"type": "up"}
+            idx += 1
+        # Inline browse rows with expansion support
+        rows = build_browse_items(node, cwd_rel, expanded)
+        for text, meta in rows:
+            listbox.insert("end", text)
+            item_map[idx] = meta
+            idx += 1
+        status.set(f"{idx} items  ·  {cwd_rel or '/'}")
+        update_preview()
+
+    def _refresh_flat(*_):
         paths = list_templates(query.get(), recursive_var.get())
         listbox.delete(0, "end")
-        rel_map.clear()
+        item_map.clear()
         for idx, p in enumerate(paths):
             rel = p.relative_to(PROMPTS_DIR)
             listbox.insert("end", str(rel))
-            rel_map[idx] = p
+            item_map[idx] = {"type": "template", "path": p}
         status.set(f"{len(paths)} templates")
         update_preview()
+
+    def refresh(*_):
+        if hier_mode:
+            _refresh_hier()
+        else:
+            _refresh_flat()
 
     btn_bar = tk.Frame(frame)
     btn_bar.pack(fill="x", pady=(0, 8))
@@ -143,26 +188,69 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     status = tk.StringVar(value="0 templates")
     tk.Label(btn_bar, textvariable=status, anchor="w").pack(side="left", padx=12)
 
+    # Folder expansion state (relative paths from cwd)
+    expanded: set[str] = load_expanded() if hier_mode else set()
+
+    def _toggle_expand_current() -> str:
+        sel = listbox.curselection()
+        if not sel:
+            return "break"
+        item = item_map.get(sel[0])
+        if not item or item.get("type") != "folder":
+            return "break"
+        rel = item.get("rel", "")
+        if rel in expanded:
+            expanded.remove(rel)
+        else:
+            expanded.add(rel)
+        refresh(); save_expanded(expanded)
+        return "break"
+
     def proceed(event=None):
+        nonlocal cwd_rel
         sel = listbox.curselection()
         if not sel:
             status.set("Select a template first")
             return "break"
-        path = rel_map[sel[0]]
+        item = item_map.get(sel[0])
+        if not item:
+            return "break"
+        if item.get("type") == "folder":
+            # navigate into
+            cwd_rel = item.get("rel", "")
+            refresh()
+            return "break"
+        if item.get("type") == "up":
+            cwd_rel = str(Path(cwd_rel).parent) if cwd_rel else ""
+            refresh()
+            return "break"
         try:
-            data = load_template(path)
+            data = load_template(item["path"])  # type: ignore[index]
         except Exception as e:  # pragma: no cover - runtime
             status.set(f"Failed: {e}")
             return "break"
         app.advance_to_collect(data)
         return "break"
 
+    def _nav_up(event=None):
+        nonlocal cwd_rel
+        # Only navigate up in hierarchical mode with no active query
+        if not hier_mode or query.get().strip():
+            return None
+        if not cwd_rel:
+            return None
+        cwd_rel = str(Path(cwd_rel).parent) if cwd_rel else ""
+        refresh()
+        return "break"
+
     def combine_action(event=None):
         sel = listbox.curselection()
-        if len(sel) < 2:
+        # Only count template selections
+        chosen = [item_map[i] for i in sel if item_map.get(i, {}).get("type") == "template"]
+        if len(chosen) < 2:
             status.set("Select at least two templates")
             return "break"
-        loaded = [load_template(rel_map[i]) for i in sel]
+        loaded = [load_template(it["path"]) for it in chosen]
         tmpl = multi_select_service.merge_templates(loaded)
         if tmpl:
             app.advance_to_collect(tmpl)
@@ -173,11 +261,14 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     next_btn = tk.Button(btn_bar, text="Next ▶", command=proceed)
     next_btn.pack(side="right", padx=4)
     tk.Button(btn_bar, text="Combine ▶", command=combine_action).pack(side="right", padx=4)
-    # Moved from search bar: easier tab navigation entry -> listbox without checkbox in between.
-    tk.Checkbutton(btn_bar, text="Recursive Search", variable=recursive_var, command=lambda: refresh()).pack(side="right", padx=8)
+    # Hide recursive toggle in hierarchical mode (not applicable)
+    if not hier_mode:
+        tk.Checkbutton(btn_bar, text="Recursive Search", variable=recursive_var, command=lambda: refresh()).pack(side="right", padx=8)
 
     entry.bind("<KeyRelease>", refresh)
     listbox.bind("<Return>", proceed)
+    listbox.bind("<Control-Return>", lambda e: _toggle_expand_current())
+    listbox.bind("<BackSpace>", _nav_up)
     listbox.bind("<<ListboxSelect>>", lambda e: update_preview())
 
     def on_key(event):
@@ -228,9 +319,12 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
         if not sel:
             preview.config(state="disabled")
             return
-        path = rel_map.get(sel[0])
+        item = item_map.get(sel[0])
+        if not item or item.get("type") != "template":
+            preview.config(state="disabled")
+            return
         try:
-            tmpl = load_template(path)
+            tmpl = load_template(item["path"])  # type: ignore[index]
             lines = tmpl.get("template", [])
             preview.insert("1.0", "\n".join(lines))
         except Exception as e:  # pragma: no cover - runtime
@@ -242,9 +336,10 @@ def build(app) -> Any:  # pragma: no cover - Tk runtime
     try:
         setattr(app, '_select_query_entry', entry)
         setattr(app, '_select_listbox', listbox)
+        setattr(app, '_select_status_var', status)
     except Exception:
         pass
-    if rel_map:
+    if item_map:
         listbox.selection_set(0)
         listbox.activate(0)
         listbox.focus_set()

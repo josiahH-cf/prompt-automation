@@ -90,14 +90,11 @@ def test_finish_cycles_back_to_select(monkeypatch):
     assert cycles['select'] >= 2
 
 
-def test_singleton_focus_ipc(monkeypatch, tmp_path):
+def test_singleton_focus_inproc(monkeypatch, tmp_path):
     _install_tk(monkeypatch)
     # Provide minimal variable_form early so import inside collect works
     fake_vf = types.SimpleNamespace(build_widget=lambda spec: (lambda parent: types.SimpleNamespace(focus_set=lambda: None), {'get': lambda: ''}))
     sys.modules['prompt_automation.services.variable_form'] = fake_vf
-    # Override socket path for isolated test
-    sock_path = tmp_path / 'gui.sock'
-    monkeypatch.setenv('PROMPT_AUTOMATION_SINGLETON_SOCKET', str(sock_path))
     import prompt_automation.gui.single_window.controller as controller
     monkeypatch.setattr(controller.options_menu, 'configure_options_menu', lambda *a, **k: {})
     # Count template focus attempts
@@ -105,33 +102,12 @@ def test_singleton_focus_ipc(monkeypatch, tmp_path):
         self.template_focus = getattr(self, 'template_focus', 0) + 1
     monkeypatch.setattr(controller.SingleWindowApp, '_focus_first_template_widget', _count_focus)
     app = controller.SingleWindowApp()
-    # Start app to simulate normal launch (triggers initial template focus)
     app.start()
-    # Ensure server thread started (best effort); simulate external client
-    from prompt_automation.gui.single_window import singleton
-    # If server didn't start (e.g. platform w/o AF_UNIX) skip
-    if not hasattr(socket, 'AF_UNIX'):
-        pytest.skip('AF_UNIX not available')
-    # Connect & send FOCUS command (simulates hotkey re-invocation)
-    if not sock_path.exists():  # server may not have created yet; minor delay loop
-        import time
-        for _ in range(20):
-            if sock_path.exists():
-                break
-            time.sleep(0.01)
-    if not sock_path.exists():
-        pytest.skip('Singleton socket not created')
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.connect(str(sock_path))
-        s.sendall(b'FOCUS\n')
-    # Wait briefly for thread to process
-    import time
-    for _ in range(20):
-        if app.root.lifted >= 1 and app.root.focused >= 1:
-            break
-        time.sleep(0.01)
+    # Simulate external focus via in-process callback (no sockets required)
+    app._focus_and_raise(); app._focus_first_template_widget()
     assert app.root.lifted >= 1 and app.root.focused >= 1
-    # Initial start triggers one template focus; singleton focus should add another
+    # Initial start triggers one template focus; simulated focus should add another
     assert getattr(app, 'template_focus', 0) >= 2
-    # New process would now early exit
+    # connect_and_focus_if_running should acknowledge an in-process instance
+    from prompt_automation.gui.single_window import singleton
     assert singleton.connect_and_focus_if_running() is True

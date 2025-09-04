@@ -86,6 +86,16 @@ class PromptCLI:
             "--list", action="store_true", help="List available prompt styles and templates"
         )
         parser.add_argument(
+            "--tree",
+            action="store_true",
+            help="Render hierarchical tree when used with --list (opt-in)",
+        )
+        parser.add_argument(
+            "--flat",
+            action="store_true",
+            help="Force flat listing (overrides feature flag)",
+        )
+        parser.add_argument(
             "--reset-log", action="store_true", help="Clear usage log database"
         )
         parser.add_argument(
@@ -141,6 +151,16 @@ class PromptCLI:
             "--persist-theme",
             action="store_true",
             help="Persist the provided --theme value to settings.json",
+        )
+        parser.add_argument(
+            "--hierarchy",
+            choices=["on", "off"],
+            help="Enable or disable hierarchical templates for this run (mimics theme toggle)",
+        )
+        parser.add_argument(
+            "--persist-hierarchy",
+            action="store_true",
+            help="Persist the provided --hierarchy value to settings.json",
         )
         args = parser.parse_args(argv)
 
@@ -213,10 +233,33 @@ class PromptCLI:
             return
 
         if args.list:
-            for style in list_styles():
-                print(style)
-                for tmpl_path in list_prompts(style):
-                    print("  ", tmpl_path.name)
+            # If --tree provided (or feature flag enabled and not overridden by --flat) use hierarchical view
+            try:
+                from ..features import is_hierarchy_enabled
+                use_tree = (args.tree or is_hierarchy_enabled()) and not args.flat
+            except Exception:
+                use_tree = args.tree and not args.flat
+            if use_tree:
+                from ..services.hierarchy import TemplateHierarchyScanner, HierarchyNode
+                scanner = TemplateHierarchyScanner()
+                tree = scanner.scan()
+
+                def _print(node: HierarchyNode, indent: int = 0) -> None:
+                    prefix = "  " * indent
+                    if node.type == "folder" and node.name:
+                        print(f"{prefix}{node.name}/")
+                    for ch in node.children:
+                        if ch.type == "folder":
+                            _print(ch, indent + 1)
+                        else:
+                            print(f"{prefix}  {Path(ch.relpath).name}")
+
+                _print(tree)
+            else:
+                for style in list_styles():
+                    print(style)
+                    for tmpl_path in list_prompts(style):
+                        print("  ", tmpl_path.name)
             return
 
         if args.troubleshoot:
@@ -276,6 +319,14 @@ class PromptCLI:
                     _tres.set_user_theme_preference(args.theme)
                 else:
                     os.environ['PROMPT_AUTOMATION_THEME'] = args.theme
+            if args.hierarchy:
+                # Map to boolean
+                enabled = args.hierarchy == "on"
+                if args.persist_hierarchy:
+                    from ..features import set_user_hierarchy_preference as _set_h
+                    _set_h(enabled)
+                else:
+                    os.environ['PROMPT_AUTOMATION_HIERARCHICAL_TEMPLATES'] = "1" if enabled else "0"
         except Exception:
             pass
 

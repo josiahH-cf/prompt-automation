@@ -1,8 +1,14 @@
-import json
 from prompt_automation.menus import render_template
 
 def test_singlefield_fallback_substitution():
-    tmpl = json.load(open('src/prompt_automation/prompts/styles/Code/01_todoist_task.json'))
+    tmpl = {
+        "id": 123,
+        "title": "todoist task",
+        "style": "Code",
+        "template": ["{{title}} [{{priority}}]{{due_display}}", "", "{{acceptance_final}}"],
+        "placeholders": [{"name": "capture"}],
+        "logic": {"timezone": "UTC"},
+    }
     # Intentionally pass capture with trailing spaces to simulate user input edge
     rendered = render_template(tmpl, {'capture': 'Budget review Q4  '})
     assert '{{title}}' not in rendered

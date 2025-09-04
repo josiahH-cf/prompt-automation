@@ -1,12 +1,19 @@
-import json
-from pathlib import Path
 from prompt_automation.menus import render_template
 
 
+def _mk_template():
+    return {
+        "id": 123,
+        "title": "todoist task",
+        "style": "Code",
+        "template": ["{{title}} [{{priority}}]{{due_display}}", "", "{{acceptance_final}}"],
+        "placeholders": [{"name": "capture"}],
+        "logic": {"timezone": "UTC"},
+    }
+
+
 def test_singlefield_render_replaces_tokens(tmp_path):
-    # Copy template into temp prompts dir to simulate normal loading if needed
-    source = Path('src/prompt_automation/prompts/styles/Code/01_todoist_task.json')
-    tmpl = json.loads(source.read_text())
+    tmpl = _mk_template()
     rendered = render_template(tmpl, {'capture': 'Email the board with Q3 forecast p1 due: today 4pm ac: Include revenue'})
     assert '{{title}}' not in rendered
     assert '{{priority}}' not in rendered
@@ -16,8 +23,7 @@ def test_singlefield_render_replaces_tokens(tmp_path):
 
 
 def test_singlefield_render_omits_optional_fields():
-    source = Path('src/prompt_automation/prompts/styles/Code/01_todoist_task.json')
-    tmpl = json.loads(source.read_text())
+    tmpl = _mk_template()
     rendered = render_template(tmpl, {'capture': 'Decide vendor shortlist p2'})
     # explicit p2 shows
     assert ' [p2]' in rendered
@@ -29,8 +35,7 @@ def test_singlefield_render_omits_optional_fields():
 
 
 def test_singlefield_render_omits_priority_block_for_default():
-    source = Path('src/prompt_automation/prompts/styles/Code/01_todoist_task.json')
-    tmpl = json.loads(source.read_text())
+    tmpl = _mk_template()
     rendered = render_template(tmpl, {'capture': 'Draft release notes outline'})
     # Default p3 still shown
     assert ' [p3]' in rendered

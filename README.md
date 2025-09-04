@@ -9,8 +9,20 @@ Recent feature highlights:
 - Numeric shortcuts & renumbering: Assign single‑digit keys to favorite templates (Options -> Manage shortcuts / renumber) and optionally renumber files/IDs to match those digits. Press the digit in the selector for instant open.
  - Multi-file reference placeholders with per‑placeholder persistence via `override: true`, plus lazy `{{name_path}}` tokens for any file variable.
  - Opt‑in value persistence using `"persist": true` (replaces legacy always‑persist behavior) with clear override management UI & CLI.
- - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
+- Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
 - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
+
+### Hierarchical Templates (Opt‑In)
+
+Browse and manage templates using the on‑disk folder structure. This is disabled by default to preserve existing behavior.
+
+- Enable via env: set `PROMPT_AUTOMATION_HIERARCHICAL_TEMPLATES=1` (or add `"hierarchical_templates": true` to `Settings/settings.json`).
+- CLI tree listing: `prompt-automation --list --tree` (use `--flat` to force legacy flat listing).
+- Safe operations (for GUI adapters / future CLI): create, rename, move, duplicate, and delete templates/folders are sandboxed under `PROMPTS_DIR` with name validation and path traversal protection.
+- Observability: scan and CRUD actions emit structured INFO logs (no template content).
+ - GUI toggle: Options → "Toggle Hierarchical Templates" shows current state and persists your choice.
+
+Rollback: unset the env var or set the settings flag to `false` to return to the flat view. No data migration is required—the filesystem is canonical.
 
 ---
 

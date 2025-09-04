@@ -13,6 +13,7 @@ from ..errorlog import get_logger
 from .constants import INFO_CLOSE_SAVE
 from ..variables import storage as _storage
 from ..theme import resolve as _theme_resolve, model as _theme_model, apply as _theme_apply
+from ..features import is_hierarchy_enabled as _hierarchy_enabled, set_user_hierarchy_preference as _set_hierarchy
 
 _log = get_logger(__name__)
 
@@ -246,6 +247,30 @@ def configure_options_menu(
                 pass
     opt.add_command(label="Manage shortcuts / renumber", command=_open_shortcut_manager, accelerator="Ctrl+Shift+S")
     accelerators['<Control-Shift-S>'] = _open_shortcut_manager
+
+    # Hierarchical templates status + toggle (mimic theme behavior)
+    try:
+        current_h = _hierarchy_enabled()
+        opt.add_separator()
+        opt.add_command(label=f"Hierarchy: {'on' if current_h else 'off'}", state='disabled')
+    except Exception:
+        pass
+
+    def _toggle_hierarchy_menu():
+        try:
+            new_state = not _hierarchy_enabled()
+            _set_hierarchy(new_state)
+            # Surface a visible refresh hook so the label updates
+            try:
+                ctrl = getattr(root, '_controller', None)
+                if ctrl and hasattr(ctrl, '_rebuild_menu'):
+                    ctrl._rebuild_menu()
+            except Exception:
+                pass
+        except Exception as e:
+            _log.error("Toggle hierarchy failed: %s", e)
+    opt.add_command(label="Toggle Hierarchical Templates (Ctrl+Alt+H)", command=_toggle_hierarchy_menu)
+    accelerators['<Control-Alt-h>'] = _toggle_hierarchy_menu
 
     # Theme status + toggle (appears for both selector and stages)
     try:
