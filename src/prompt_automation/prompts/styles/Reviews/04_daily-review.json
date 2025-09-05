@@ -3,6 +3,10 @@
   "id": 4,
   "title": "Daily Review",
   "style": "Reviews",
+  "reminders": [
+    "TEST: Keep entries concise and actionable",
+    "TEST: Verify Reminders panel shows on open"
+  ],
   "placeholders": [
     {
       "name": "reminder",

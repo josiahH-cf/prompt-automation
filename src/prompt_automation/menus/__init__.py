@@ -44,6 +44,14 @@ from .render_pipeline import (
     apply_post_render,
 )
 from .. import parser_singlefield
+from ..reminders import (
+    extract_template_reminders,
+    partition_placeholder_reminders,
+)
+from ..features import is_reminders_enabled as _reminders_enabled, is_reminders_timing_enabled as _rem_timing
+from ..errorlog import get_logger
+
+_log = get_logger(__name__)
 
 
 # --- Rendering -------------------------------------------------------------
@@ -90,6 +98,38 @@ def render_template(
             globals_map.setdefault(k, v)
         tmpl["global_placeholders"] = globals_map
     if values is None:
+        # Compute reminders (non-invasive): attach a private key for CLI flow,
+        # and pass template/global reminders via globals_map under a reserved key.
+        if _reminders_enabled():
+            try:
+                import time
+                t0 = time.perf_counter() if _rem_timing() else None
+                tmpl_rem = extract_template_reminders(tmpl)
+                ph_map = partition_placeholder_reminders(placeholders, tmpl_rem)
+                # Attach sanitized per-placeholder reminders for CLI presentation
+                for ph in placeholders:
+                    if isinstance(ph, dict) and ph.get("name") in ph_map:
+                        ph.setdefault("_reminders_inline", ph_map[ph["name"]])
+                # Inject template reminders into globals map for CLI printing
+                if tmpl_rem:
+                    globals_map = dict(globals_map)
+                    globals_map["__template_reminders"] = tmpl_rem
+                # Observability: log counts without content
+                try:
+                    _log.info(
+                        "reminders.summary",
+                        extra={
+                            "template": len(tmpl_rem),
+                            "placeholder": sum(len(v) for v in ph_map.values()),
+                        },
+                    )
+                    if t0 is not None:
+                        dt_ms = int((time.perf_counter() - t0) * 1000)
+                        _log.info("reminders.timing_ms", extra={"duration_ms": dt_ms})
+                except Exception:
+                    pass
+            except Exception:
+                pass
         raw_vars = get_variables(
             placeholders, template_id=template_id, globals_map=globals_map
         )

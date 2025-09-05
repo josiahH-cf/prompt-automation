@@ -12,6 +12,43 @@ Recent feature highlights:
 - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
 - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
 
+### Reminders (Template & Placeholder)
+
+Lightweight, read‑only instructional text you can declare in JSON which shows during variable collection to reduce cognitive load.
+
+- Where to declare:
+  - Template root: `"reminders": ["Keep code examples minimal", "Prefer POSIX shell"]`
+  - Placeholder-level: in any placeholder object: `"reminders": ["Write in bullets", "Max 5 sentences"]`
+  - Global file: `globals.json -> global_placeholders.reminders` provides defaults merged into template reminders.
+- GUI behavior:
+  - Inline: placeholder reminders render beneath the associated input field with muted styling.
+  - Collapsible panel: a top “Reminders” panel groups template/global reminders; expanded on first open per session; toggle remembered for the session.
+- CLI behavior:
+  - Template/global reminders print once before the first prompt.
+  - Placeholder reminders print just before that placeholder’s query.
+- Read‑only: reminders are not editable at runtime and are never persisted; they are sourced from JSON only.
+- Feature flag: enable/disable via `PROMPT_AUTOMATION_REMINDERS=1|0` or `Settings/settings.json: { "reminders_enabled": true|false }`.
+- Dev timing (optional): set `PROMPT_AUTOMATION_REMINDERS_TIMING=1` to log `reminders.timing_ms` for the parsing step.
+
+JSON examples:
+
+```jsonc
+{
+  "id": 123,
+  "title": "My Template",
+  "reminders": [
+    "Keep answers concise",
+    "Cite any external data"
+  ],
+  "placeholders": [
+    { "name": "summary", "label": "Summary", "multiline": true, "reminders": ["Bullet points", "<= 5 lines"] },
+    { "name": "severity", "type": "options", "options": ["low","medium","high"], "reminders": ["Default is medium"] }
+  ]
+}
+```
+
+Note: Existing behavior that appends global reminders to the rendered output (as a markdown block) remains available for templates that rely on it.
+
 ### Hierarchical Templates (Opt‑In)
 
 Browse and manage templates using the on‑disk folder structure. This is disabled by default to preserve existing behavior.
@@ -57,7 +94,7 @@ Placeholder dialogs now display a grey "Default:" box showing the (possibly trun
 
 ### Global Reminders (Feature B)
 
-Add a `reminders` entry (string or list of strings) under `global_placeholders` inside your top-level `globals.json` to have them appended as a markdown blockquote at the end of each rendered prompt. Individual templates can override by defining their own `global_placeholders.reminders`.
+Add a `reminders` entry (string or list of strings) under `global_placeholders` inside your top-level `globals.json`. These will appear in the GUI’s collapsible panel and CLI preface during collection. If your template uses the legacy post‑render append, they will also be appended to the final markdown unless the template excludes them.
 
 Example `globals.json` fragment:
 

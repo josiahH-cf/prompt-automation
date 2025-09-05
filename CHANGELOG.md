@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Added: Optional hierarchical template browsing behind a feature flag. A new scanner (`TemplateHierarchyScanner`) renders physical on‑disk folders as a tree with caching and safe defaults. CRUD operations (`TemplateFSService`) provide create/rename/move/delete for folders and templates with path sandboxing and name validation. CLI gains `--tree` (and `--flat`) modifiers for `--list`. Observability: structured INFO logs for scan and CRUD events. Backward‑compatible: flat listing and public APIs unchanged by default.
+ - Added: Read‑only “reminders” support at template root and placeholder level. Inline reminder text renders beneath inputs in the single‑window GUI, with a collapsible panel presenting template/global reminders. CLI prints template/global reminders once before the first prompt and placeholder reminders before each query. Feature flag `PROMPT_AUTOMATION_REMINDERS` (and `Settings/settings.json: reminders_enabled`) controls enablement; default is enabled. Observability: single `reminders.summary` log per template summarizing counts.
 - Single-window GUI: restored bullet/checklist auto-formatting for multiline placeholders via lightweight key bindings.
 - Reference file picker now renders only when a `reference_file` placeholder exists and appears inline beneath it (no global toolbar clutter).
 - Improved accessibility: focus changes auto-scroll to reveal the focused input; added debug logs for bullet insertion, inline ref picker instantiation, and scroll adjustments.

@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 from ..config import PROMPTS_DIR
 from ..errorlog import get_logger
 from ..utils import safe_run
+from ..features import is_reminders_enabled as _reminders_enabled
+from ..reminders import cli_format_block as _cli_block, extract_placeholder_reminders as _extract_ph_reminders
 
 from .files import _resolve_file_placeholder
 from .gui import _gui_file_prompt, _gui_prompt
@@ -67,6 +69,9 @@ def get_variables(
     except Exception:
         pass
 
+    # CLI reminder header printed once per run (before first CLI prompt)
+    _cli_header_printed = False
+
     for ph in placeholders:
         name = ph["name"]
         ptype = ph.get("type")
@@ -115,6 +120,28 @@ def get_variables(
                     val = _editor_prompt()
             if val is None:
                 _log.info("CLI fallback for %s", label)
+                # When using CLI path, print template/global reminders once
+                if _reminders_enabled() and not _cli_header_printed:
+                    try:
+                        tlist = (globals_map or {}).get("__template_reminders") or []
+                        if isinstance(tlist, list) and tlist:
+                            for line in _cli_block(tlist):
+                                print(line)
+                            print("")  # spacing
+                    except Exception:
+                        pass
+                    _cli_header_printed = True
+                # Print placeholder-level reminders (sanitized, if provided by upstream)
+                if _reminders_enabled():
+                    try:
+                        rinl = ph.get("_reminders_inline") or _extract_ph_reminders(ph) or []
+                        if isinstance(rinl, list) and rinl:
+                            for line in _cli_block(rinl):
+                                # suppress the header line; we want bullets only here
+                                if not line.startswith("Reminders:"):
+                                    print(line)
+                    except Exception:
+                        pass
                 if opts:
                     print(f"{label} options: {', '.join(opts)}")
                     while True:

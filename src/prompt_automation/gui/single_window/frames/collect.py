@@ -13,6 +13,8 @@ import types
 from pathlib import Path
 
 from ....services.variable_form import build_widget as variable_form_factory
+from ....reminders import extract_template_reminders, extract_placeholder_reminders
+from ....features import is_reminders_enabled as _reminders_enabled
 from ...collector.persistence import get_global_reference_file
 from ...collector.overrides import load_overrides, save_overrides
 from ....renderer import read_file_safe
@@ -25,6 +27,22 @@ from ....errorlog import get_logger
 def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     """Return a view object after constructing the form."""
     import tkinter as tk  # type: ignore
+
+    def _reminder_fg() -> str:
+        """Theme-aware foreground for reminder text.
+
+        - Light: keep existing muted gray (#444)
+        - Dark: use off-white for stronger contrast (theme textPrimary or fallback)
+        """
+        try:
+            from ....theme import resolve as _tres, model as _tmodel
+            name = _tres.ThemeResolver(_tres.get_registry()).resolve()
+            if (name or '').lower() == 'dark':
+                tokens = _tmodel.get_theme(name)
+                return tokens.get('textPrimary', '#E6EAF0')
+        except Exception:
+            pass
+        return '#444'
 
     # Headless test stub: provide legend text without constructing widgets
     if not hasattr(tk, "Canvas"):
@@ -88,6 +106,71 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
     tk.Label(frame, text=INSTR_COLLECT_SHORTCUTS, anchor="w", fg="#444").pack(
         fill="x", padx=12
     )
+
+    # Collapsible panel for template/global reminders
+    tmpl_reminders = extract_template_reminders(template) if _reminders_enabled() else []
+    # Observability (GUI path): summarize counts once per build
+    try:
+        log = get_logger(__name__)
+        phs = template.get("placeholders") or []
+        if isinstance(phs, list):
+            ph_count = 0
+            for ph in phs:
+                try:
+                    ph_count += len(extract_placeholder_reminders(ph))
+                except Exception:
+                    continue
+        else:
+            ph_count = 0
+        log.info("reminders.summary", extra={"template": len(tmpl_reminders), "placeholder": ph_count})
+    except Exception:
+        pass
+    reminders_panel = None
+    reminders_toggle_btn = None
+    if tmpl_reminders:
+        # Session-persistent expanded state (in-memory only)
+        expanded = getattr(app, "_reminders_expanded", None)
+        if expanded is None:
+            expanded = True
+        app._reminders_expanded = bool(expanded)
+
+        panel = tk.Frame(frame)
+        panel.pack(fill="x", padx=12, pady=(4, 0))
+        header = tk.Frame(panel)
+        header.pack(fill="x")
+
+        state_var = tk.StringVar(value="−" if app._reminders_expanded else "+")
+
+        def _toggle():  # pragma: no cover - tk runtime
+            try:
+                app._reminders_expanded = not bool(app._reminders_expanded)
+                state_var.set("−" if app._reminders_expanded else "+")
+                if app._reminders_expanded:
+                    body.pack(fill="x", padx=(2, 0), pady=(2, 6))
+                else:
+                    body.forget()
+            except Exception:
+                pass
+
+        reminders_toggle_btn = tk.Button(
+            header,
+            textvariable=state_var,
+            width=2,
+            command=_toggle,
+            takefocus=1,
+        )
+        reminders_toggle_btn.pack(side="left")
+        tk.Label(header, text="Reminders", font=("Arial", 10, "bold"), anchor="w").pack(
+            side="left", padx=(6, 0)
+        )
+
+        body = tk.Frame(panel)
+        bullets = "\n".join([f"• {s}" for s in tmpl_reminders])
+        lbl = tk.Label(body, text=bullets, anchor="w", justify="left", fg=_reminder_fg(), takefocus=1)
+        lbl.pack(fill="x")
+        if app._reminders_expanded:
+            body.pack(fill="x", padx=(2, 0), pady=(2, 6))
+        reminders_panel = panel
 
     canvas = tk.Canvas(frame, borderwidth=0, highlightthickness=0)
     inner = tk.Frame(canvas)
@@ -213,6 +296,20 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             except Exception:
                 pass
             grid_row += 1
+            # Inline placeholder reminders for multi-line widgets
+            try:
+                rinl = extract_placeholder_reminders(ph)
+            except Exception:
+                rinl = []
+            if _reminders_enabled() and rinl:
+                try:
+                    bullets = "\n".join([f"• {s}" for s in rinl])
+                    rlbl = tk.Label(inner, text=bullets, anchor="w", justify="left", fg=_reminder_fg(), takefocus=1)
+                    rlbl.grid(row=grid_row, column=1, sticky="we", padx=(6, 0), pady=(0, 6))
+                    label_widgets.append(rlbl)
+                    grid_row += 1
+                except Exception:
+                    pass
         elif bind.get("path_var") is not None:
             widget.grid(row=grid_row, column=1, sticky="we", padx=6, pady=4)
             entry = getattr(widget, "entry", None)
@@ -233,6 +330,20 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             if bind.get("view") and hasattr(widget, "view_btn"):
                 widget.view_btn.pack(side="left", padx=2)  # type: ignore[attr-defined]
             grid_row += 1
+            # Inline placeholder reminders for file widgets
+            try:
+                rinl = extract_placeholder_reminders(ph)
+            except Exception:
+                rinl = []
+            if _reminders_enabled() and rinl:
+                try:
+                    bullets = "\n".join([f"• {s}" for s in rinl])
+                    rlbl = tk.Label(inner, text=bullets, anchor="w", justify="left", fg=_reminder_fg(), takefocus=1)
+                    rlbl.grid(row=grid_row, column=1, sticky="we", padx=(6, 0), pady=(0, 6))
+                    label_widgets.append(rlbl)
+                    grid_row += 1
+                except Exception:
+                    pass
         else:  # single-line entry
             widget.grid(row=grid_row, column=1, sticky="we", padx=6, pady=4)
             try:
@@ -247,6 +358,20 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
             except Exception:
                 pass
             grid_row += 1
+            # Inline placeholder reminders for single-line entries
+            try:
+                rinl = extract_placeholder_reminders(ph)
+            except Exception:
+                rinl = []
+            if _reminders_enabled() and rinl:
+                try:
+                    bullets = "\n".join([f"• {s}" for s in rinl])
+                    rlbl = tk.Label(inner, text=bullets, anchor="w", justify="left", fg=_reminder_fg(), takefocus=1)
+                    rlbl.grid(row=grid_row, column=1, sticky="we", padx=(6, 0), pady=(0, 6))
+                    label_widgets.append(rlbl)
+                    grid_row += 1
+                except Exception:
+                    pass
             if bind.get("remember_var") is not None:
                 tk.Checkbutton(
                     inner,
@@ -541,6 +666,8 @@ def build(app, template: Dict[str, Any]):  # pragma: no cover - Tk runtime
         bindings=bindings,
         open_exclusions=open_exclusions,
         review=review,
+        reminders_panel=reminders_panel,
+        reminders_toggle=_toggle if reminders_panel else (lambda: None),
     )
 
 

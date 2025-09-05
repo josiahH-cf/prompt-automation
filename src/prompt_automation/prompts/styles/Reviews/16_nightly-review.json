@@ -35,6 +35,7 @@
       "name": "morning",
       "label": "Morning Tasks",
       "multiline": true,
+      "reminders": ["TEST: Morning list — keep to 5 items max"],
       "default": "",
       "format": "bullet"
     },

@@ -162,6 +162,11 @@ class PromptCLI:
             action="store_true",
             help="Persist the provided --hierarchy value to settings.json",
         )
+        parser.add_argument(
+            "--show-reminders",
+            action="store_true",
+            help="Print reminders for a selected template and exit (no prompting)",
+        )
         args = parser.parse_args(argv)
 
         if args.version:
@@ -350,6 +355,30 @@ class PromptCLI:
         tmpl: dict[str, Any] | None = select_template_cli()
         if not tmpl:
             return
+
+        # Fast inspection path: print reminders and exit
+        if args.show_reminders:
+            try:
+                from ..reminders import extract_template_reminders, partition_placeholder_reminders
+                tlist = extract_template_reminders(tmpl)
+                phs = tmpl.get("placeholders") or []
+                pmap = partition_placeholder_reminders(phs, tlist)
+                if tlist:
+                    print("Reminders:")
+                    for s in tlist:
+                        print(f" - {s}")
+                else:
+                    print("Reminders: (none)")
+                if pmap:
+                    print("\nPlaceholder Reminders:")
+                    for name, items in pmap.items():
+                        print(f" [{name}]")
+                        for s in items:
+                            print(f"  - {s}")
+                return
+            except Exception as e:
+                print(f"[prompt-automation] Failed to print reminders: {e}")
+                return
 
         res = render_template_cli(tmpl)
         if res:
