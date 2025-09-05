@@ -50,6 +50,7 @@
     "- No performance regressions on critical paths; include a micro-benchmark or justification if hot code is changed.",
     "- Add or verify logs, metrics, or traces near the fix; do not log sensitive data.",
     "- Maintain backward compatibility for public interfaces and document behavior clarifications.",
+  "- Backward compatibility is the default expectation; if a fix or emergent feature variant should apply only to a scoped portion of the application, that limited scope will be explicitly stated by the user (do not infer unrequested narrowing).",
     "- Output a single message only, using the Output Schema.",
     "- After each substantive tool call or code edit, validate the result in 1-2 sentences; only proceed if validation succeeds, otherwise attempt self-correction or state the limitation.",
     "",

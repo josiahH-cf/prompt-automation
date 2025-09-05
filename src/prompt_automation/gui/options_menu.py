@@ -14,6 +14,7 @@ from .constants import INFO_CLOSE_SAVE
 from ..variables import storage as _storage
 from ..theme import resolve as _theme_resolve, model as _theme_model, apply as _theme_apply
 from ..features import is_hierarchy_enabled as _hierarchy_enabled, set_user_hierarchy_preference as _set_hierarchy
+from ..history import list_history as _list_history, is_enabled as _history_enabled
 
 _log = get_logger(__name__)
 
@@ -233,6 +234,94 @@ def configure_options_menu(
             _load()
         opt.add_command(label='Manage templates', command=_open_manage_templates)
         opt.add_separator()
+
+    # Recent history panel (lightweight list with copy)
+    def _open_recent_history():  # pragma: no cover - GUI heavy
+        import tkinter as tk
+        from tkinter import messagebox
+        from .error_dialogs import safe_copy_to_clipboard as _safe_copy
+        from ..paste import copy_to_clipboard as _legacy_copy
+        try:
+            if not _history_enabled():
+                messagebox.showinfo("Recent history", "History is disabled (see settings or env)")
+                return
+            entries = _list_history()
+            win = tk.Toplevel(root)
+            win.title("Recent History")
+            win.geometry("900x520")
+            win.resizable(True, True)
+            import tkinter.ttk as ttk
+            cols = ("when", "template", "preview")
+            tree = ttk.Treeview(win, columns=cols, show="headings")
+            tree.heading("when", text="When (UTC)"); tree.column("when", width=170, anchor='w')
+            tree.heading("template", text="Template"); tree.column("template", width=240, anchor='w')
+            tree.heading("preview", text="Output Preview"); tree.column("preview", width=440, anchor='w')
+            vs = tk.Scrollbar(win, orient='vertical', command=tree.yview)
+            tree.configure(yscrollcommand=vs.set)
+            tree.pack(side='top', fill='both', expand=True)
+            vs.pack(side='right', fill='y')
+            # Preview area
+            txt = tk.Text(win, wrap='word', height=10)
+            txt.pack(side='bottom', fill='x')
+            txt.config(state='disabled')
+
+            def _truncate(s: str, n: int = 85) -> str:
+                s = s.replace('\n', ' ').strip()
+                return s if len(s) <= n else s[: n - 1] + '…'
+
+            def _load_rows():
+                tree.delete(*tree.get_children())
+                for e in entries:
+                    prev = _truncate((e.get('output') or e.get('rendered') or ''))
+                    tree.insert('', 'end', iid=e.get('entry_id'), values=(e.get('ts'), e.get('title') or '', prev))
+
+            def _on_select(event=None):
+                sel = tree.selection()
+                if not sel:
+                    return
+                eid = sel[0]
+                entry = next((x for x in entries if x.get('entry_id') == eid), None)
+                if not entry:
+                    return
+                try:
+                    txt.config(state='normal'); txt.delete('1.0','end')
+                    full = entry.get('output') or entry.get('rendered') or ''
+                    txt.insert('1.0', full)
+                finally:
+                    txt.config(state='disabled')
+
+            def _copy_selected():
+                sel = tree.selection()
+                if not sel:
+                    messagebox.showinfo('Copy', 'Select an entry to copy.')
+                    return
+                eid = sel[0]
+                entry = next((x for x in entries if x.get('entry_id') == eid), None)
+                if not entry:
+                    return
+                payload = entry.get('output') or entry.get('rendered') or ''
+                if not payload.strip():
+                    messagebox.showinfo('Copy', 'Nothing to copy for this entry.')
+                    return
+                if _safe_copy(payload) or _legacy_copy(payload):
+                    messagebox.showinfo('Copy', 'Copied to clipboard.')
+                else:
+                    messagebox.showerror('Copy', 'Copy failed; see logs.')
+
+            btnbar = tk.Frame(win); btnbar.pack(side='bottom', fill='x')
+            tk.Button(btnbar, text='Copy', command=_copy_selected).pack(side='right', padx=6, pady=6)
+            tk.Button(btnbar, text='Close', command=win.destroy).pack(side='right', padx=6, pady=6)
+            tree.bind('<<TreeviewSelect>>', _on_select)
+            _load_rows()
+            # Auto-select first row if present
+            items = tree.get_children()
+            if items:
+                tree.selection_set(items[0]); _on_select()
+        except Exception as e:
+            _log.error('Recent history UI failed: %s', e)
+
+    opt.add_command(label='Recent history', command=_open_recent_history)
+    opt.add_separator()
 
     # Shortcut manager
     def _open_shortcut_manager():

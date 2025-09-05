@@ -396,6 +396,13 @@ class PromptCLI:
             print(text)
             print("=" * 60)
 
+            # Append to recent history (non-intrusive; ignore failures)
+            try:
+                from ..history import record_history
+                record_history(tmpl, rendered_text=text, final_output=text)
+            except Exception:
+                pass
+
             if input("\nProceed with clipboard copy? [Y/n]: ").lower() not in {"n", "no"}:
                 paste.copy_to_clipboard(text)
                 print(

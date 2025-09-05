@@ -81,6 +81,12 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
                 if do_append:
                     _append_to_files(variables, rendered)
             log_usage(template, len(rendered))
+            # Record in recent history (ignore errors)
+            try:
+                from ....history import record_history
+                record_history(template, rendered_text=rendered, final_output=rendered)
+            except Exception:
+                pass
             if not safe_copy_to_clipboard(rendered):
                 copy_to_clipboard(rendered)
             app.finish(rendered)
@@ -217,6 +223,12 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             if do_append:
                 _append_to_files(variables, final_text)
         log_usage(template, len(final_text))
+        # Record in recent history (ignore errors)
+        try:
+            from ....history import record_history
+            record_history(template, rendered_text=final_text, final_output=final_text)
+        except Exception:
+            pass
         if not safe_copy_to_clipboard(final_text):
             copy_to_clipboard(final_text)
         app.finish(final_text)

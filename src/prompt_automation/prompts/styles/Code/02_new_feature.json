@@ -50,6 +50,7 @@
     "## Sub-categories",
     "### Working Rules",
     "- Be concise and directive.",
+  "- All features must remain backward compatible across the application by default; if a feature is intended to exist only within a specific module/area of the app, that scoping will be explicitly stated in the user instructions (do not assume hidden scope restrictions).",
     "- Do not propose feature implementation or design—write instructions only.",
     "- No hallucinations: derive only from inputs; label and justify gaps as Assumptions.",
     "- Use generic wording and parameterize unknown specifics.",
