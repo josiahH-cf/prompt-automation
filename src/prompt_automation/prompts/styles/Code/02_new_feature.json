@@ -89,6 +89,7 @@
   "  - Include Labeled Assumptions (with parameter tokens for unknown specifics)",
   "  - Reserve a brief `Rationale` section (1–2 sentences) at the end inside the code block",
   "  - Include a short `Codebase Context Initialization` subsection referencing the prior `#codebase` ingestion (do not output its raw content)",
+  "  - End with a short 'Local Verification Suggestions' subsection listing 1–2 concrete, minimal local test/validation steps (commands or manual actions) the user can perform to confirm the feature behaves as expected",
     "- **Rationale:** Embedded at the bottom of the fenced block (not outside).",
     "",
     "### Self-Check",

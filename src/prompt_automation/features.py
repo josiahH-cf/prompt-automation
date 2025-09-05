@@ -145,3 +145,36 @@ def is_reminders_timing_enabled() -> bool:
 
 
 __all__.append("is_reminders_timing_enabled")
+
+
+# --- Placeholder fast-path (auto-skip collect stage) ------------------------
+def is_placeholder_fastpath_enabled() -> bool:
+    """Return True if the placeholder-empty fast-path is enabled.
+
+    Resolution order (env overrides settings):
+      1. Env PROMPT_AUTOMATION_DISABLE_PLACEHOLDER_FASTPATH
+         - truthy (1/true/on)  => disabled (return False)
+         - falsy  (0/false/off)=> enabled  (return True)
+      2. Settings Settings/settings.json key "disable_placeholder_fastpath"
+         - truthy => disabled (False)
+         - falsy  => enabled  (True)
+      3. Default: enabled (True)
+    """
+    env = os.environ.get("PROMPT_AUTOMATION_DISABLE_PLACEHOLDER_FASTPATH")
+    coerced = _coerce_bool(env) if env is not None else None
+    if coerced is not None:
+        return not coerced
+    try:
+        settings = PROMPTS_DIR / "Settings" / "settings.json"
+        if settings.exists():
+            data = json.loads(settings.read_text())
+            v = data.get("disable_placeholder_fastpath")
+            coerced = _coerce_bool(v)
+            if coerced is not None:
+                return not coerced
+    except Exception:
+        pass
+    return True
+
+
+__all__.append("is_placeholder_fastpath_enabled")

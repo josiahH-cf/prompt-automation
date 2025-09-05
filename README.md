@@ -12,6 +12,9 @@ Recent feature highlights:
 - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
 - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
 
+Fast-path (placeholder-empty templates):
+- If a template defines no effective input placeholders (placeholders field is missing, null, `[]`, or only contains reminder/link/invalid entries), the app skips the variable collection step and navigates straight to the final review/output view. Output is rendered and available immediately; auto-copy behavior follows your existing setting. Disable via `PROMPT_AUTOMATION_DISABLE_PLACEHOLDER_FASTPATH=1` or `Settings/settings.json: { "disable_placeholder_fastpath": true }`.
+
 ### Reminders (Template & Placeholder)
 
 Lightweight, read‑only instructional text you can declare in JSON which shows during variable collection to reduce cognitive load.

@@ -76,6 +76,7 @@
     "- *DIFFS*: Present all file changes as unified diffs in fenced code blocks (```diff).",
     "- *TEST_PLAN*: Summarize new/modified test names, paths, and asserted behaviors.",
     "- *VALIDATION*: Sequence the exact post-fix commands to demonstrate all tests and behavior now pass.",
+  "  - Conclude VALIDATION with 1–2 simple 'Local Verification Suggestions' (explicit commands or brief manual steps) enabling the user to independently confirm the fix without additional tooling.",
     "- *SECURITY_PRIVACY_REVIEW*: Brief risk analysis and reasoning for safety.",
     "- *PERFORMANCE_IMPACT*: Indicate if the change touches hot path; support with checks or justification.",
     "- *OBSERVABILITY_PLAN*: Summarize updates to logs/metrics/traces and cite their locations.",

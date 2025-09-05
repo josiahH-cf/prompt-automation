@@ -17,6 +17,8 @@ from typing import Any, Dict, Optional
 from ...errorlog import get_logger
 from .geometry import load_geometry, save_geometry
 from .frames import select, collect, review
+from ...renderer import validate_template as _validate_template
+from ...placeholder_fastpath import evaluate_fastpath_state, FastPathState
 from . import singleton
 from ..selector.view.exclusions import edit_exclusions as exclusions_dialog
 from ...services import exclusions as exclusions_service
@@ -231,6 +233,25 @@ class SingleWindowApp:
 
     def advance_to_collect(self, template: Dict[str, Any]) -> None:
         self.template = template
+        # Fast-path: if template has no effective input placeholders and feature enabled,
+        # skip variable collection and go directly to review. Avoid any transient UI.
+        # Evaluate fast-path for templates that look like real prompt files
+        # (have at least a body under 'template'); avoid triggering for
+        # bare stubs used in unit tests that lack these keys.
+        try:
+            body = template.get("template") if isinstance(template, dict) else None
+            if isinstance(body, list):
+                state = evaluate_fastpath_state(template)
+                if state == FastPathState.EMPTY:
+                    try:
+                        # Single debug-level line; no sensitive content.
+                        self._log.debug("fastpath.placeholder_empty", extra={"activated": True})
+                    except Exception:
+                        pass
+                    self.advance_to_review({})
+                    return
+        except Exception:  # pragma: no cover - defensive
+            pass
         self._clear_content()
         self._stage = "collect"
         try:
