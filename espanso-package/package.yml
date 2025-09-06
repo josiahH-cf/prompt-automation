@@ -1,4 +1,4 @@
 # Minimal package descriptor; Espanso v2 loads matches from match/*.yml by convention
-name: your-pa
+name: prompt-automation
 # You can declare dependencies if needed in the future
 dependencies: []

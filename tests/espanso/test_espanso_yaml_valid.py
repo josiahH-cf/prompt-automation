@@ -8,7 +8,18 @@ yaml = pytest.importorskip("yaml", reason="PyYAML is required for espanso YAML v
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC_PKG_DIR = REPO_ROOT / "espanso-package"
-EXT_PKG_BASE = REPO_ROOT / "packages" / "your-pa"
+# Resolve package name dynamically from source manifest
+_name = "prompt-automation"
+_mf = SRC_PKG_DIR / "_manifest.yml"
+if _mf.exists():
+    import yaml as _yaml
+    try:
+        _data = _yaml.safe_load(_mf.read_text()) or {}
+        if isinstance(_data.get("name"), str):
+            _name = _data["name"]
+    except Exception:
+        pass
+EXT_PKG_BASE = REPO_ROOT / "packages" / _name
 LATEST = None
 if EXT_PKG_BASE.exists():
     versions = sorted((p for p in EXT_PKG_BASE.iterdir() if p.is_dir()), key=lambda p: p.name)
@@ -83,3 +94,16 @@ def test_no_duplicate_triggers_across_all_match_files():
     dups = {t: files for t, files in triggers.items() if len(files) > 1}
     assert not dups, f"Duplicate triggers found: {dups}"
 
+
+def test_trigger_style_conventions():
+    """Basic hygiene: triggers should be strings, start with ':', and contain no spaces."""
+    match_files = sorted((PKG_DIR / "match").glob("*.yml"))
+    bad = []
+    for f in match_files:
+        data = yaml.safe_load(f.read_text())
+        for entry in data.get("matches", []) or []:
+            t = entry.get("trigger")
+            if isinstance(t, str):
+                if not t.startswith(":") or (" " in t):
+                    bad.append((f.name, t))
+    assert not bad, f"Triggers violate style (start with ':' and no spaces): {bad}"

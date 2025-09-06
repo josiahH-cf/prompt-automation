@@ -23,3 +23,15 @@ Happy hacking!
 - Avoid committing files larger than 500 KB. Use compression or external hosting for sizable assets.
 - Keep individual source modules focused and roughly under 400 lines; split functionality across packages when they grow.
 - Discuss major refactors in an issue before starting and land them in small, reviewable commits.
+
+## Espanso Snippets
+
+- Edit snippets only under `espanso-package/match/*.yml`.
+- Keep triggers namespaced (e.g., `:pa.*`) and free of spaces; tests enforce basic hygiene and duplicate detection.
+- Bump version in `espanso-package/_manifest.yml` when changing snippets (SemVer).
+- Validate locally: `pytest -q tests/espanso`.
+- Mirror to the distribution layout and install/update via the runbook:
+
+```bash
+bash scripts/espanso-package-runbook.sh    # set BUMP_VERSION=true to bump patch automatically
+```

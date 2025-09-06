@@ -5,7 +5,7 @@ set -euo pipefail
 # PARAMETERS  #
 ###############
 # Package name and initial version. You may adjust these.
-PACKAGE_NAME="${PACKAGE_NAME:-your-pa}"
+PACKAGE_NAME="${PACKAGE_NAME:-prompt-automation}"
 INITIAL_VERSION="${INITIAL_VERSION:-0.1.0}"
 
 # If you want to force a version bump on every run, set to "true".
@@ -49,8 +49,10 @@ require_cmd awk
 require_cmd sed
 require_cmd powershell.exe
 
-# Optional, but helpful for path conversions:
-require_cmd wslpath
+# Optional, but helpful for path conversions (WSL dev flow):
+if ! command -v wslpath >/dev/null 2>&1; then
+  warn "wslpath not found; Windows path mirroring will be skipped."
+fi
 
 #####################
 # REPO DISCOVERY    #
@@ -83,11 +85,34 @@ PKG_YML="$PKG_DIR/package.yml"
 if [ ! -f "$PKG_YML" ]; then
   info "Creating package.yml"
   cat > "$PKG_YML" <<'YAML'
-# Global defaults can live here; matches typically live in match/*.yml
-matches: []
+name: prompt-automation
+dependencies: []
 YAML
 else
   info "package.yml exists; leaving as-is."
+fi
+
+# Ensure a source manifest exists (canonical version lives here)
+SRC_MANIFEST="$PKG_DIR/_manifest.yml"
+if [ ! -f "$SRC_MANIFEST" ]; then
+  info "Creating espanso-package/_manifest.yml"
+  cat > "$SRC_MANIFEST" <<YAML
+name: ${PACKAGE_NAME}
+title: "Prompt-Automation Snippets"
+version: ${INITIAL_VERSION}
+description: "Prompt-Automation Espanso snippets packaged for team-wide installation"
+author: "Prompt-Automation Team"
+homepage: ${REPO_URL:-https://github.com/josiahH-cf/prompt-automation}
+license: MIT
+YAML
+fi
+
+# If manifest exists, prefer its 'name' for PACKAGE_NAME
+if [ -f "$SRC_MANIFEST" ]; then
+  MF_NAME="$(awk '/^name:[[:space:]]*/{print $2; exit}' "$SRC_MANIFEST" 2>/dev/null || true)"
+  if [ -n "$MF_NAME" ]; then
+    PACKAGE_NAME="$MF_NAME"
+  fi
 fi
 
 #############################################
@@ -96,30 +121,27 @@ fi
 info "Discovering Windows %APPDATA% path via PowerShell..."
 # Use PowerShell to get APPDATA and expand to a Windows path string.
 WIN_APPDATA="$(powershell.exe -NoProfile -Command '[Environment]::GetFolderPath("ApplicationData")' | tr -d '\r')"
-if [ -z "$WIN_APPDATA" ]; then
-  warn "Could not resolve %APPDATA% from PowerShell. Skipping base.yml copy."
+if [ -z "$WIN_APPDATA" ] || ! command -v wslpath >/dev/null 2>&1; then
+  warn "Could not resolve %APPDATA% or wslpath unavailable. Skipping Windows seed copy."
 else
   info "Windows APPDATA: $WIN_APPDATA"
-  # Convert to WSL path
-  WSL_APPDATA="$(wslpath "$WIN_APPDATA")"
-  WIN_BASE_YML="$WIN_APPDATA\\espanso\\match\\base.yml"
-  WSL_BASE_YML="$(wslpath "$WIN_BASE_YML" 2>/dev/null || true)"
-
-  if [ -n "$WSL_BASE_YML" ] && [ -f "$WSL_BASE_YML" ]; then
-    info "Found existing Windows Espanso base.yml at: $WSL_BASE_YML"
-    TARGET_BASE="$MATCH_DIR/base.yml"
-
-    # If target exists, back it up once
-    if [ -f "$TARGET_BASE" ]; then
-      cp -f "$TARGET_BASE" "$TARGET_BASE.bak.$(date +%s)"
-      info "Backed up existing $TARGET_BASE -> $TARGET_BASE.bak.*"
+  WIN_MATCH_DIR="$WIN_APPDATA\\espanso\\match"
+  # Copy all *.yml files from Windows match dir into repo (seed)
+  info "Seeding repo from Windows match dir: $WIN_MATCH_DIR"
+  mapfile -t WIN_FILES < <(powershell.exe -NoProfile -Command "Get-ChildItem -Path '$WIN_MATCH_DIR' -Filter *.yml -File | %% { $_.FullName }" | tr -d '\r')
+  for wf in "${WIN_FILES[@]}"; do
+    [ -z "$wf" ] && continue
+    WSL_FILE="$(wslpath "$wf" 2>/dev/null || true)"
+    [ -z "$WSL_FILE" ] && continue
+    base="$(basename "$WSL_FILE")"
+    src="$WSL_FILE"
+    dst="$MATCH_DIR/$base"
+    if [ -f "$dst" ]; then
+      cp -f "$dst" "$dst.bak.$(date +%s)"
     fi
-
-    cp -f "$WSL_BASE_YML" "$TARGET_BASE"
-    info "Copied Windows base.yml into repo: $TARGET_BASE"
-  else
-    warn "No Windows base.yml found at %APPDATA%\\espanso\\match\\base.yml. You can add snippets later under $MATCH_DIR/"
-  fi
+    cp -f "$src" "$dst"
+    info "Copied: $base"
+  done
 fi
 
 #############################################
@@ -134,8 +156,15 @@ find_latest_version_dir(){
 }
 
 EXT_BASE="$REPO_ROOT/packages/$PACKAGE_NAME"
-LATEST_VER="$(find_latest_version_dir "$EXT_BASE" || true)"
-CURRENT_VERSION="${LATEST_VER:-$INITIAL_VERSION}"
+
+# Discover version from source manifest
+SRC_VERSION="$(awk '/^version:[[:space:]]*/{print $2; exit}' "$SRC_MANIFEST" 2>/dev/null || true)"
+if [ -z "$SRC_VERSION" ]; then
+  warn "Could not read version from $SRC_MANIFEST; defaulting to $INITIAL_VERSION"
+  SRC_VERSION="$INITIAL_VERSION"
+fi
+
+CURRENT_VERSION="$SRC_VERSION"
 
 EXT_PKG_DIR="$EXT_BASE/$CURRENT_VERSION"
 info "Syncing package to external repo layout at: $EXT_PKG_DIR"
@@ -143,19 +172,10 @@ mkdir -p "$EXT_PKG_DIR/match"
 
 # Ensure external manifest exists and is correct; create if missing
 EXT_MANIFEST="$EXT_PKG_DIR/_manifest.yml"
-if [ ! -f "$EXT_MANIFEST" ]; then
-  cat > "$EXT_MANIFEST" <<YAML
-name: ${PACKAGE_NAME}
-title: "${PACKAGE_NAME} Snippets"
-version: ${CURRENT_VERSION}
-author: "Prompt-Automation Team"
-description: Unified Espanso snippets managed in the prompt-automation repo.
-homepage: ${REPO_URL:-https://github.com/josiahH-cf/prompt-automation}
-license: MIT
+info "Writing external _manifest.yml"
+cat > "$EXT_MANIFEST" <<YAML
+$(cat "$SRC_MANIFEST")
 YAML
-else
-  info "External _manifest.yml exists; leaving as-is."
-fi
 
 # Copy package.yml and match files into external layout
 cp -f "$PKG_YML" "$EXT_PKG_DIR/package.yml"
@@ -175,23 +195,33 @@ EOF
 fi
 
 ##################################
+# VALIDATE (pytest espanso tests) #
+##################################
+if command -v pytest >/dev/null 2>&1; then
+  info "Running espanso tests (pytest tests/espanso)"
+  if ! pytest -q tests/espanso; then
+    err "Espanso tests failed. Fix YAML or duplicates and re-run."
+    exit 1
+  fi
+else
+  warn "pytest not found; skipping test run."
+fi
+
+##################################
 # OPTIONAL: VERSION BUMP LOGIC   #
 ##################################
 if [ "$BUMP_VERSION" = "true" ]; then
-  info "Bumping patch version in external _manifest.yml"
-  if yaml_bump_patch_version "$EXT_MANIFEST"; then
-    # After bump, read the new version and move/copy into new version folder
-    NEW_VERSION="$(awk '/^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+/ {print $2; exit}' "$EXT_MANIFEST")"
+  info "Bumping patch version in source manifest"
+  if yaml_bump_patch_version "$SRC_MANIFEST"; then
+    NEW_VERSION="$(awk '/^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+/ {print $2; exit}' "$SRC_MANIFEST")"
     if [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
-      NEW_DIR="$EXT_BASE/$NEW_VERSION"
-      info "Creating new version directory: $NEW_DIR"
-      mkdir -p "$NEW_DIR"
-      mv "$EXT_MANIFEST" "$NEW_DIR/_manifest.yml"
-      cp -f "$EXT_PKG_DIR/package.yml" "$NEW_DIR/package.yml"
-      mkdir -p "$NEW_DIR/match"
-      cp -rf "$EXT_PKG_DIR/match/"* "$NEW_DIR/match/" 2>/dev/null || true
-      [ -f "$EXT_PKG_DIR/README.md" ] && cp -f "$EXT_PKG_DIR/README.md" "$NEW_DIR/README.md"
-      EXT_PKG_DIR="$NEW_DIR"
+      info "Detected new source version: $NEW_VERSION"
+      EXT_PKG_DIR="$EXT_BASE/$NEW_VERSION"
+      mkdir -p "$EXT_PKG_DIR/match"
+      # Rewrite external manifest from updated source
+      cat "$SRC_MANIFEST" > "$EXT_PKG_DIR/_manifest.yml"
+      cp -f "$PKG_YML" "$EXT_PKG_DIR/package.yml"
+      cp -rf "$MATCH_DIR/"* "$EXT_PKG_DIR/match/" 2>/dev/null || true
     fi
   else
     warn "Automatic bump failed or not applicable; keeping version as-is."

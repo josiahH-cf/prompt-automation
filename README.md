@@ -89,19 +89,19 @@ Run tests as a baseline: `pytest -q`.
 Install the versioned Espanso package from this repo to get team-wide text expansions:
 
 ```bash
-espanso package install your-pa --git https://github.com/ORG/REPO
+espanso package install prompt-automation --git https://github.com/josiahH-cf/prompt-automation
 ```
 
 Update when a new version is released:
 
 ```bash
-espanso package update your-pa
+espanso package update prompt-automation
 ```
 
 Uninstall (does not affect Prompt-Automation itself):
 
 ```bash
-espanso package uninstall your-pa
+espanso package uninstall prompt-automation
 ```
 
 See `docs/ESPANSO_PACKAGE.md` for authoring, versioning, and CI details.

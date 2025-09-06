@@ -1,11 +1,3 @@
-# Espanso Package
-
-This repository hosts an Espanso external package. The canonical package consumed by Espanso lives under `packages/<name>/<version>/`. The editable sources live under `espanso-package/` and are mirrored into the external layout by the runbook.
-
-Edit snippets in `espanso-package/match/*.yml`, bump the version in `packages/<name>/<version>/_manifest.yml` (or set BUMP_VERSION=true in the runbook), commit, push, then update on Windows with:
-
-    espanso package update your-pa
-    espanso restart
 # Espanso Package (Snippets)
 
 This repository ships an Espanso package so all text expansion rules are versioned, shared, and easy to update.
@@ -16,33 +8,33 @@ This repository ships an Espanso package so all text expansion rules are version
 - Install the package directly from GitHub:
 
 ```bash
-espanso package install your-pa --git https://github.com/ORG/REPO
+espanso package install prompt-automation --git https://github.com/josiahH-cf/prompt-automation
 ```
 
 - Update when a new version is released:
 
 ```bash
-espanso package update your-pa
+espanso package update prompt-automation
 ```
 
 - Uninstall if needed (does not affect Prompt-Automation itself):
 
 ```bash
-espanso package uninstall your-pa
+espanso package uninstall prompt-automation
 ```
 
-## Package Layout
+## Package Layout (Source of Truth)
 
 ```
 espanso-package/
-  _manifest.yml      # name, version, description, author
-  package.yml        # minimal package descriptor
+  _manifest.yml      # name, version, description, author (SemVer)
+  package.yml        # minimal package descriptor (optional)
   match/             # split snippets across multiple files
     prompt_automation_basics.yml
     prompt_automation_tools.yml
 ```
 
-Snippets can be split across any number of `match/*.yml` files; Espanso loads them all.
+Snippets can be split across any number of `match/*.yml` files. These are mirrored to the external distribution layout.
 
 ## Authoring & Conventions
 
@@ -62,9 +54,27 @@ matches:
 
 - Version lives in `espanso-package/_manifest.yml` and follows SemVer.
 - CI workflow validates YAML on every PR and push.
-- To release a new espanso package version, run the GitHub Action manually:
-  - Actions → "Espanso Package CI" → "Run workflow" → provide `new_version`.
+- Manual release: Actions → "Espanso Package CI" → "Run workflow" → provide `new_version`.
   - The workflow bumps `_manifest.yml`, commits, tags `espanso-vX.Y.Z`, and pushes.
+
+## Distribution Layout (for espanso install)
+
+This repo also contains a mirror under `packages/<name>/<version>/` to support installing via `espanso package install <name> --git <repo>`.
+
+- Mirror the source to the distribution layout and optionally bump the version:
+
+```bash
+# WSL/Linux
+bash scripts/espanso-package-runbook.sh            # set BUMP_VERSION=true to auto-bump patch
+# The runbook seeds ALL Windows %APPDATA%\espanso\match\*.yml into espanso-package/match/ before mirroring
+```
+
+- After mirroring, install/update on Windows:
+
+```powershell
+espanso package update prompt-automation
+espanso restart
+```
 
 ## Local Development & Validation
 
@@ -78,6 +88,23 @@ pytest -q tests/espanso
 
 ```bash
 espanso restart
+```
+
+## Helper Scripts
+
+- Lint YAML and duplicates: `scripts/espanso.sh lint`
+- Mirror (and optional bump): `BUMP_VERSION=true scripts/espanso.sh mirror`
+- Update and restart local espanso: `scripts/espanso.sh update`
+- Add a quick snippet:
+
+```bash
+scripts/espanso.sh add-snippet --file base.yml --trigger :pa.hello --replace "Hello from Prompt-Automation"
+```
+
+- Disable local `%APPDATA%\espanso\match\base.yml` on Windows to avoid duplicates:
+
+```powershell
+powershell -File scripts/espanso-windows.ps1 -DisableLocalBase
 ```
 
 ## Backward Compatibility
