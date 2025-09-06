@@ -1,0 +1,7 @@
+# your-pa
+
+This is an external Espanso package mirrored from the prompt-automation repository.
+
+- Matches live in match/*.yml
+- Metadata is in _manifest.yml
+

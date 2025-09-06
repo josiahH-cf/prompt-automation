@@ -1,0 +1,8 @@
+name: your-pa
+version: 0.1.0
+description: "Prompt-Automation Espanso snippets packaged for team-wide installation"
+author: "Prompt-Automation Team"
+# Optional, but useful metadata
+# title: "Prompt-Automation Snippets"
+# homepage: "https://github.com/ORG/REPO"
+# license: "MIT"
