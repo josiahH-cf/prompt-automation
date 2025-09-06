@@ -89,6 +89,10 @@ def get_variables(
             else:
                 ph["label"] = note_text.strip() or name
 
+        # Ensure human-readable label is always available for downstream
+        # fallback and retry logic, even when a pre-supplied value exists.
+        label = ph.get("label", name)
+
     # reference_file now behaves like a normal per-template file placeholder when declared
 
         if ptype == "file" and template_id is not None:
@@ -99,7 +103,6 @@ def get_variables(
         if name in values and values[name] not in ("", None):
             val: Any = values[name]
         else:
-            label = ph.get("label", name)
             opts = ph.get("options")
             if name == "hallucinate" and not opts:
                 opts = [
@@ -192,7 +195,9 @@ def get_variables(
                     f"{label} not found. Enter new path or leave blank to skip: "
                 )
                 if not new_val:
-                    val = ""
+                    # Treat explicit skip as None (no value) to avoid
+                    # downstream confusion between empty and unset.
+                    val = None
                     break
                 val = new_val
 

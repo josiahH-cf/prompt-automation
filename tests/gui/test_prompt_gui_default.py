@@ -27,9 +27,24 @@ def _patch_updates(monkeypatch):
     monkeypatch.setattr(controller.update, "check_and_prompt", lambda: None)
 
 
+def _disable_singleton_focus(monkeypatch):
+    """Prevent cross-test or external singleton from short-circuiting the GUI path.
+
+    Some environments may have a lingering singleton socket/port file or an
+    in-process flag set by earlier tests. The default GUI entry checks
+    ``singleton.connect_and_focus_if_running`` first and returns early when it
+    reports an existing instance. That would make this test flaky. We patch the
+    function to return ``False`` deterministically to exercise the default
+    single-window path.
+    """
+    import prompt_automation.gui.single_window.singleton as singleton_mod
+    monkeypatch.setattr(singleton_mod, "connect_and_focus_if_running", lambda: False)
+
+
 def test_single_window_is_default(monkeypatch):
     _install_tk(monkeypatch)
     _patch_updates(monkeypatch)
+    _disable_singleton_focus(monkeypatch)
     called = {"single": False, "legacy": False}
 
     class DummyApp:
@@ -48,6 +63,7 @@ def test_single_window_is_default(monkeypatch):
 def test_force_legacy_env(monkeypatch):
     _install_tk(monkeypatch)
     _patch_updates(monkeypatch)
+    _disable_singleton_focus(monkeypatch)
     monkeypatch.setenv("PROMPT_AUTOMATION_FORCE_LEGACY", "1")
     called = {"single": False, "legacy": False}
 
