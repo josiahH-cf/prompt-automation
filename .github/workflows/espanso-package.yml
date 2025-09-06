@@ -9,11 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate YAML presence
+      - name: Validate package layout
         run: |
-          test -f espanso-package/_manifest.yml
-          test -f espanso-package/package.yml
-          test -d espanso-package/match
+          test -d packages/your-pa
+          ls -1 packages/your-pa | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep .
+          latest=$(ls -1 packages/your-pa | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+          test -f "packages/your-pa/$latest/_manifest.yml"
+          test -f "packages/your-pa/$latest/package.yml"
+          test -d "packages/your-pa/$latest/match"
 name: Espanso Package CI
 
 on:

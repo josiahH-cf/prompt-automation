@@ -78,22 +78,6 @@ PKG_DIR="$REPO_ROOT/espanso-package"
 MATCH_DIR="$PKG_DIR/match"
 mkdir -p "$MATCH_DIR"
 
-# _manifest.yml
-MANIFEST="$PKG_DIR/_manifest.yml"
-if [ ! -f "$MANIFEST" ]; then
-  info "Creating _manifest.yml"
-  cat > "$MANIFEST" <<YAML
-name: ${PACKAGE_NAME}
-title: ${PACKAGE_NAME} Snippets
-version: ${INITIAL_VERSION}
-author: Your Name
-description: Unified Espanso snippets managed in the prompt-automation repo.
-homepage: ${REPO_URL:-https://example.com}
-YAML
-else
-  info "_manifest.yml exists; leaving as-is."
-fi
-
 # package.yml
 PKG_YML="$PKG_DIR/package.yml"
 if [ ! -f "$PKG_YML" ]; then
@@ -142,18 +126,38 @@ fi
 # MIRROR TO EXTERNAL-REPO LAYOUT FOR INSTALL #
 #############################################
 # Espanso expects packages/<name>/<version> with _manifest.yml, package.yml, README.md
-CURRENT_VERSION="$INITIAL_VERSION"
-if [ -f "$MANIFEST" ]; then
-  # read version from manifest if present
-  if awk '/^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+/ {print $2; found=1} END{exit found?0:1}' "$MANIFEST" >/dev/null 2>&1; then
-    CURRENT_VERSION="$(awk '/^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+/ {print $2; exit}' "$MANIFEST")"
-  fi
-fi
 
-EXT_PKG_DIR="$REPO_ROOT/packages/$PACKAGE_NAME/$CURRENT_VERSION"
+# Determine CURRENT_VERSION from external layout if available, else INITIAL_VERSION
+find_latest_version_dir(){
+  local base="$1"; [ -d "$base" ] || return 1
+  ls -1 "$base" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1
+}
+
+EXT_BASE="$REPO_ROOT/packages/$PACKAGE_NAME"
+LATEST_VER="$(find_latest_version_dir "$EXT_BASE" || true)"
+CURRENT_VERSION="${LATEST_VER:-$INITIAL_VERSION}"
+
+EXT_PKG_DIR="$EXT_BASE/$CURRENT_VERSION"
 info "Syncing package to external repo layout at: $EXT_PKG_DIR"
 mkdir -p "$EXT_PKG_DIR/match"
-cp -f "$MANIFEST" "$EXT_PKG_DIR/_manifest.yml"
+
+# Ensure external manifest exists and is correct; create if missing
+EXT_MANIFEST="$EXT_PKG_DIR/_manifest.yml"
+if [ ! -f "$EXT_MANIFEST" ]; then
+  cat > "$EXT_MANIFEST" <<YAML
+name: ${PACKAGE_NAME}
+title: "${PACKAGE_NAME} Snippets"
+version: ${CURRENT_VERSION}
+author: "Prompt-Automation Team"
+description: Unified Espanso snippets managed in the prompt-automation repo.
+homepage: ${REPO_URL:-https://github.com/josiahH-cf/prompt-automation}
+license: MIT
+YAML
+else
+  info "External _manifest.yml exists; leaving as-is."
+fi
+
+# Copy package.yml and match files into external layout
 cp -f "$PKG_YML" "$EXT_PKG_DIR/package.yml"
 if [ -d "$MATCH_DIR" ]; then
   cp -rf "$MATCH_DIR/"* "$EXT_PKG_DIR/match/" 2>/dev/null || true
@@ -162,7 +166,7 @@ if [ ! -f "$EXT_PKG_DIR/README.md" ]; then
   cat > "$EXT_PKG_DIR/README.md" <<EOF
 # ${PACKAGE_NAME}
 
-This is an external Espanso package mirrored from the prompt-automation repository.
+External Espanso package mirrored from the prompt-automation repository.
 
 - Matches live in match/*.yml
 - Metadata is in _manifest.yml
@@ -174,8 +178,22 @@ fi
 # OPTIONAL: VERSION BUMP LOGIC   #
 ##################################
 if [ "$BUMP_VERSION" = "true" ]; then
-  info "Bumping patch version in _manifest.yml"
-  if ! yaml_bump_patch_version "$MANIFEST"; then
+  info "Bumping patch version in external _manifest.yml"
+  if yaml_bump_patch_version "$EXT_MANIFEST"; then
+    # After bump, read the new version and move/copy into new version folder
+    NEW_VERSION="$(awk '/^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+/ {print $2; exit}' "$EXT_MANIFEST")"
+    if [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
+      NEW_DIR="$EXT_BASE/$NEW_VERSION"
+      info "Creating new version directory: $NEW_DIR"
+      mkdir -p "$NEW_DIR"
+      mv "$EXT_MANIFEST" "$NEW_DIR/_manifest.yml"
+      cp -f "$EXT_PKG_DIR/package.yml" "$NEW_DIR/package.yml"
+      mkdir -p "$NEW_DIR/match"
+      cp -rf "$EXT_PKG_DIR/match/"* "$NEW_DIR/match/" 2>/dev/null || true
+      [ -f "$EXT_PKG_DIR/README.md" ] && cp -f "$EXT_PKG_DIR/README.md" "$NEW_DIR/README.md"
+      EXT_PKG_DIR="$NEW_DIR"
+    fi
+  else
     warn "Automatic bump failed or not applicable; keeping version as-is."
   fi
 fi

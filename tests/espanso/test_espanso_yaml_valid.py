@@ -7,15 +7,20 @@ yaml = pytest.importorskip("yaml", reason="PyYAML is required for espanso YAML v
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-PKG_DIR = REPO_ROOT / "espanso-package"
+SRC_PKG_DIR = REPO_ROOT / "espanso-package"
+EXT_PKG_BASE = REPO_ROOT / "packages" / "your-pa"
+LATEST = None
+if EXT_PKG_BASE.exists():
+    versions = sorted((p for p in EXT_PKG_BASE.iterdir() if p.is_dir()), key=lambda p: p.name)
+    if versions:
+        LATEST = versions[-1]
+PKG_DIR = LATEST if LATEST else SRC_PKG_DIR
 
 
 def _yaml_files() -> List[pathlib.Path]:
     files: List[pathlib.Path] = []
-    # top-level package files
     files.append(PKG_DIR / "_manifest.yml")
     files.append(PKG_DIR / "package.yml")
-    # all match files
     files.extend(sorted((PKG_DIR / "match").glob("*.yml")))
     return [p for p in files if p.exists()]
 
@@ -25,7 +30,7 @@ def test_manifest_fields_present():
     assert manifest_path.exists(), "_manifest.yml missing"
     data = yaml.safe_load(manifest_path.read_text())
     assert isinstance(data, dict)
-    for field in ("name", "version", "description", "author"):
+    for field in ("name", "title", "version", "description", "author"):
         assert field in data and str(data[field]).strip(), f"Missing manifest field: {field}"
 
 

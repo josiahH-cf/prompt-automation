@@ -84,6 +84,28 @@ Hotkey repair/verification: `prompt-automation --hotkey-repair` (re-writes AHK/E
 
 Run tests as a baseline: `pytest -q`.
 
+### Espanso Package (Snippets)
+
+Install the versioned Espanso package from this repo to get team-wide text expansions:
+
+```bash
+espanso package install your-pa --git https://github.com/ORG/REPO
+```
+
+Update when a new version is released:
+
+```bash
+espanso package update your-pa
+```
+
+Uninstall (does not affect Prompt-Automation itself):
+
+```bash
+espanso package uninstall your-pa
+```
+
+See `docs/ESPANSO_PACKAGE.md` for authoring, versioning, and CI details.
+
 ### Dark Mode & Theming
 
 - Default is light (unchanged visuals). Toggle at runtime with `Ctrl+Alt+D`.

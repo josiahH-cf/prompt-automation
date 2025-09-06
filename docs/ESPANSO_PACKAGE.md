@@ -1,8 +1,8 @@
 # Espanso Package
 
-This repository hosts an Espanso external package under `espanso-package/` and mirrored in `packages/<name>/<version>/` for installation via `espanso package install --git ... --external`.
+This repository hosts an Espanso external package. The canonical package consumed by Espanso lives under `packages/<name>/<version>/`. The editable sources live under `espanso-package/` and are mirrored into the external layout by the runbook.
 
-Edit snippets in `espanso-package/match/*.yml`, bump `_manifest.yml` version, commit, push, then update on Windows with:
+Edit snippets in `espanso-package/match/*.yml`, bump the version in `packages/<name>/<version>/_manifest.yml` (or set BUMP_VERSION=true in the runbook), commit, push, then update on Windows with:
 
     espanso package update your-pa
     espanso restart
