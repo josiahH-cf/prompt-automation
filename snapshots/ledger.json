@@ -1,1 +1,2 @@
 {"ts":"2025-09-02T10:28:40Z","line":"v2","sha":"fb200ce33e01488251d69386d816f3c56bbee300","branch":"lkg-v1","tag":"lkg-v2-20250902-102840","note":null,"smoke":"skipped"}
+{"ts":"2025-09-06T09:46:02Z","line":"v1","sha":"6b9b4272b0e6b90575b414f86b4a2daa37208ccf","branch":"update-files-for-v2","tag":"lkg-v1-20250906-094602","note":"promote current branch to v1","smoke":"skipped"}
