@@ -1,0 +1,6 @@
+matches:
+  - trigger: ":pa.hello"
+    replace: "Hello from Prompt-Automation"
+  - trigger: ":pa.docs"
+    replace: "See Prompt-Automation docs in repo: docs/"
+

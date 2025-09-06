@@ -1,0 +1,6 @@
+matches:
+  - trigger: ":pa.ver"
+    replace: "Prompt-Automation — see pyproject.toml for version"
+  - trigger: ":pa.issue"
+    replace: "Open a new issue in the repo with context."
+
