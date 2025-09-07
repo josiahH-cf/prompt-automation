@@ -15,6 +15,7 @@ Commands:
   lint                     Run YAML/duplicate-trigger tests (pytest tests/espanso)
   mirror                   Mirror source package to packages/<name>/<version>/ (uses runbook)
   update                   Update installed package and restart espanso (local machine)
+  sync                     Validate, mirror, and install/update via CLI orchestrator; restart espanso
   add-snippet              Add a simple trigger/replace snippet to a match file
   disable-local-base       Backup and disable %APPDATA%\espanso\match\base.yml on Windows (via PowerShell)
   help                     Show this help
@@ -23,6 +24,7 @@ Examples:
   scripts/espanso.sh lint
   BUMP_VERSION=true scripts/espanso.sh mirror
   scripts/espanso.sh update
+  PA_SKIP_INSTALL=1 scripts/espanso.sh sync    # dry-run style
   scripts/espanso.sh add-snippet --file base.yml --trigger :hello --replace "Hello"
 EOF
 }
@@ -48,6 +50,17 @@ case "$cmd" in
     else
       echo "espanso not found on PATH. Install espanso first." >&2
       exit 1
+    fi
+    ;;
+  sync)
+    # Orchestrate full cycle using Python CLI. Prefer installed CLI if present; otherwise python -m fallback.
+    AUTO_BUMP_ARG=${AUTO_BUMP_ARG:-}
+    if [ -n "${PA_AUTO_BUMP:-}" ]; then AUTO_BUMP_ARG="--auto-bump $PA_AUTO_BUMP"; fi
+    SKIP_ARG=""; if [ "${PA_SKIP_INSTALL:-}" = "1" ]; then SKIP_ARG="--skip-install"; fi
+    if command -v prompt-automation >/dev/null 2>&1; then
+      prompt-automation --espanso-sync ${SKIP_ARG} ${AUTO_BUMP_ARG}
+    else
+      PYTHONPATH="$ROOT_DIR/src" python3 -m prompt_automation.espanso_sync ${SKIP_ARG} ${AUTO_BUMP_ARG}
     fi
     ;;
   add-snippet)

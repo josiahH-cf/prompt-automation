@@ -128,6 +128,22 @@ class PromptCLI:
             help="Run dependency and template health checks and exit",
         )
         parser.add_argument(
+            "--espanso-sync",
+            action="store_true",
+            help="Validate, mirror, and update the espanso package, then restart",
+        )
+        parser.add_argument(
+            "--espanso-skip-install",
+            action="store_true",
+            help="Skip espanso install/update (validate+mirror only)",
+        )
+        parser.add_argument(
+            "--espanso-auto-bump",
+            choices=("off", "patch"),
+            default=None,
+            help="Auto-bump patch version before mirroring",
+        )
+        parser.add_argument(
             "--assign-hotkey",
             action="store_true",
             help="Interactively set or change the global GUI hotkey",
@@ -200,6 +216,17 @@ class PromptCLI:
 
         if args.update:
             perform_update(args)
+            return
+
+        if args.espanso_sync:
+            # Delegate to module to keep concerns isolated
+            from .. import espanso_sync as _esp
+            argv: list[str] = []
+            if args.espanso_skip_install:
+                argv.append("--skip-install")
+            if args.espanso_auto_bump:
+                argv.extend(["--auto-bump", args.espanso_auto_bump])
+            _esp.main(argv)
             return
 
         try:

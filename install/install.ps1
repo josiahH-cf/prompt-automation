@@ -54,6 +54,15 @@ PROMPT_AUTOMATION_MANIFEST_AUTO=1
 '@ | Set-Content (Join-Path $cfgDir 'environment')
 Info 'Environment defaults written (GUI + auto-update enabled)'
 
+# Add repo root hint for espanso sync orchestrator
+try {
+    $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    Add-Content -Path (Join-Path $cfgDir 'environment') -Value "PROMPT_AUTOMATION_REPO=$projectRoot"
+    Info "Recorded PROMPT_AUTOMATION_REPO in environment file"
+} catch {
+    Write-Warning "Could not record PROMPT_AUTOMATION_REPO: $($_.Exception.Message)"
+}
+
 # Ensure we are running on Windows. If not, fall back to WSL-compatible installer
 if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
     Write-Warning 'Non-Windows environment detected. Running WSL-compatible installer if available.'
@@ -366,6 +375,15 @@ if ($LASTEXITCODE -ne 0) {
     Write-Warning 'You can still try to use the application, but some features may not work'
     # Don't fail the entire installation for health check issues
     # Fail 'Health check failed.' 
+}
+
+# Configure espanso package and :pa.sync command (best-effort)
+try {
+    $env:PROMPT_AUTOMATION_REPO = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    & prompt-automation --espanso-sync | Out-Null
+    Info 'Espanso package synced and :pa.sync registered'
+} catch {
+    Write-Warning "Espanso sync orchestration encountered issues: $($_.Exception.Message)"
 }
 
 Info "\nFor troubleshooting tips see docs or run scripts/troubleshoot-hotkeys.ps1 --Fix"

@@ -1,28 +1,10 @@
 name: Espanso Package CI
-on:
-  push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "**" ]
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate package layout
-        run: |
-          test -d packages/your-pa
-          ls -1 packages/your-pa | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep .
-          latest=$(ls -1 packages/your-pa | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
-          test -f "packages/your-pa/$latest/_manifest.yml"
-          test -f "packages/your-pa/$latest/package.yml"
-          test -d "packages/your-pa/$latest/match"
-name: Espanso Package CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "**" ]
   pull_request:
+    branches: [ "**" ]
   workflow_dispatch:
     inputs:
       new_version:
@@ -34,6 +16,19 @@ permissions:
   contents: write
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate package layout
+        run: |
+          test -d packages/prompt-automation
+          ls -1 packages/prompt-automation | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep .
+          latest=$(ls -1 packages/prompt-automation | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+          test -f "packages/prompt-automation/$latest/_manifest.yml"
+          test -f "packages/prompt-automation/$latest/package.yml"
+          test -d "packages/prompt-automation/$latest/match"
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -50,6 +45,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest pyyaml
+
+      - name: Dry-run espanso sync orchestrator
+        run: |
+          chmod +x scripts/espanso.sh
+          PA_SKIP_INSTALL=1 PA_AUTO_BUMP=off ./scripts/espanso.sh sync
 
       - name: Run espanso package tests only
         run: pytest -q tests/espanso

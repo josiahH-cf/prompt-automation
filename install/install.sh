@@ -124,6 +124,8 @@ ENV_FILE="$HOTKEY_CFG_DIR/environment"
     echo 'PROMPT_AUTOMATION_GUI=1'
     echo 'PROMPT_AUTOMATION_AUTO_UPDATE=1'
     echo 'PROMPT_AUTOMATION_MANIFEST_AUTO=1'
+    # Enable espanso sync orchestration to find this repo root
+    echo "PROMPT_AUTOMATION_REPO=$PROJECT_ROOT"
 } > "$ENV_FILE"
 info "Wrote environment defaults to $ENV_FILE"
 
@@ -154,6 +156,10 @@ info "Setting up global hotkey..."
 PYTHONPATH="$PROJECT_ROOT/src" python3 -m prompt_automation.install.hotkey --hotkey "ctrl+shift+j" || {
     err "Failed to configure global hotkey. You can set it up manually later with: prompt-automation --assign-hotkey"
 }
+
+# Register espanso colon command and ensure package is mirrored + installed
+info "Configuring espanso package and :pa.sync command..."
+PROMPT_AUTOMATION_REPO="$PROJECT_ROOT" prompt-automation --espanso-sync || info "espanso sync orchestration completed with warnings"
 
 # Summary verification
 wait $UPGRADE_PID 2>/dev/null || true

@@ -120,3 +120,26 @@ This package is additive and does not change Prompt-Automation behavior. If you 
 ---
 
 Maintainers: keep snippets modular, avoid secrets, and rely on CI tests to catch YAML mistakes and trigger collisions.
+
+## One-Command Sync (Colon Command)
+
+- Trigger `:pa.sync` from any text field to run the full, non-interactive pipeline:
+  - Validate YAML and reject duplicates with a clear error.
+  - Mirror `espanso-package/` to `packages/<name>/<version>/`.
+  - Install/update the package locally and restart Espanso.
+
+How it works:
+
+- The match `espanso-package/match/prompt_automation_sync.yml` invokes the CLI:
+  - `prompt-automation --espanso-sync`
+  - The orchestrator discovers the repo via `PROMPT_AUTOMATION_REPO` (set by installers) or by walking up from the current directory.
+
+Flags and env:
+
+- `PA_AUTO_BUMP=patch|off` (default off) controls auto patch-bump.
+- `PA_SKIP_INSTALL=1` skips install/update (useful for dry-runs).
+- `PA_DRY_RUN=1` validates and mirrors only.
+
+Installer integration:
+
+- Installers write `~/.prompt-automation/environment` including `PROMPT_AUTOMATION_REPO=<project_root>` so the colon command can find your repo clone.

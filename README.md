@@ -106,6 +106,23 @@ espanso package uninstall prompt-automation
 
 See `docs/ESPANSO_PACKAGE.md` for authoring, versioning, and CI details.
 
+#### Quick Add → Validate → Sync (Espanso)
+
+- Create safely (prevents duplicates):
+   - python3 scripts/add_espanso_snippet.py --file my_tools.yml --trigger :pa.kudos --replace "Great job — thanks for the help!"
+- Validate fast:
+   - pytest -q tests/espanso
+   - scripts/espanso.sh lint
+- Sync locally (mirror + install/update + restart):
+   - scripts/espanso.sh sync
+   - Optional: PA_SKIP_INSTALL=1 (dry-run), PA_AUTO_BUMP=patch (auto bump)
+- Smoke check:
+   - espanso package list; espanso status; try your trigger in any text field
+- Commit & push:
+   - git add espanso-package packages && git commit -m "feat(espanso): add :pa.kudos snippet" && git push
+
+Tip: Use the template "Espanso Snippet – Meta‑Prompt (Simple)" to generate a compact meta‑prompt you can paste into your LLM assistant to perform the exact edits and commands above.
+
 ### Dark Mode & Theming
 
 - Default is light (unchanged visuals). Toggle at runtime with `Ctrl+Alt+D`.
