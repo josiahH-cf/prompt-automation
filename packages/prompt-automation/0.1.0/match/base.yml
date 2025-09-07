@@ -11,7 +11,7 @@ matches:
       - name: open_cfg
         type: shell
         params:
-          cmd: 'cmd /C start "" notepad "%CONFIG%\\match\\base.yml"'
+          cmd: 'cmd /C start "" notepad "%CONFIG%\match\base.yml"'
 
   # --- New Task (API): create Todoist task via external script ---
   - trigger: ":ntsk"
@@ -39,7 +39,7 @@ matches:
         type: shell
         params:
           # Uses CMD so %APPDATA% expands; calls your PS script with two args.
-          cmd: 'cmd /C powershell -NoProfile -ExecutionPolicy Bypass -File "%APPDATA%\\espanso\\scripts\\todoist_add.ps1" "{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}" "NRA: {{ntsk.nra}}"'
+          cmd: 'cmd /C powershell -NoProfile -ExecutionPolicy Bypass -File "%APPDATA%\espanso\scripts\todoist_add.ps1" "{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}" "NRA: {{ntsk.nra}}"'
 
   # --- Crit: prompts, then prints bullets ---
   - trigger: ":cnote"
