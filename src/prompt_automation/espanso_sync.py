@@ -190,6 +190,16 @@ def _git_remote(repo: Path) -> str | None:
     return url or None
 
 
+def _current_branch(repo: Path) -> str | None:
+    """Return the current git branch name, or None when detached/unknown."""
+    code, out, _ = _run(["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"])
+    if code == 0:
+        br = out.strip()
+        if br and br != "HEAD":
+            return br
+    return None
+
+
 def _espanso_bin() -> list[str] | None:
     # return invocation for espanso appropriate per OS
     if shutil.which("espanso"):
@@ -197,7 +207,7 @@ def _espanso_bin() -> list[str] | None:
     return None
 
 
-def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | None) -> None:
+def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | None, git_branch: str | None) -> None:
     bin_ = _espanso_bin()
     if not bin_:
         _j("warn", "espanso_missing", note="espanso not on PATH; skipping install/update")
@@ -208,7 +218,15 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
 
     if repo_url:
         # Prefer git-based workflow
-        code, _, _ = _run(bin_ + ["package", "install", pkg_name, "--git", repo_url, "--external"])  # type: ignore[operator]
+        cmd = bin_ + [
+            "package", "install", pkg_name,
+            "--git", repo_url,
+            "--external",
+            "--force",
+        ]
+        if git_branch:
+            cmd += ["--git-branch", git_branch]
+        code, _, _ = _run(cmd)  # type: ignore[operator]
         if code != 0:
             _run(bin_ + ["package", "update", pkg_name])  # type: ignore[operator]
     elif local_path:
@@ -231,6 +249,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--auto-bump", choices=["off", "patch"], default=os.environ.get("PA_AUTO_BUMP", "off"))
     ap.add_argument("--skip-install", action="store_true", default=os.environ.get("PA_SKIP_INSTALL") == "1")
     ap.add_argument("--dry-run", action="store_true", default=os.environ.get("PA_DRY_RUN") == "1")
+    ap.add_argument("--git-branch", default=os.environ.get("PA_GIT_BRANCH", ""), help="Branch to install from when using git source (defaults to current branch)")
     args = ap.parse_args(argv)
 
     _j("start", "sync", os=platform.system())
@@ -256,7 +275,9 @@ def main(argv: list[str] | None = None) -> None:
         _j("ok", "skip_install", reason="flag")
         return
     repo_url = _git_remote(repo)
-    _install_or_update(pkg_name, repo_url, local_pkg_dir)
+    # Decide which git branch to use for installation
+    git_branch = args.git_branch.strip() or _current_branch(repo) or None
+    _install_or_update(pkg_name, repo_url, local_pkg_dir, git_branch)
     _j("done", "sync")
 
 
