@@ -378,39 +378,39 @@ def _mirror(repo: Path, pkg_name: str, version: str) -> Path:
 
 
 def _prune_local_defaults() -> None:
-    """Remove default/base espanso match files that cause duplicate triggers.
+    """Remove all local match YAMLs so only the package rules apply.
 
-    Targets (best-effort, safe to ignore errors):
-    - Linux: ~/.config/espanso/match/base.yml and base.yaml
-    - Windows: %APPDATA%/espanso/match/base.yml and base.yaml
+    Deletes every ``*.yml``/``*.yaml`` file under:
+    - Linux/macOS: ``~/.config/espanso/match/``
+    - Windows: ``%APPDATA%/espanso/match/``
+    Safe and idempotent; logs removed paths.
     """
     removed: List[str] = []
     errors: List[str] = []
     # Linux/macOS style
     try:
-        home = Path.home()
-        for nm in ("base.yml", "base.yaml"):
-            p = home / ".config" / "espanso" / "match" / nm
-            try:
-                if p.exists():
+        match_dir = Path.home() / ".config" / "espanso" / "match"
+        if match_dir.exists():
+            for p in list(match_dir.glob("*.yml")) + list(match_dir.glob("*.yaml")):
+                try:
                     p.unlink()
                     removed.append(str(p))
-            except Exception as e:  # pragma: no cover - best effort
-                errors.append(f"{p}: {str(e)[:120]}")
+                except Exception as e:  # pragma: no cover - best effort
+                    errors.append(f"{p}: {str(e)[:120]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"home_lookup: {str(e)[:120]}")
     # Windows style
     try:
         appdata = os.environ.get("APPDATA")
         if appdata:
-            for nm in ("base.yml", "base.yaml"):
-                p = Path(appdata) / "espanso" / "match" / nm
-                try:
-                    if p.exists():
+            match_dir = Path(appdata) / "espanso" / "match"
+            if match_dir.exists():
+                for p in list(match_dir.glob("*.yml")) + list(match_dir.glob("*.yaml")):
+                    try:
                         p.unlink()
                         removed.append(str(p))
-                except Exception as e:  # pragma: no cover - best effort
-                    errors.append(f"{p}: {str(e)[:120]}")
+                    except Exception as e:  # pragma: no cover - best effort
+                        errors.append(f"{p}: {str(e)[:120]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"appdata_lookup: {str(e)[:120]}")
     if removed:
@@ -499,6 +499,76 @@ def _current_branch(repo: Path) -> str | None:
         if br and br != "HEAD":
             return br
     return None
+
+
+def _git_prepare_branch(repo: Path, preferred: str | None) -> str | None:
+    """Ensure we are on a usable branch, fetch, and pull --rebase safely.
+
+    - Creates a new branch when detached or preferred missing.
+    - Commits a pre-sync snapshot if the working tree is dirty.
+    - Pulls with rebase; on failure, tries auto-stash and retries once.
+    Returns the active branch or None when not a git repo.
+    """
+    if not (repo / ".git").exists():
+        _j("skip", "git_prepare", reason="not_a_git_repo")
+        return None
+    def _status_dirty() -> bool:
+        code, out, err = _run(["git", "-C", str(repo), "status", "--porcelain"])
+        return code == 0 and bool((out or "").strip())
+    # Determine branch and switch/create if needed
+    current = _current_branch(repo)
+    active = current
+    if preferred:
+        if current != preferred:
+            # try checkout preferred; create if missing
+            code, _, _ = _run(["git", "-C", str(repo), "rev-parse", "--verify", preferred])
+            if code == 0:
+                _run(["git", "-C", str(repo), "checkout", preferred])
+            else:
+                _run(["git", "-C", str(repo), "checkout", "-b", preferred])
+            active = preferred
+    if active is None:
+        import datetime as _dt
+        newb = f"espanso-sync-{_dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        _run(["git", "-C", str(repo), "checkout", "-b", newb])
+        active = newb
+        _j("ok", "git_branch_created", name=newb)
+    # Pre-sync snapshot commit if dirty
+    if _status_dirty():
+        _run(["git", "-C", str(repo), "add", "-A"])  # stage all
+        code_c, out_c, err_c = _run(["git", "-C", str(repo), "commit", "-m", "chore(sync): pre-espanso sync snapshot"]) 
+        _j("ok" if code_c == 0 else "warn", "git_pre_snapshot_commit", note=(err_c or out_c).strip()[:200])
+    # Fetch and rebase/pull
+    remote = _git_remote(repo)
+    if remote:
+        _run(["git", "-C", str(repo), "fetch", "--prune", "origin"], timeout=20)
+        code_p, out_p, err_p = _run(["git", "-C", str(repo), "pull", "--rebase", "origin", active], timeout=30)
+        if code_p != 0:
+            # try auto-stash then retry once
+            _j("warn", "git_pull_rebase_failed", error=(err_p or out_p).strip()[:200])
+            _run(["git", "-C", str(repo), "stash", "push", "-u", "-m", "espanso-sync-autostash"], timeout=20)
+            code_p2, out_p2, err_p2 = _run(["git", "-C", str(repo), "pull", "--rebase", "origin", active], timeout=30)
+            if code_p2 == 0:
+                _run(["git", "-C", str(repo), "stash", "pop"], timeout=20)
+            else:
+                _j("warn", "git_pull_stash_failed", error=(err_p2 or out_p2).strip()[:200], hint="There are merges that still need committed; please resolve and re-run sync.")
+    return active
+
+
+def _git_tag_and_push(repo: Path, version: str) -> None:
+    """Create and push a tag `espanso-v<version>` if missing."""
+    if not (repo / ".git").exists():
+        return
+    tag = f"espanso-v{version}"
+    code_l, out_l, _ = _run(["git", "-C", str(repo), "tag", "-l", tag])
+    if code_l == 0 and tag in (out_l or ""):
+        _j("skip", "git_tag", reason="exists", tag=tag)
+    else:
+        code_t, out_t, err_t = _run(["git", "-C", str(repo), "tag", "-a", tag, "-m", f"espanso {version}"])
+        _j("ok" if code_t == 0 else "warn", "git_tag", tag=tag, note=(err_t or out_t).strip()[:200])
+    # Push tag best-effort
+    code_p, out_p, err_p = _run(["git", "-C", str(repo), "push", "origin", tag], timeout=20)
+    _j("ok" if code_p == 0 else "warn", "git_tag_push", tag=tag, note=(err_p or out_p).strip()[:200])
 
 
 def _git_commit_and_push(repo: Path, branch: str | None, version: str) -> None:
@@ -952,6 +1022,15 @@ def main(argv: list[str] | None = None) -> None:
     repo = _find_repo_root(args.repo)
     _j("ok", "discover_repo", repo=str(repo))
 
+    # Prepare branch & pull latest safely (no-op if not a git repo)
+    git_branch = _active_branch(repo, args.git_branch)
+    try:
+        active_branch = _git_prepare_branch(repo, git_branch)
+        if active_branch:
+            git_branch = active_branch
+    except Exception:
+        _j("warn", "git_prepare_failed", note="continuing")
+
     # Generate from templates then validate
     _generate_from_templates(repo)
     # Validate
@@ -964,10 +1043,14 @@ def main(argv: list[str] | None = None) -> None:
     local_pkg_dir = _mirror(repo, pkg_name, version)
     # Commit and push authoritative state to origin for remote installs
     try:
-        git_branch = _active_branch(repo, args.git_branch)
         _git_commit_and_push(repo, git_branch, version)
     except Exception:
         _j("warn", "git_push_failed", note="continuing with install")
+    # Tag and push tag
+    try:
+        _git_tag_and_push(repo, version)
+    except Exception:
+        _j("warn", "git_tag_failed", note="continuing")
 
     if args.dry_run:
         _j("ok", "dry_run", note="skipping install/update")
