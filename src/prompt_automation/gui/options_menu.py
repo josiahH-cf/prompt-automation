@@ -53,6 +53,7 @@ def configure_options_menu(
                 try:
                     # Use CLI module to reuse argument parsing and env
                     from ..espanso_sync import main as _sync_main
+                    from .. import espanso_sync as _esp
                     # If user configured a repo root in Settings, pass it explicitly
                     # Prefer Settings override; fall back to environment file
                     try:
@@ -72,7 +73,32 @@ def configure_options_menu(
                     argv = ["--repo", repo_root] if repo_root else []
                     # Respect env flags; do not hardcode branch or skip-install here
                     _sync_main(argv)
-                    messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
+                    # After successful sync, show installed version if available
+                    try:
+                        pkgs = _esp._list_installed_packages()
+                        ver = None; src = None
+                        for p in pkgs:
+                            if p.get("name") == "prompt-automation":
+                                ver = p.get("version"); src = p.get("source"); break
+                        if ver:
+                            messagebox.showinfo("Espanso", f"Sync complete. Installed prompt-automation v{ver}.\n\n{('('+src+')' if src else '')}")
+                        else:
+                            messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
+                    except Exception:
+                        messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
+                    # Windows-only advisory if local base.yml exists (can cause duplicates)
+                    try:
+                        import platform, os
+                        from pathlib import Path as _P
+                        if platform.system() == "Windows":
+                            appdata = os.environ.get("APPDATA")
+                            if appdata:
+                                by = _P(appdata) / "espanso" / "match" / "base.yml"
+                                if by.exists():
+                                    messagebox.showwarning("Espanso",
+                                        f"Local base.yml detected at:\n{by}\n\nIt may cause duplicate triggers.\nUse: scripts/espanso-windows.ps1 -DisableLocalBase")
+                    except Exception:
+                        pass
                 except SystemExit as e:
                     code = getattr(e, 'code', 1)
                     if code:

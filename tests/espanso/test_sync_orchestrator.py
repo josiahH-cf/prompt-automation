@@ -42,8 +42,8 @@ def test_sync_dry_run_validates_and_mirrors(tmp_path: Path) -> None:
     _write_minimal_pkg(tmp_path)
     code = run_sync(tmp_path, ["--dry-run"])  # mirror should proceed; install skipped
     assert code == 0
-    # External mirror exists
-    ext = tmp_path / "packages" / "prompt-automation" / "0.0.1"
+    # External mirror exists (auto-bumped patch version)
+    ext = tmp_path / "packages" / "prompt-automation" / "0.0.2"
     assert (ext / "_manifest.yml").exists()
     assert (ext / "package.yml").exists()
     assert (ext / "match" / "basic.yml").exists()

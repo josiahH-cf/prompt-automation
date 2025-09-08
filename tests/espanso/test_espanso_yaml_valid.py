@@ -22,9 +22,16 @@ if _mf.exists():
 EXT_PKG_BASE = REPO_ROOT / "packages" / _name
 LATEST = None
 if EXT_PKG_BASE.exists():
-    versions = sorted((p for p in EXT_PKG_BASE.iterdir() if p.is_dir()), key=lambda p: p.name)
-    if versions:
-        LATEST = versions[-1]
+    # Prefer a semantic version directory if present, else ignore backups
+    ver_dirs = sorted(
+        (p for p in EXT_PKG_BASE.iterdir() if p.is_dir() and p.name not in {"_backup"}),
+        key=lambda p: p.name,
+    )
+    # Filter to X.Y.Z style names
+    import re as _re
+    semver_dirs = [p for p in ver_dirs if _re.match(r"^\d+\.\d+\.\d+$", p.name)]
+    if semver_dirs:
+        LATEST = semver_dirs[-1]
 PKG_DIR = LATEST if LATEST else SRC_PKG_DIR
 
 

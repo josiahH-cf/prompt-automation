@@ -60,8 +60,8 @@ def test_generation_writes_match_files_with_block_scalars_and_mirror(tmp_path: P
     assert ':t.gen' not in triggers  # duplicate removed in second file
     assert ':t.ok' in triggers
 
-    # Mirrored external layout exists and matches version and triggers
-    ext = tmp_path / 'packages' / 'prompt-automation' / '0.9.1'
+    # Mirrored external layout exists and matches version and triggers (auto-bumped)
+    ext = tmp_path / 'packages' / 'prompt-automation' / '0.9.2'
     assert (ext / '_manifest.yml').exists()
     # Basic parity: triggers present in external mirror
     e2 = yaml.safe_load((ext / 'match' / 'gen2.yml').read_text())

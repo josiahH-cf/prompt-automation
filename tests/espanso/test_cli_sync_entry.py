@@ -37,8 +37,8 @@ def test_cli_espanso_sync_entry_skips_install_and_mirrors(tmp_path: Path, monkey
     from prompt_automation.cli import cli as cli_mod
     cli_mod.main(["--espanso-sync", "--espanso-skip-install"])  # should not raise
 
-    # Validate mirror exists
-    ext = tmp_path / "packages" / "prompt-automation" / "0.0.2"
+    # Validate mirror exists (auto-bumped patch version)
+    ext = tmp_path / "packages" / "prompt-automation" / "0.0.3"
     assert (ext / "_manifest.yml").exists()
     assert (ext / "package.yml").exists()
     assert (ext / "match" / "basic.yml").exists()

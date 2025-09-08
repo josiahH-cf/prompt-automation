@@ -6,7 +6,7 @@ Designed to be cross-platform and callable from:
 
 Behavior is environment-agnostic and parameterized via CLI args or env vars:
 - PROMPT_AUTOMATION_REPO: repo root (auto-detected if unset)
-- PA_AUTO_BUMP: "off"|"patch" (default: off)
+- PA_AUTO_BUMP: "off"|"patch" (default: patch)
 - PA_SKIP_INSTALL: "1" to skip espanso install/update (default: skip when not running under espanso)
 - PA_DRY_RUN: "1" to run validation + mirror only
 
@@ -303,22 +303,77 @@ def _maybe_bump_patch(repo: Path, enable: bool) -> str:
 
 
 def _mirror(repo: Path, pkg_name: str, version: str) -> Path:
+    """Mirror espanso-package into packages/<pkg>/<version> with pruning.
+
+    Policy: keep only two folders under packages/<pkg_name>:
+    - The current version directory (just mirrored)
+    - A single backup directory "_backup/" containing the previous version snapshot
+    Any other historical version directories are deleted to avoid growth.
+    """
+    import re
+
     src = repo / "espanso-package"
-    dst = repo / "packages" / pkg_name / version
+    base = repo / "packages" / pkg_name
+    dst = base / version
+
+    # Ensure destination exists and mirror files
     (dst / "match").mkdir(parents=True, exist_ok=True)
-    # Mirror manifest 1:1
     shutil.copy2(src / "_manifest.yml", dst / "_manifest.yml")
-    # Copy package.yml
     if (src / "package.yml").exists():
         shutil.copy2(src / "package.yml", dst / "package.yml")
-    # Copy match files
-    for p in (src / "match").glob("*.yml"):
+    for p in sorted((src / "match").glob("*.yml")):
         shutil.copy2(p, dst / "match" / p.name)
-    # README lightweight
     readme = dst / "README.md"
     if not readme.exists():
-        readme.write_text(f"# {pkg_name}\n\nMirrored from espanso-package/ for version {version}.\n", encoding="utf-8")
+        readme.write_text(
+            f"# {pkg_name}\n\nMirrored from espanso-package/ for version {version}.\n",
+            encoding="utf-8",
+        )
     _j("ok", "mirror", dest=str(dst))
+
+    # Collect existing version directories (semver-like names)
+    def _is_ver_dir(d: Path) -> bool:
+        return d.is_dir() and re.match(r"^\d+\.\d+\.\d+$", d.name) is not None
+
+    try:
+        existing = [d for d in base.iterdir() if _is_ver_dir(d) and d.name != version]
+    except FileNotFoundError:
+        existing = []
+
+    # Identify the most recent previous version by semantic version sort
+    def _semver_key(v: str) -> tuple[int, int, int]:
+        m = re.match(r"^(\d+)\.(\d+)\.(\d+)$", v)
+        if not m:
+            return (0, 0, 0)
+        return tuple(map(int, m.groups()))  # type: ignore[return-value]
+
+    prev_dir: Path | None = None
+    if existing:
+        prev_dir = sorted(existing, key=lambda p: _semver_key(p.name))[-1]
+
+    # Prepare a single backup directory containing the previous version snapshot
+    backup_root = base / "_backup"
+    try:
+        if backup_root.exists():
+            shutil.rmtree(backup_root, ignore_errors=True)
+        backup_root.mkdir(parents=True, exist_ok=True)
+        if prev_dir is not None and prev_dir.exists():
+            shutil.copytree(prev_dir, backup_root / prev_dir.name)
+            _j("ok", "mirror_backup", previous=str(prev_dir), backup=str(backup_root / prev_dir.name))
+    except Exception as e:
+        _j("warn", "mirror_backup_failed", error=str(e)[:200])
+
+    # Prune all historical version dirs except the current one
+    removed: list[str] = []
+    for d in existing:
+        try:
+            shutil.rmtree(d, ignore_errors=True)
+            removed.append(d.name)
+        except Exception:
+            pass
+    if removed:
+        _j("ok", "mirror_prune", removed=removed)
+
     return dst
 
 
@@ -446,13 +501,16 @@ def _list_installed_packages() -> List[Dict[str, str]]:
     Source is a free-form string from espanso (e.g., "git: <url>" or "path: <dir>").
     """
     bin_ = _espanso_bin()
-    if not bin_:
-        return []
-    code, out, err = _run(bin_ + ["package", "list"], timeout=6)
-    if code != 0 and platform.system() == "Windows" and shutil.which("powershell.exe"):
-        # Avoid UNC CWD issues by switching to a safe local directory inside PowerShell
-        ps_cmd = "Set-Location $env:USERPROFILE; espanso package list"
-        code, out, err = _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd], timeout=10)
+    out = ""
+    code = 1
+    err = ""
+    if bin_:
+        code, out, err = _run(bin_ + ["package", "list"], timeout=6)
+    # Fall back to PowerShell even when espanso isn't directly invokable
+    if (not bin_) or (code != 0 or not out):
+        if platform.system() == "Windows" and shutil.which("powershell.exe"):
+            ps_cmd = "Set-Location $env:USERPROFILE; espanso package list"
+            code, out, err = _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd], timeout=12)
     if code != 0 or not out:
         return []
     lines = [l.strip() for l in out.splitlines()]
@@ -552,10 +610,10 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
     _direct(["service", "register"])  # ignore result
     _direct(["start"])  # ignore result
 
-    # On Windows, enforce Git-only installs. If no repo URL is available, skip local installs.
+    # On Windows, enforce Git-only installs; skip local --path due to espanso v2 CLI.
     if system == "Windows" and not repo_url:
         _j("warn", "install_update", reason="windows_git_only_no_repo_url_skip")
-        # Best-effort: still refresh service/list to surface current state
+        # Best-effort: refresh service/list to surface current state
         if shutil.which("powershell.exe"):
             _ps("espanso restart")
             _ps("espanso package list")
@@ -565,8 +623,7 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
         _j("ok", "install_update_done", mode="git")
         return
 
-    # Prefer local install first on non-Windows, even if a repo URL exists.
-    # On Windows, skip local installs due to clap/--path issues; use Git-only as enforced above.
+    # Prefer local install first on non-Windows only.
     prefer_local = (system != "Windows") and (local_path is not None)
     mode = "local" if prefer_local else ("git" if repo_url else "local")
     local_ok = False
@@ -644,7 +701,24 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
 
     if repo_url and not local_ok:
         mode = "git"
-        cmds = _build_git_install_cmds(pkg_name, repo_url, git_branch)
+        # Prefer HTTPS over SSH on Windows to avoid interactive auth / timeouts
+        repo_for_install = repo_url
+        if system == "Windows":
+            try:
+                ru = (repo_url or "").strip()
+                if ru.startswith("git@github.com:"):
+                    owner_repo = ru.split(":", 1)[1]
+                    if owner_repo.endswith(".git"):
+                        owner_repo = owner_repo[:-4]
+                    repo_for_install = f"https://github.com/{owner_repo}.git"
+                elif ru.startswith("ssh://") and "github.com" in ru:
+                    tail = ru.split("github.com", 1)[1].lstrip(":/")
+                    if tail.endswith(".git"):
+                        tail = tail[:-4]
+                    repo_for_install = f"https://github.com/{tail}.git"
+            except Exception:
+                pass
+        cmds = _build_git_install_cmds(pkg_name, repo_for_install, git_branch)
         # If already installed from the same repo, prefer update over reinstall (Windows)
         try:
             if platform.system() == "Windows":
@@ -674,13 +748,13 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
             last_err = ""
             code = 1
             for c in cmds:
-                scmd = "espanso " + " ".join(c)
+                scmd = "Set-Location $env:USERPROFILE; espanso " + " ".join(c)
                 code, out, err = _ps(scmd)
                 if code == 0:
                     break
                 last_err = err or out
             if code != 0 and (last_err or "").lower().find("already installed") != -1:
-                _ps(f"espanso package update {pkg_name}")
+                _ps(f"Set-Location $env:USERPROFILE; espanso package update {pkg_name}")
                 code = 0
             # Do not fall back to WSL for installs on Windows; it often lacks espanso
             if code != 0:
@@ -707,10 +781,70 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
     _j("ok", "install_update_done", mode=mode)
 
 
+def _ensure_version_aligned(pkg_name: str, expected_version: str, repo_url: str | None, local_path: Path | None, git_branch: str | None) -> None:
+    """Ensure the installed package version matches the manifest version.
+
+    - If mismatched, attempt update once.
+    - If still mismatched, attempt uninstall + reinstall once.
+    - If still mismatched, emit a warning and continue.
+    """
+    def _current_installed() -> tuple[str | None, str | None]:
+        try:
+            for p in _list_installed_packages():
+                if p.get("name") == pkg_name:
+                    return p.get("version"), p.get("source")
+        except Exception:
+            pass
+        return None, None
+
+    cur_ver, cur_src = _current_installed()
+    if cur_ver == expected_version:
+        _j("ok", "version_aligned", name=pkg_name, version=expected_version)
+        return
+
+    # Try update once
+    try:
+        if platform.system() == "Windows" and shutil.which("powershell.exe"):
+            _run([
+                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                f"Set-Location $env:USERPROFILE; espanso package update {pkg_name}"
+            ], timeout=12)
+        else:
+            bin_ = _espanso_bin()
+            if bin_:
+                _run(bin_ + ["package", "update", pkg_name], timeout=12)
+    except Exception:
+        pass
+
+    cur_ver, cur_src = _current_installed()
+    if cur_ver == expected_version:
+        _j("ok", "version_aligned_after_update", name=pkg_name, version=expected_version)
+        return
+
+    # Uninstall and reinstall once (Git or default path per platform rules)
+    try:
+        _uninstall_package(pkg_name)
+    except Exception:
+        pass
+    try:
+        _install_or_update(pkg_name, repo_url, local_path, git_branch)
+    except Exception:
+        pass
+
+    cur_ver, cur_src = _current_installed()
+    if cur_ver == expected_version:
+        _j("ok", "version_aligned_after_reinstall", name=pkg_name, version=expected_version)
+        return
+
+    # No further local-path attempts on Windows; warn persists
+
+    _j("warn", "version_mismatch_persists", name=pkg_name, expected=expected_version, installed=cur_ver or "unknown", source=cur_src or "")
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="espanso-sync", add_help=True)
     ap.add_argument("--repo", type=Path, default=None, help="Repository root containing espanso-package/")
-    ap.add_argument("--auto-bump", choices=["off", "patch"], default=os.environ.get("PA_AUTO_BUMP", "off"))
+    ap.add_argument("--auto-bump", choices=["off", "patch"], default=os.environ.get("PA_AUTO_BUMP", "patch"))
     ap.add_argument("--skip-install", action="store_true", default=os.environ.get("PA_SKIP_INSTALL") == "1")
     ap.add_argument("--dry-run", action="store_true", default=os.environ.get("PA_DRY_RUN") == "1")
     ap.add_argument("--git-branch", default=os.environ.get("PA_GIT_BRANCH", ""), help="Branch to install from when using git source (defaults to current branch)")
@@ -750,6 +884,11 @@ def main(argv: list[str] | None = None) -> None:
     # Enforce single-package convergence: remove any reappearing legacy or same-repo duplicates post-install
     try:
         _resolve_conflicts(pkg_name, repo_url, local_pkg_dir)
+    except Exception:
+        pass
+    # Ensure manifest version alignment (retry once; warn if still mismatched)
+    try:
+        _ensure_version_aligned(pkg_name, version, repo_url, local_pkg_dir, git_branch)
     except Exception:
         pass
     # Windows-only advisory: if local base.yml exists, it may duplicate triggers.

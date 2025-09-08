@@ -154,6 +154,11 @@ class PromptCLI:
             help="Deep clean: backup and remove ALL local match/*.yml (not just base.yml)",
         )
         parser.add_argument(
+            "--espanso-no-sync",
+            action="store_true",
+            help="When used with --espanso-clean-deep, skip the automatic sync step",
+        )
+        parser.add_argument(
             "--espanso-clean-list",
             action="store_true",
             help="List local match files and installed packages (no changes)",
@@ -251,7 +256,12 @@ class PromptCLI:
 
         if args.espanso_clean or args.espanso_clean_list or args.espanso_clean_deep:
             from .espanso_cmds import clean_env
+            from .. import espanso_sync as _esp
+            # Perform requested clean
             clean_env(list_only=args.espanso_clean_list, deep=args.espanso_clean_deep)
+            # If deep clean was requested and not explicitly disabled, run a sync automatically
+            if args.espanso_clean_deep and not args.espanso_no_sync and not args.espanso_clean_list:
+                _esp.main([])
             return
 
         if args.espanso_reset:
