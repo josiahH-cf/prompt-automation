@@ -85,7 +85,7 @@ def configure_options_menu(
                         else:
                             messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
                     except Exception:
-                        messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
+                        messagebox.showinfo("Espanso", "Sync complete. Espanso restarted (remote-first).")
                     # Windows-only advisory if local base.yml exists (can cause duplicates)
                     try:
                         import platform, os

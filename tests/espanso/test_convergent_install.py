@@ -56,7 +56,7 @@ def test_install_prefers_local_external(monkeypatch, tmp_path):
     assert not any("package install" in s and "--git" in s for s in flat)
 
 
-def test_uninstall_then_reinstall_when_local_fails(monkeypatch, tmp_path):
+def test_remote_first_when_git_available(monkeypatch, tmp_path):
     import importlib
     import prompt_automation.espanso_sync as sync
     importlib.reload(sync)
@@ -68,12 +68,10 @@ def test_uninstall_then_reinstall_when_local_fails(monkeypatch, tmp_path):
 
     calls: List[List[str]] = []
 
-    # Simulate: external fail, path fail -> uninstall -> external success
+    # Simulate: git install attempt -> already installed -> update -> restart/list
     outcomes: List[Tuple[str, int]] = [
-        ("--path", 1),  # first path attempt fails
-        ("--path", 1),  # second path attempt fails (alternate ordering)
-        ("uninstall", 0),
-        ("--path", 0),  # reinstall via path succeeds
+        ("--git", 1),  # initial install returns non-zero with already-installed
+        ("update", 0),
         ("restart", 0),
         ("package list", 0),
     ]
@@ -86,25 +84,18 @@ def test_uninstall_then_reinstall_when_local_fails(monkeypatch, tmp_path):
             s = " ".join(args)
             calls.append([str(a) for a in args])
             # find next outcome matching this type
-            if "package install" in s and "--external" in s:
-                rc = next((rc for typ, rc in outcomes if typ == "--external"), 0)
-                # rotate the first matching outcome to simulate progression
+            if "package install" in s and "--git" in s:
+                rc = next((rc for typ, rc in outcomes if typ == "--git"), 0)
                 for i, (typ, _rc) in enumerate(outcomes):
-                    if typ == "--external":
+                    if typ == "--git":
                         outcomes.pop(i)
                         break
-                return rc, "", "err" if rc else ""
-            if "package install" in s and "--path" in s:
-                rc = next((rc for typ, rc in outcomes if typ == "--path"), 0)
+                # Simulate 'already installed' err text to trigger update
+                return rc, "", "unable to install package: package prompt-automation is already installed"
+            if "package update" in s:
+                rc = next((rc for typ, rc in outcomes if typ == "update"), 0)
                 for i, (typ, _rc) in enumerate(outcomes):
-                    if typ == "--path":
-                        outcomes.pop(i)
-                        break
-                return rc, "", "err" if rc else ""
-            if "package uninstall" in s:
-                rc = next((rc for typ, rc in outcomes if typ == "uninstall"), 0)
-                for i, (typ, _rc) in enumerate(outcomes):
-                    if typ == "uninstall":
+                    if typ == "update":
                         outcomes.pop(i)
                         break
                 return rc, "", ""
@@ -130,8 +121,7 @@ def test_uninstall_then_reinstall_when_local_fails(monkeypatch, tmp_path):
     sync._install_or_update(pkg_name, repo_url="https://example.com/repo.git", local_path=local_pkg, git_branch="main")
 
     flat = [" ".join(c) for c in calls]
-    # We expect uninstall then a second external install before any git attempt
-    # (our fake never triggers git path; we assert the key calls happened)
-    assert any("package uninstall prompt-automation" in s for s in flat)
-    # Ensure we retried a local install after uninstall
-    assert sum(1 for s in flat if ("package install" in s and ("--path" in s or "--external" in s))) >= 2
+    # Ensure we attempted a git install
+    assert any("package install" in s and "--git" in s for s in flat)
+    # Ensure no local --path attempts when repo_url is provided
+    assert not any("package install" in s and "--path" in s for s in flat)

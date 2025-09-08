@@ -377,6 +377,48 @@ def _mirror(repo: Path, pkg_name: str, version: str) -> Path:
     return dst
 
 
+def _prune_local_defaults() -> None:
+    """Remove default/base espanso match files that cause duplicate triggers.
+
+    Targets (best-effort, safe to ignore errors):
+    - Linux: ~/.config/espanso/match/base.yml and base.yaml
+    - Windows: %APPDATA%/espanso/match/base.yml and base.yaml
+    """
+    removed: List[str] = []
+    errors: List[str] = []
+    # Linux/macOS style
+    try:
+        home = Path.home()
+        for nm in ("base.yml", "base.yaml"):
+            p = home / ".config" / "espanso" / "match" / nm
+            try:
+                if p.exists():
+                    p.unlink()
+                    removed.append(str(p))
+            except Exception as e:  # pragma: no cover - best effort
+                errors.append(f"{p}: {str(e)[:120]}")
+    except Exception as e:  # pragma: no cover - best effort
+        errors.append(f"home_lookup: {str(e)[:120]}")
+    # Windows style
+    try:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            for nm in ("base.yml", "base.yaml"):
+                p = Path(appdata) / "espanso" / "match" / nm
+                try:
+                    if p.exists():
+                        p.unlink()
+                        removed.append(str(p))
+                except Exception as e:  # pragma: no cover - best effort
+                    errors.append(f"{p}: {str(e)[:120]}")
+    except Exception as e:  # pragma: no cover - best effort
+        errors.append(f"appdata_lookup: {str(e)[:120]}")
+    if removed:
+        _j("ok", "prune_defaults", removed=removed)
+    if errors:
+        _j("warn", "prune_defaults", errors=errors)
+
+
 def _manifest_homepage(repo: Path) -> str | None:
     try:
         import yaml
@@ -457,6 +499,38 @@ def _current_branch(repo: Path) -> str | None:
         if br and br != "HEAD":
             return br
     return None
+
+
+def _git_commit_and_push(repo: Path, branch: str | None, version: str) -> None:
+    """Stage, commit, and push espanso changes to origin.
+
+    No-op if not a git repo. Commit may be skipped when tree is clean.
+    """
+    try:
+        if not (repo / ".git").exists():
+            _j("skip", "git_commit", reason="not_a_git_repo")
+            return
+        # Stage all relevant changes
+        _run(["git", "-C", str(repo), "add", "-A"], timeout=10)
+        # Commit; allow failure if nothing to commit
+        code_c, out_c, err_c = _run(
+            ["git", "-C", str(repo), "commit", "-m", f"chore(espanso): sync v{version}"], timeout=10
+        )
+        if code_c == 0:
+            _j("ok", "git_commit", version=version)
+        else:
+            _j("skip", "git_commit", reason=(err_c or out_c).strip()[:200] or "no_changes")
+        # Push
+        if branch:
+            code_p, out_p, err_p = _run(["git", "-C", str(repo), "push", "origin", branch], timeout=20)
+        else:
+            code_p, out_p, err_p = _run(["git", "-C", str(repo), "push"], timeout=20)
+        if code_p == 0:
+            _j("ok", "git_push", branch=branch or "current")
+        else:
+            _j("warn", "git_push_failed", branch=branch or "current", error=(err_p or out_p).strip()[:200])
+    except Exception as e:  # pragma: no cover - best effort
+        _j("warn", "git_push_exception", error=str(e)[:200])
 
 
 def _espanso_bin() -> list[str] | None:
@@ -562,25 +636,38 @@ def _resolve_conflicts(pkg_name: str, repo_url: str | None, local_path: Path | N
     for p in pkgs:
         name = p.get("name", "")
         src = p.get("source", "")
-        if not name or name == pkg_name:
+        if not name:
             continue
-        # Same repository under a different package name (normalize URL to compare)
+        # If the same-named package is installed from a local path, mark for uninstall
         try:
             src_l = (src or "").lower()
-            if "git:" in src_l and repo_norm:
-                src_url = src_l.split("git:", 1)[1].strip()
-                src_norm = _normalize_git_url(src_url)
-                # treat equality or containment as a match to be resilient to protocol diffs
-                if src_norm and (src_norm == repo_norm or repo_norm in src_norm or src_norm in repo_norm):
-                    to_uninstall.append(name)
+            if name == pkg_name and ("path:" in src_l or (local_path and str(local_path) in src)):
+                to_uninstall.append(name)
+                continue
         except Exception:
             pass
+        # Same repository under a different package name (normalize URL to compare).
+        # Do not target the canonical package name in this alias logic.
+        if name == pkg_name:
+            # Skip alias checks for canonical name
+            pass
+        else:
+            try:
+                src_l = (src or "").lower()
+                if "git:" in src_l and repo_norm:
+                    src_url = src_l.split("git:", 1)[1].strip()
+                    src_norm = _normalize_git_url(src_url)
+                    # treat equality or containment as a match to be resilient to protocol diffs
+                    if src_norm and (src_norm == repo_norm or repo_norm in src_norm or src_norm in repo_norm):
+                        to_uninstall.append(name)
+            except Exception:
+                pass
         # Known legacy names
         if name in legacy_names:
             to_uninstall.append(name)
         # Path-based installs pointing at our mirrored local path under a different name
         try:
-            if local_path and ("path:" in src) and str(local_path) in src:
+            if local_path and ("path:" in src) and str(local_path) in src and name != pkg_name:
                 to_uninstall.append(name)
         except Exception:
             pass
@@ -623,10 +710,15 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
         _j("ok", "install_update_done", mode="git")
         return
 
-    # Prefer local install first on non-Windows only.
-    prefer_local = (system != "Windows") and (local_path is not None)
+    # Remote-first when a repo URL is available; otherwise allow local path on non-Windows.
+    prefer_local = (system != "Windows") and (local_path is not None) and not bool(repo_url)
     mode = "local" if prefer_local else ("git" if repo_url else "local")
     local_ok = False
+    # Pre-install pruning of default base files to avoid duplicates
+    try:
+        _prune_local_defaults()
+    except Exception:
+        pass
     if prefer_local:
         used_path = local_path
         if platform.system() == "Windows":
@@ -778,6 +870,11 @@ def _install_or_update(pkg_name: str, repo_url: str | None, local_path: Path | N
     else:
         _direct(["restart"])
         _direct(["package", "list"])
+    # Post-install prune as well (if a prior restart re-created samples)
+    try:
+        _prune_local_defaults()
+    except Exception:
+        pass
     _j("ok", "install_update_done", mode=mode)
 
 
@@ -865,6 +962,12 @@ def main(argv: list[str] | None = None) -> None:
     pkg_name, _ = _read_manifest(repo)
     # Mirror
     local_pkg_dir = _mirror(repo, pkg_name, version)
+    # Commit and push authoritative state to origin for remote installs
+    try:
+        git_branch = _active_branch(repo, args.git_branch)
+        _git_commit_and_push(repo, git_branch, version)
+    except Exception:
+        _j("warn", "git_push_failed", note="continuing with install")
 
     if args.dry_run:
         _j("ok", "dry_run", note="skipping install/update")
