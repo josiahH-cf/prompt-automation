@@ -143,3 +143,52 @@ Flags and env:
 Installer integration:
 
 - Installers write `~/.prompt-automation/environment` including `PROMPT_AUTOMATION_REPO=<project_root>` so the colon command can find your repo clone.
+
+## Template-Driven Generation
+
+- On sync, the orchestrator generates/updates snippets from templates, then validates and mirrors.
+- Templates are discovered at:
+  - `espanso-package/templates/*.yml`, and
+  - `espanso-package/match/*.yml.example` (written to a sibling `*.yml`).
+- Multi-line `replace` values are written using YAML block scalars (|) for readability.
+- Duplicate triggers across generated templates are deduplicated; validation still rejects any remaining duplicates across all files.
+
+## Branch-Aware Install/Update
+
+- By default, git-based install/update targets the current branch (`git rev-parse --abbrev-ref HEAD`).
+- Override via `PA_GIT_BRANCH=<branch>` or CLI `--git-branch <branch>`.
+- The orchestrator tries `espanso package install ... --ref <branch>`, then falls back to `--branch <branch>` if needed.
+
+## Windows-First + WSL Fallback
+
+- On Windows, the install/update attempts PowerShell first.
+- If it fails (non-zero exit or timeout), it retries via WSL (`wsl.exe bash -lc 'espanso ...'`).
+- Non-Windows runs espanso directly.
+
+## GUI Button: “Sync Espanso?”
+
+- In the app’s Options menu, click “Sync Espanso?” to run the same pipeline as `:pa.sync` and the CLI.
+- Shows success/failure; see logs at `~/.prompt-automation/logs/` for step-by-step JSON lines.
+
+### Repo discovery for the GUI
+
+- Optionally set a repo root in your prompts settings file to make the GUI button work outside the repo:
+
+```
+src/prompt_automation/prompts/styles/Settings/settings.json
+{
+  "espanso_repo_root": "C:/Users/<you>/github-cf/prompt-automation"
+}
+```
+
+The sync orchestrator will prefer installing from the local mirrored path to avoid depending on `git` when not necessary.
+
+### Convergence to One Source
+
+- Sync force‑converges your machine to use the package from your repo path first (`--external`), falling back to `--path`, and only then to `--git` if needed.
+- If the package is already installed from a different source, sync attempts a safe uninstall + reinstall to converge without affecting other packages.
+- Windows tip: if `%APPDATA%\espanso\match\base.yml` exists you may get duplicate triggers. Disable it with:
+
+```
+powershell -File scripts/espanso-windows.ps1 -DisableLocalBase
+```

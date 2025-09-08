@@ -87,6 +87,24 @@ def set_setting_enable_theming(enabled: bool) -> None:
     except Exception as e:  # pragma: no cover - I/O errors
         _log.error("failed to persist enable_theming: %s", e)
 
+# --- Espanso repo root (optional) -------------------------------------------
+def get_setting_espanso_repo_root() -> str | None:
+    """Return an explicit repo root for espanso sync if configured.
+
+    Looks for the key ``espanso_repo_root`` (preferred) or ``repo_root``
+    inside Settings/settings.json. Returns a normalized absolute path or
+    None if missing/invalid. This enables the GUI "Sync Espanso?" action
+    to locate the repo when the app is launched outside of the repo.
+    """
+    try:
+        payload = _load_settings_payload()
+        val = payload.get("espanso_repo_root") or payload.get("repo_root")
+        if isinstance(val, str) and val.strip():
+            return str(Path(val).expanduser().resolve())
+    except Exception:
+        pass
+    return None
+
 def _sync_settings_from_overrides(overrides: Dict[str, Any]) -> None:
     """Persist selected override data into settings file.
 

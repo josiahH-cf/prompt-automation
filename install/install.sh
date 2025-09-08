@@ -115,6 +115,11 @@ elif [ "$PLATFORM" = "macOS" ]; then
     osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$WORKFLOW_DIR'/macos.applescript", hidden:false}' || true
 fi
 
+# Determine project root early (used by environment file below)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+info "Project root directory: $PROJECT_ROOT"
+
 # record default hotkey mapping and enable GUI + auto updates
 HOTKEY_CFG_DIR="$HOME/.prompt-automation"
 mkdir -p "$HOTKEY_CFG_DIR"
@@ -131,9 +136,6 @@ info "Wrote environment defaults to $ENV_FILE"
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-info "Project root directory: $PROJECT_ROOT"
 
 if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
     err "pyproject.toml not found at $PROJECT_ROOT/pyproject.toml. Make sure you're running this script from the correct location."; exit 1
@@ -141,6 +143,11 @@ fi
 info "Found pyproject.toml at: $PROJECT_ROOT/pyproject.toml"
 
 retry "pipx install --force \"$PROJECT_ROOT\"" || { err "Failed to install prompt-automation from local source"; exit 1; }
+
+# Ensure PyYAML is available for espanso sync (belt-and-suspenders)
+if command -v pipx >/dev/null 2>&1; then
+    (pipx inject prompt-automation PyYAML >/dev/null 2>&1 || true) &
+fi
 
 # Perform immediate background upgrade + manifest update (idempotent) so future runs are current
 (pipx upgrade prompt-automation >/dev/null 2>&1 || true) &
@@ -160,6 +167,28 @@ PYTHONPATH="$PROJECT_ROOT/src" python3 -m prompt_automation.install.hotkey --hot
 # Register espanso colon command and ensure package is mirrored + installed
 info "Configuring espanso package and :pa.sync command..."
 PROMPT_AUTOMATION_REPO="$PROJECT_ROOT" prompt-automation --espanso-sync || info "espanso sync orchestration completed with warnings"
+
+# Seed Settings/settings.json with espanso_repo_root so GUI sync can find repo
+python3 - <<PY || true
+import json, os
+from pathlib import Path
+try:
+    from prompt_automation.config import PROMPTS_DIR
+    repo = os.environ.get('PROMPT_AUTOMATION_REPO', '')
+    settings_dir = PROMPTS_DIR / 'Settings'
+    settings_dir.mkdir(parents=True, exist_ok=True)
+    sf = settings_dir / 'settings.json'
+    try:
+        data = json.loads(sf.read_text(encoding='utf-8')) if sf.exists() else {}
+    except Exception:
+        data = {}
+    if repo:
+        data['espanso_repo_root'] = repo
+        sf.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        print(f"[install] Seeded espanso_repo_root in {sf}")
+except Exception as e:
+    print('[install] Could not seed espanso_repo_root:', e)
+PY
 
 # Summary verification
 wait $UPGRADE_PID 2>/dev/null || true

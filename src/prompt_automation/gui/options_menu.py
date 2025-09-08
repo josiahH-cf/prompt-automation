@@ -44,6 +44,48 @@ def configure_options_menu(
     opt = tk.Menu(new_menubar, tearoff=0)
     accelerators: Dict[str, Callable[[], None]] = {}
 
+    # Manual Espanso sync button (calls same orchestrator as CLI/colon command)
+    def _sync_espanso():  # pragma: no cover - GUI side effects
+        import threading
+        from tkinter import messagebox
+        try:
+            def _run_sync():
+                try:
+                    # Use CLI module to reuse argument parsing and env
+                    from ..espanso_sync import main as _sync_main
+                    # If user configured a repo root in Settings, pass it explicitly
+                    # Prefer Settings override; fall back to environment file
+                    try:
+                        repo_root = _storage.get_setting_espanso_repo_root()
+                    except Exception:
+                        repo_root = None
+                    if not repo_root:
+                        try:
+                            env_file = Path.home() / ".prompt-automation" / "environment"
+                            if env_file.exists():
+                                for line in env_file.read_text(encoding="utf-8").splitlines():
+                                    if line.startswith("PROMPT_AUTOMATION_REPO="):
+                                        repo_root = line.split("=", 1)[1].strip()
+                                        break
+                        except Exception:
+                            pass
+                    argv = ["--repo", repo_root] if repo_root else []
+                    # Respect env flags; do not hardcode branch or skip-install here
+                    _sync_main(argv)
+                    messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
+                except SystemExit as e:
+                    code = getattr(e, 'code', 1)
+                    if code:
+                        messagebox.showerror("Espanso", f"Sync failed (exit {code}). See logs.")
+                    else:
+                        messagebox.showinfo("Espanso", "Sync complete.")
+                except Exception as e:
+                    messagebox.showerror("Espanso", f"Sync failed: {e}")
+            threading.Thread(target=_run_sync, daemon=True).start()
+        except Exception as e:
+            _log.error("Espanso sync action failed: %s", e)
+    opt.add_command(label="Sync Espanso?", command=_sync_espanso)
+
     # Reset reference files (with confirmation + undo support)
     def _reset_refs():
         try:

@@ -230,15 +230,15 @@ if (Test-Path $appScript) {
     Fail 'install-prompt-automation.ps1 not found.'
 }
 
-# Set up global hotkey with GUI mode
+# Skip PyYAML inject (already declared in pyproject). Avoid cp1252 console encoding issues.
+
+# Set up global hotkey via CLI to ensure pipx venv is used
 Info 'Setting up global hotkey...'
 try {
-    $env:PYTHONPATH = (Resolve-Path (Join-Path $PSScriptRoot '..\src')).Path
-    python -m prompt_automation.install.hotkey --hotkey 'ctrl+shift+j'
+    & prompt-automation --assign-hotkey | Out-Null
     Info 'Global hotkey configured successfully'
 } catch {
-    Write-Warning "Failed to configure global hotkey: $($_.Exception.Message)"
-    Write-Warning "You can set it up manually later with: prompt-automation --assign-hotkey"
+    Write-Warning "Failed to configure global hotkey via CLI: $($_.Exception.Message)"
 }
 
 # Verify hotkey setup
@@ -380,13 +380,44 @@ if ($LASTEXITCODE -ne 0) {
 # Configure espanso package and :pa.sync command (best-effort)
 try {
     $env:PROMPT_AUTOMATION_REPO = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    Push-Location $env:USERPROFILE
     & prompt-automation --espanso-sync | Out-Null
+    Pop-Location
     Info 'Espanso package synced and :pa.sync registered'
 } catch {
+    Pop-Location -ErrorAction SilentlyContinue
     Write-Warning "Espanso sync orchestration encountered issues: $($_.Exception.Message)"
 }
 
+# Seed Settings/settings.json with espanso_repo_root for GUI sync discovery
+try {
+    $py = @"
+import json, os
+from pathlib import Path
+from prompt_automation.config import PROMPTS_DIR
+repo = os.environ.get('PROMPT_AUTOMATION_REPO', '')
+settings_dir = PROMPTS_DIR / 'Settings'
+settings_dir.mkdir(parents=True, exist_ok=True)
+sf = settings_dir / 'settings.json'
+try:
+    data = json.loads(sf.read_text(encoding='utf-8')) if sf.exists() else {}
+except Exception:
+    data = {}
+if repo:
+    data['espanso_repo_root'] = repo
+    sf.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    print('[install] Seeded espanso_repo_root in', sf)
+"@
+    # Use -c in PowerShell instead of bash-style heredoc redirection
+    python -c $py | Out-Null
+} catch {
+    Write-Warning "Could not seed espanso_repo_root: $($_.Exception.Message)"
+}
+
 Info "\nFor troubleshooting tips see docs or run scripts/troubleshoot-hotkeys.ps1 --Fix"
+
+# Finalize with update mode to activate latest behavior and hotkey
+try { & prompt-automation -u | Out-Null } catch {}
 
 # Optional GUI test
 $testScript = Join-Path $PSScriptRoot 'test-gui.py'

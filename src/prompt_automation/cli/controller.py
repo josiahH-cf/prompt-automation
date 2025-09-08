@@ -144,6 +144,26 @@ class PromptCLI:
             help="Auto-bump patch version before mirroring",
         )
         parser.add_argument(
+            "--espanso-clean",
+            action="store_true",
+            help="Backup and remove local espanso match files and uninstall legacy/conflicting packages",
+        )
+        parser.add_argument(
+            "--espanso-clean-deep",
+            action="store_true",
+            help="Deep clean: backup and remove ALL local match/*.yml (not just base.yml)",
+        )
+        parser.add_argument(
+            "--espanso-clean-list",
+            action="store_true",
+            help="List local match files and installed packages (no changes)",
+        )
+        parser.add_argument(
+            "--espanso-reset",
+            action="store_true",
+            help="One-shot: deep clean local matches + uninstall legacy packages, then sync",
+        )
+        parser.add_argument(
             "--assign-hotkey",
             action="store_true",
             help="Interactively set or change the global GUI hotkey",
@@ -227,6 +247,19 @@ class PromptCLI:
             if args.espanso_auto_bump:
                 argv.extend(["--auto-bump", args.espanso_auto_bump])
             _esp.main(argv)
+            return
+
+        if args.espanso_clean or args.espanso_clean_list or args.espanso_clean_deep:
+            from .espanso_cmds import clean_env
+            clean_env(list_only=args.espanso_clean_list, deep=args.espanso_clean_deep)
+            return
+
+        if args.espanso_reset:
+            # Deep clean and then run sync using the same orchestrator entry
+            from .espanso_cmds import clean_env
+            from .. import espanso_sync as _esp
+            clean_env(list_only=False, deep=True)
+            _esp.main([])
             return
 
         try:

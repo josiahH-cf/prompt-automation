@@ -11,6 +11,54 @@ Recent feature highlights:
  - Opt‑in value persistence using `"persist": true` (replaces legacy always‑persist behavior) with clear override management UI & CLI.
 - Conditional phrase removal (`remove_if_empty`) to auto‑strip headings / prefixes when optional values omitted.
 - Expanded, example‑rich Variables & Globals reference (see docs) covering formatting (`format` / `as`), path tokens, snapshotting, exclusions, and troubleshooting.
+- Espanso integration: one‑click “Sync Espanso?” under Options (or use `:pa.sync` / `prompt-automation --espanso-sync`) updates snippets, validates, mirrors, installs/updates the package, and restarts Espanso. Supports branch override via `PA_GIT_BRANCH` and Windows PowerShell‑first with automatic WSL fallback.
+ - Cleanup/reset commands: `prompt-automation --espanso-clean[-deep|-list]` safely backs up and removes local match files and uninstalls legacy/conflicting packages (cross‑platform). See the First‑Run checklist.
+ 
+## Espanso: Create and Sync Workflow
+
+Single source of truth lives under `espanso-package/`. Use templates to generate snippets, then sync.
+
+- Add a template (preferred):
+  - Create `espanso-package/templates/my_snippets.yml` with entries like:
+    
+        matches:
+          - trigger: ":pa.kudos"
+            replace: "Nice work!"
+          - trigger: ":pa.mline"
+            replace: "Line 1\nLine 2"
+    
+  - Or add a template stub in `espanso-package/match/*.yml.example` (will be written to `*.yml`).
+- Generate + validate + mirror + install/update:
+  - GUI: Options → "Sync Espanso?" (Windows-first PowerShell with WSL fallback).
+  - Colon command: type `:pa.sync` anywhere.
+  - CLI: `prompt-automation --espanso-sync`
+  - Script: `scripts/espanso.sh sync`
+- Branch override (git sources):
+  - `PA_GIT_BRANCH=feature-x scripts/espanso.sh sync`
+  - or `prompt-automation --espanso-sync --git-branch feature-x`
+- Dry-run (generate + validate + mirror only):
+  - `PA_SKIP_INSTALL=1 scripts/espanso.sh sync`
+- After sync:
+  - `espanso package list` shows `prompt-automation`.
+  - `espanso restart` (run automatically by sync) ensures expansions are live.
+
+Notes
+- Multi-line replacements are written as YAML block scalars for readability.
+- Duplicate triggers are deduplicated across generated templates, and validation rejects remaining duplicates across all files.
+- Logs are JSON-line structured at `~/.prompt-automation/logs/`.
+
+### Troubleshooting Espanso Sync
+
+- Error: `No module named 'yaml'` (PyYAML missing)
+  - If installed via pipx: `pipx inject prompt-automation pyyaml`
+  - If using a venv: `pip install pyyaml`
+  - Re-run: `prompt-automation --espanso-sync`
+
+- Espanso not found
+  - Ensure espanso v2 is installed and on PATH. Then re-run sync.
+
+- Windows: PowerShell call fails
+  - Sync automatically falls back to WSL if available. You can also run `scripts/espanso.sh sync` from WSL.
 
 Fast-path (placeholder-empty templates):
 - If a template defines no effective input placeholders (placeholders field is missing, null, `[]`, or only contains reminder/link/invalid entries), the app skips the variable collection step and navigates straight to the final review/output view. Output is rendered and available immediately; auto-copy behavior follows your existing setting. Disable via `PROMPT_AUTOMATION_DISABLE_PLACEHOLDER_FASTPATH=1` or `Settings/settings.json: { "disable_placeholder_fastpath": true }`.
@@ -839,3 +887,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup. For a summary of t
 - Options → Reset reference files now shows a confirmation dialog and creates a one‑level undo snapshot.
 - To restore, use Options → Undo last reset.
 - Scope: includes file path/skip overrides and template value overrides stored in `placeholder-overrides.json`. The undo snapshot is single‑level and is cleared after restore.
+### Espanso First‑Run / Reset
+
+Use these commands any time to converge to a clean, single‑source setup:
+
+- Inspect local state (no changes): `prompt-automation --espanso-clean-list`
+- Minimal cleanup: `prompt-automation --espanso-clean` (backs up + removes local base.yml; uninstalls legacy package names; restarts Espanso)
+- Deep cleanup: `prompt-automation --espanso-clean-deep` (backs up + removes all local match/*.yml)
+
+Then sync:
+
+- GUI: Options → "Sync Espanso?"
+- CLI: `prompt-automation --espanso-sync`
+
+See `docs/ESPANSO_FIRST_RUN.md` for the full checklist.

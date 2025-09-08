@@ -1,5 +1,6 @@
 {
   "_comment": "User-adjustable settings for prompt-automation. file_overrides mirrors placeholder-overrides.json entries.",
+  "espanso_repo_root": "C:/Users/JosiahHunter/github-cf/prompt-automation",
   "file_overrides": {
     "templates": {
       "3": {
@@ -25,7 +26,7 @@
   "metadata": {
     "created": "initial",
     "notes": "Edit paths or set skip=true for any file placeholder. Changes sync to local overrides automatically.",
-    "last_sync": "Windows-11-10.0.26100-SP0",
+    "last_sync": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.39",
     "share_this_file_openly": true
   },
   "theme": "dark",
