@@ -586,7 +586,15 @@ def _git_tag_and_push(repo: Path, version: str) -> None:
         code_t, out_t, err_t = _run(["git", "-C", str(repo), "tag", "-a", tag, "-m", f"espanso {version}"])
         _j("ok" if code_t == 0 else "warn", "git_tag", tag=tag, note=(err_t or out_t).strip()[:200])
     # Push tag best-effort
-    code_p, out_p, err_p = _run(["git", "-C", str(repo), "push", "origin", tag], timeout=20)
+    # Push tag; auto-fix 'dubious ownership' by adding safe.directory and retrying once
+    def _do_push_tag() -> tuple[int, str, str]:
+        return _run(["git", "-C", str(repo), "push", "origin", tag], timeout=20)
+
+    code_p, out_p, err_p = _do_push_tag()
+    if code_p != 0 and ("dubious ownership" in (err_p or "").lower() or "dubious ownership" in (out_p or "").lower()):
+        _run(["git", "config", "--global", "--add", "safe.directory", str(repo)])
+        _j("warn", "git_tag_push_dubious", action="add_safe_directory", repo=str(repo), tag=tag)
+        code_p, out_p, err_p = _do_push_tag()
     _j("ok" if code_p == 0 else "warn", "git_tag_push", tag=tag, note=(err_p or out_p).strip()[:200])
 
 
@@ -610,10 +618,18 @@ def _git_commit_and_push(repo: Path, branch: str | None, version: str) -> None:
         else:
             _j("skip", "git_commit", reason=(err_c or out_c).strip()[:200] or "no_changes")
         # Push
-        if branch:
-            code_p, out_p, err_p = _run(["git", "-C", str(repo), "push", "origin", branch], timeout=20)
-        else:
-            code_p, out_p, err_p = _run(["git", "-C", str(repo), "push"], timeout=20)
+        # Attempt push; on 'dubious ownership' add safe.directory and retry once
+        def _do_push() -> tuple[int, str, str]:
+            if branch:
+                return _run(["git", "-C", str(repo), "push", "origin", branch], timeout=20)
+            return _run(["git", "-C", str(repo), "push"], timeout=20)
+
+        code_p, out_p, err_p = _do_push()
+        if code_p != 0 and ("dubious ownership" in (err_p or "").lower() or "dubious ownership" in (out_p or "").lower()):
+            # Configure safe.directory for this repo and retry once
+            _run(["git", "config", "--global", "--add", "safe.directory", str(repo)])
+            _j("warn", "git_push_dubious", action="add_safe_directory", repo=str(repo))
+            code_p, out_p, err_p = _do_push()
         if code_p == 0:
             _j("ok", "git_push", branch=branch or "current")
         else:
