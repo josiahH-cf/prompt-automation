@@ -51,7 +51,16 @@ def _run(cmd: list[str] | str, cwd: Path | None = None, check: bool = False, tim
             args, cwd=str(cwd) if cwd else None, shell=shell,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
-        out, err = proc.communicate(timeout=timeout)
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Terminate the process tree and return a timeout code instead of raising
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            out, err = proc.communicate()
+            return 124, out or "", f"timeout after {int(timeout or 0)}s"
     except FileNotFoundError as e:  # common on Windows when PATH differs for GUI apps
         return 127, "", str(e)
     if check and proc.returncode != 0:
@@ -399,7 +408,7 @@ def _prune_local_defaults() -> None:
                     errors.append(f"{p}: {str(e)[:120]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"home_lookup: {str(e)[:120]}")
-    # Windows style
+    # Windows style (try Python path removal and PowerShell removal for robustness from WSL)
     try:
         appdata = os.environ.get("APPDATA")
         if appdata:
@@ -411,6 +420,16 @@ def _prune_local_defaults() -> None:
                         removed.append(str(p))
                     except Exception as e:  # pragma: no cover - best effort
                         errors.append(f"{p}: {str(e)[:120]}")
+        # Also attempt deletion via PowerShell so WSL can remove Windows-host files
+        if shutil.which("powershell.exe"):
+            ps = (
+                "$ErrorActionPreference='SilentlyContinue'; "
+                "if (Test-Path $env:APPDATA/espanso/match) { Remove-Item -Force -Recurse $env:APPDATA/espanso/match/*.yml, $env:APPDATA/espanso/match/*.yaml } "
+                "if (Test-Path $env:LOCALAPPDATA/espanso/match) { Remove-Item -Force -Recurse $env:LOCALAPPDATA/espanso/match/*.yml, $env:LOCALAPPDATA/espanso/match/*.yaml }"
+            )
+            code_ps, out_ps, err_ps = _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], timeout=20)
+            if code_ps != 0 and (err_ps or out_ps):
+                errors.append(f"powershell: {(err_ps or out_ps).strip()[:180]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"appdata_lookup: {str(e)[:120]}")
     if removed:
