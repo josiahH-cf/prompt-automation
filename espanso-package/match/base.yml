@@ -29,25 +29,8 @@ matches:
       - name: create_todoist_task_ntsk
         type: shell
         params:
-          # Windows PowerShell via CMD; resolves repo path via env or WSL and runs repo script.
-          cmd: >-
-            cmd /C powershell -NoProfile -ExecutionPolicy Bypass -Command
-            "$ErrorActionPreference='Stop';
-            $repo=$env:PROMPT_AUTOMATION_REPO;
-            if (-not $repo) {
-              $wsl=(Get-Command wsl.exe -ErrorAction SilentlyContinue);
-              if ($wsl) {
-                try {
-                  $linux=(wsl.exe bash -lc 'printf %s "${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}"');
-                  if ($linux) { $repo=(wsl.exe wslpath -w $linux).Trim() }
-                } catch { }
-              }
-            };
-            if (-not $repo) { Write-Error 'Repo path not found. Set PROMPT_AUTOMATION_REPO or ensure repo at $HOME/github-cf/prompt-automation'; exit 1 };
-            $script=Join-Path $repo 'scripts\todoist_add.ps1';
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $script
-            '{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}'
-            'NRA: {{ntsk.nra}}'"
+          # Windows PowerShell via CMD; hardcoded UNC path to repo script for reliability.
+          cmd: "cmd /C powershell -NoProfile -ExecutionPolicy Bypass -File \"\\\\wsl.localhost\\Ubuntu\\home\\josiah\\github-cf\\prompt-automation\\scripts\\todoist_add.ps1\" \"{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}\" \"NRA: {{ntsk.nra}}\""
 
   # --- Communication coach prompt (asks for 3 inputs, prints two options only) ---
   - trigger: ":comms"

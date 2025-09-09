@@ -36,8 +36,8 @@ def test_ntsk_command_uses_repo_script_and_not_appdata():
     assert "-File" in cmd, "should use -File for final invocation"
     assert "scripts\\todoist_add.ps1" in cmd or "scripts/todoist_add.ps1" in cmd, "should point to repo script"
 
-    # Should include WSL/Windows path bridging (either env var or wslpath approach)
+    # Should use a bridging strategy: env/WSL detection or a stable UNC path
     assert (
-        "PROMPT_AUTOMATION_REPO" in cmd or "wslpath" in cmd or "wsl.exe" in cmd
+        "PROMPT_AUTOMATION_REPO" in cmd or "wslpath" in cmd or "wsl.exe" in cmd or "\\\\wsl.localhost\\" in cmd
     ), "should handle WSL/Windows path bridging"
 
