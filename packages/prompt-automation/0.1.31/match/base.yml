@@ -35,14 +35,14 @@ matches:
             "$ErrorActionPreference='Stop';
             $repo=$env:PROMPT_AUTOMATION_REPO;
             if (-not $repo) {
-              $linux=(wsl.exe bash -lc 'printf %s \"${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}\"');
+              $linux=(wsl.exe bash -lc 'printf %s "${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}"');
               if ($linux) { $repo=(wsl.exe wslpath -w $linux).Trim() }
             };
             if (-not $repo) { Write-Error 'Repo path not found. Set PROMPT_AUTOMATION_REPO or ensure repo at $HOME/github-cf/prompt-automation'; exit 1 };
             $script=Join-Path $repo 'scripts\todoist_add.ps1';
             & powershell -NoProfile -ExecutionPolicy Bypass -File $script
-            \"{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}\"
-            \"NRA: {{ntsk.nra}}\""
+            '{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}'
+            'NRA: {{ntsk.nra}}'"
 
   # --- Communication coach prompt (asks for 3 inputs, prints two options only) ---
   - trigger: ":comms"
