@@ -17,6 +17,7 @@ from ....variables.storage import get_setting_auto_copy_review, is_auto_copy_ena
 from ...constants import INSTR_FINISH_COPY_AGAIN, INSTR_FINISH_COPY_CLOSE
 from ...file_append import _append_to_files
 from ....logger import log_usage
+from ....services.todoist_action import send_to_todoist, build_summary_and_note
 
 
 def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: no cover - Tk runtime
@@ -231,6 +232,31 @@ def build(app, template: Dict[str, Any], variables: Dict[str, Any]):  # pragma: 
             pass
         if not safe_copy_to_clipboard(final_text):
             copy_to_clipboard(final_text)
+
+        # Optional Todoist post-action (non-blocking UX on failure)
+        try:
+            # Build Summary/Note from current variables following omission rules
+            summary, note = build_summary_and_note(
+                action=str(variables.get("action") or ""),
+                type_=str(variables.get("type") or ""),
+                dod=str(variables.get("dod") or ""),
+                nra=str(variables.get("nra") or ""),
+            )
+            if summary.strip():
+                ok, _msg = send_to_todoist(summary, note)
+                if not ok:
+                    try:
+                        from tkinter import messagebox  # type: ignore
+                        messagebox.showwarning("Todoist", "API failed, copied to clipboard instead")
+                    except Exception:
+                        pass
+        except Exception:
+            # Never block finish due to post-action errors
+            try:
+                from tkinter import messagebox  # type: ignore
+                messagebox.showwarning("Todoist", "API failed, copied to clipboard instead")
+            except Exception:
+                pass
         app.finish(final_text)
 
     def cancel() -> None:

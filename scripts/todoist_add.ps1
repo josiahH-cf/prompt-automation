@@ -35,24 +35,31 @@ function Load-TodoistToken {
   if (-not $tok) { $tok = [Environment]::GetEnvironmentVariable($varName, 'Machine') }
   if ($tok) { return @{ token = $tok; source = "env:$varName" } }
 
-  # 2) Repo-local secret file (gitignored): <repo>\local.secrets.psd1 with @{ TODOIST_API_TOKEN = '...' }
-  $secretsPath = Join-Path $RepoRoot 'local.secrets.psd1'
-  if (Test-Path $secretsPath -PathType Leaf) {
+  # 2) Repo-local secret file (gitignored):
+  #    - Default: local.secrets.psd1 (back-compat for tests and existing setups)
+  #    - Opt-in: local.secrets.todoist.psd1 when TODOIST_USE_TODOIST_FILE=1|true|yes
+  $useNew = ($env:TODOIST_USE_TODOIST_FILE -and ($env:TODOIST_USE_TODOIST_FILE -match '^(1|true|yes)$'))
+  $secretsOld = Join-Path $RepoRoot 'local.secrets.psd1'
+  $secretsNew = Join-Path $RepoRoot 'local.secrets.todoist.psd1'
+  $secretsPath = ''
+  if ($useNew -and (Test-Path $secretsNew -PathType Leaf)) { $secretsPath = $secretsNew }
+  elseif (Test-Path $secretsOld -PathType Leaf) { $secretsPath = $secretsOld }
+  if ($secretsPath -and (Test-Path $secretsPath -PathType Leaf)) {
     try {
       $data = Import-PowerShellDataFile -Path $secretsPath
-      if ($null -ne $data -and $data.ContainsKey('TODOIST_API_TOKEN') -and $data.TODOIST_API_TOKEN) {
-        return @{ token = [string]$data.TODOIST_API_TOKEN; source = "file:$([IO.Path]::GetFileName($secretsPath))" }
-      }
-      if ($data -and $data.ContainsKey('TODOIST_TOKEN') -and $data.TODOIST_TOKEN) {
-        return @{ token = [string]$data.TODOIST_TOKEN; source = "file:$([IO.Path]::GetFileName($secretsPath))" }
-      }
-      throw "Secret file present but missing TODOIST_API_TOKEN key"
     } catch {
       throw "Failed to read secrets from $secretsPath. Error: $($_.Exception.Message)"
     }
+    if ($null -ne $data -and $data.ContainsKey('TODOIST_API_TOKEN') -and $data.TODOIST_API_TOKEN) {
+      return @{ token = [string]$data.TODOIST_API_TOKEN; source = "file:$([IO.Path]::GetFileName($secretsPath))" }
+    }
+    if ($data -and $data.ContainsKey('TODOIST_TOKEN') -and $data.TODOIST_TOKEN) {
+      return @{ token = [string]$data.TODOIST_TOKEN; source = "file:$([IO.Path]::GetFileName($secretsPath))" }
+    }
+    throw "Secret file present but missing TODOIST_API_TOKEN key"
   }
 
-  throw "Todoist token not found. Set env TODOIST_API_TOKEN or create $secretsPath with `@{ TODOIST_API_TOKEN = '<YOUR_TOKEN>' }`"
+  throw 'Todoist token not found. Set env TODOIST_API_TOKEN or create local.secrets.psd1 with @{ TODOIST_API_TOKEN = ''<YOUR_TOKEN>'' }'
 }
 
 function Parse-Inputs {
@@ -64,7 +71,7 @@ function Parse-Inputs {
   if (-not $summary) { $summary = '' }
   $summary = $summary.Trim()
   if (-not $summary) {
-    throw "Action text is required. Got empty summary string."
+    throw 'Action text is required. Got empty summary string.'
   }
 
   # Description: prefer value after 'NRA: ' prefix in note if present, else use note as-is
@@ -100,9 +107,7 @@ try {
   try {
     $tokenObj = Load-TodoistToken -RepoRoot $repoRoot
   } catch {
-    # Allow DryRun to proceed without a token for testability
-    if (-not $DryRun -and -not ($env:TODOIST_DRY_RUN -as [int])) { throw }
-    $tokenObj = @{ token = ''; source = 'none (dry-run)' }
+  throw
   }
 
   $payload = @{ content = $inputs.content }

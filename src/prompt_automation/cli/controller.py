@@ -481,5 +481,25 @@ class PromptCLI:
                 _append_to_files(var_map, text)
                 logger.log_usage(tmpl, len(text))
 
+                # Optional Todoist post-action (non-blocking). Uses same omission rules as GUI.
+                try:
+                    from ..services.todoist_action import build_summary_and_note, send_to_todoist
+                    summary, note = build_summary_and_note(
+                        action=str(var_map.get("action") or ""),
+                        type_=str(var_map.get("type") or ""),
+                        dod=str(var_map.get("dod") or ""),
+                        nra=str(var_map.get("nra") or ""),
+                    )
+                    if summary.strip():
+                        ok, _msg = send_to_todoist(summary, note)
+                        if not ok:
+                            print("[prompt-automation] Todoist send failed; output remains in clipboard.")
+                except Exception:
+                    # Never block CLI flow due to post-action
+                    try:
+                        print("[prompt-automation] Todoist send failed; output remains in clipboard.")
+                    except Exception:
+                        pass
+
 
 __all__ = ["PromptCLI"]

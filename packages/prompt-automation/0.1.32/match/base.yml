@@ -1,8 +1,45 @@
 matches:
   # --- keep tddh ---
-  - trigger: ":th"
+  - trigger: ":tddh"
     replace: >-
       Think Deeply. Don't Hallucinate.
+
+  # --- New Task (API): create Todoist task via external script ---
+  - trigger: ":ntsk"
+    replace: "{{create_todoist_task_ntsk}}"
+    vars:
+      - name: ntsk
+        type: form
+        params:
+          layout: |-
+            Action - Verb + Object + Action: [[action]]
+            DoD - Falsifiable: [[dod]]
+            Next Right Action: [[nra]]
+            TYPE (e.g., research, bug, feature): [[type]]
+          fields:
+            type:
+              multiline: false
+            action:
+              multiline: false
+            dod:
+              multiline: false
+            nra:
+              multiline: false
+
+      - name: create_todoist_task_ntsk
+        type: shell
+        params:
+          # Windows PowerShell via CMD; hardcoded UNC path to repo script for reliability.
+          cmd: >-
+            cmd /C powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "$p=$env:PROMPT_AUTOMATION_REPO;
+            if ($p) { $p=Join-Path $p 'scripts\todoist_add.ps1' }
+            else {
+              $p='\\wsl$\Ubuntu\home\josiah\github-cf\prompt-automation\scripts\todoist_add.ps1';
+              if (-not (Test-Path $p)) { $p='\\wsl.localhost\Ubuntu\home\josiah\github-cf\prompt-automation\scripts\todoist_add.ps1' }
+            };
+            if (-not (Test-Path $p)) { Write-Error ('Script not found: ' + $p); exit 1 };
+            powershell -NoProfile -ExecutionPolicy Bypass -File $p '{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}' 'NRA: {{ntsk.nra}}'"
 
   # --- Communication coach prompt (asks for 3 inputs, prints two options only) ---
   - trigger: ":comms"

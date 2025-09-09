@@ -1,0 +1,8 @@
+matches:
+  - trigger: ":pa.sync"
+    replace: "Run prompt-automation espanso sync"
+    vars:
+      - name: run_sync
+        type: shell
+        params:
+          cmd: "prompt-automation --espanso-sync"

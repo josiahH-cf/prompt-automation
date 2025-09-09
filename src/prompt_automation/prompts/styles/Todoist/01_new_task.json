@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": 60,
+  "title": "Todoist – New Task",
+  "style": "Todoist",
+  "template": [
+    "{{type}} - {{action}} — DoD: {{dod}}",
+    "NRA: {{nra}}"
+  ],
+  "placeholders": [
+    {
+      "name": "action",
+      "label": "Action - Verb + Object + Action",
+      "multiline": false,
+      "required": true,
+      "default": ""
+    },
+    {
+      "name": "type",
+      "label": "TYPE (e.g., research, bug, feature)",
+      "multiline": false,
+      "required": false,
+      "default": "",
+      "remove_if_empty": ["-"]
+    },
+    {
+      "name": "dod",
+      "label": "DoD - Falsifiable",
+      "multiline": false,
+      "required": false,
+      "default": "",
+      "remove_if_empty": ["— DoD:"]
+    },
+    {
+      "name": "nra",
+      "label": "Next Right Action",
+      "multiline": false,
+      "required": false,
+      "default": "",
+      "remove_if_empty": ["NRA:"]
+    }
+  ],
+  "metadata": {
+    "path": "Todoist/01_new_task.json",
+    "tags": ["todoist", "tasks"],
+    "version": 1,
+    "render": "plain",
+    "share_this_file_openly": true,
+    "post_action": { "todoist_send": true }
+  }
+}

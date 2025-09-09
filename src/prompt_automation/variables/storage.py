@@ -281,6 +281,27 @@ def set_template_auto_copy_disabled(template_id: int, disabled: bool) -> None:
     except Exception as e:  # pragma: no cover - I/O / formatting issues
         _log.error("failed to persist per-template auto-copy flag: %s", e)
 
+# --- Generic boolean from settings by key (helper) -------------------------
+def get_boolean_setting(key: str, default: bool = False) -> bool:
+    try:
+        payload = _load_settings_payload()
+        val = payload.get(key)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            return val.strip().lower() in {"1", "true", "yes", "on"}
+    except Exception:
+        pass
+    return default
+
+def set_boolean_setting(key: str, value: bool) -> None:
+    try:
+        payload = _load_settings_payload()
+        payload[key] = bool(value)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover
+        _log.error("failed to persist boolean setting %s: %s", key, e)
+
 def _normalize_reference_path(path: str) -> str:
     """Normalize reference file path for cross-platform consistency.
 

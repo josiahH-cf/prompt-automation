@@ -15,6 +15,7 @@ from ..variables import storage as _storage
 from ..theme import resolve as _theme_resolve, model as _theme_model, apply as _theme_apply
 from ..features import is_hierarchy_enabled as _hierarchy_enabled, set_user_hierarchy_preference as _set_hierarchy
 from ..history import list_history as _list_history, is_enabled as _history_enabled
+from ..variables.storage import get_boolean_setting as _get_bool_setting, set_boolean_setting as _set_bool_setting
 
 _log = get_logger(__name__)
 
@@ -1006,6 +1007,40 @@ def configure_options_menu(
             _log.error("Edit exclusions failed: %s", e)
     opt.add_command(label="Edit global exclusions", command=_edit_exclusions)
     opt.add_separator()
+
+    # Todoist post-action toggles (persistent settings)
+    def _toggle_todoist_send():  # pragma: no cover - GUI action
+        try:
+            cur = _get_bool_setting('send_todoist_after_render', False)
+            _set_bool_setting('send_todoist_after_render', not cur)
+            # Refresh menu labels
+            ctrl = getattr(root, '_controller', None)
+            if ctrl and hasattr(ctrl, '_rebuild_menu'):
+                try: ctrl._rebuild_menu()
+                except Exception: pass
+        except Exception as e:
+            _log.error('toggle send_todoist_after_render failed: %s', e)
+
+    def _toggle_todoist_dry_run():  # pragma: no cover - GUI action
+        try:
+            cur = _get_bool_setting('todoist_dry_run', False)
+            _set_bool_setting('todoist_dry_run', not cur)
+            ctrl = getattr(root, '_controller', None)
+            if ctrl and hasattr(ctrl, '_rebuild_menu'):
+                try: ctrl._rebuild_menu()
+                except Exception: pass
+        except Exception as e:
+            _log.error('toggle todoist_dry_run failed: %s', e)
+
+    try:
+        send_on = _get_bool_setting('send_todoist_after_render', False)
+        dry_on = _get_bool_setting('todoist_dry_run', False)
+        opt.add_command(label=f"Todoist send-after-render: {'on' if send_on else 'off'}", state='disabled')
+        opt.add_command(label=('Disable Todoist send' if send_on else 'Enable Todoist send'), command=_toggle_todoist_send)
+        opt.add_command(label=('Disable Todoist dry-run' if dry_on else 'Enable Todoist dry-run'), command=_toggle_todoist_dry_run)
+        opt.add_separator()
+    except Exception:
+        pass
 
     # Auto-copy on review toggle (copies rendered output immediately when entering review stage)
     def _toggle_auto_copy():

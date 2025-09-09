@@ -43,3 +43,4 @@ troubleshooting/
 
 # Local secrets (Todoist token)
 local.secrets.psd1
+local.secrets.todoist.psd1

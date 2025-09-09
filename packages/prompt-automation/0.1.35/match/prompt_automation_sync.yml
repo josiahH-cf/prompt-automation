@@ -1,0 +1,3 @@
+matches:
+  - trigger: ":pa.sync"
+    replace: "Run prompt-automation espanso sync"
