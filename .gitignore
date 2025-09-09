@@ -40,3 +40,6 @@ espanso.deb
 
 # Local troubleshooting notes (do not commit)
 troubleshooting/
+
+# Local secrets (Todoist token)
+local.secrets.psd1

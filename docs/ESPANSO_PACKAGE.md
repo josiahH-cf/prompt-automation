@@ -105,6 +105,11 @@ scripts/espanso.sh add-snippet --file base.yml --trigger :pa.hello --replace "He
 
 ```powershell
 powershell -File scripts/espanso-windows.ps1 -DisableLocalBase
+
+### Todoist (:ntsk) Integration
+
+- The `:ntsk` match invokes a repository-resident PowerShell script to create Todoist tasks.
+- Windows/WSL path bridging and secret handling are built in; see `docs/TODOIST_NTSK.md` for setup and troubleshooting.
 ```
 
 ## Backward Compatibility
