@@ -1,9 +1,0 @@
-matches:
-  - trigger: ":pa.sync"
-    replace: "Prompt-Automation: syncing espanso package..."
-    vars:
-      - name: sync
-        type: shell
-        params:
-          cmd: "prompt-automation --espanso-sync"
-

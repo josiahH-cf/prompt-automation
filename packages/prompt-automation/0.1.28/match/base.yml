@@ -4,15 +4,6 @@ matches:
     replace: >-
       Think Deeply. Don't Hallucinate.
 
-  # --- open espanso config in Notepad (prints nothing) ---
-  - trigger: ":espanso"
-    replace: "{{open_cfg}}"
-    vars:
-      - name: open_cfg
-        type: shell
-        params:
-          cmd: 'cmd /C start "" notepad "%CONFIG%\match\base.yml"'
-
   # --- New Task (API): create Todoist task via external script ---
   - trigger: ":ntsk"
     replace: "{{create_todoist_task_ntsk}}"
@@ -38,30 +29,20 @@ matches:
       - name: create_todoist_task_ntsk
         type: shell
         params:
-          # Uses CMD so %APPDATA% expands; calls your PS script with two args.
-          cmd: 'cmd /C powershell -NoProfile -ExecutionPolicy Bypass -File "%APPDATA%\espanso\scripts\todoist_add.ps1" "{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}" "NRA: {{ntsk.nra}}"'
-
-  # --- Crit: prompts, then prints bullets ---
-  - trigger: ":cnote"
-    replace: |-
-      - Context: {{cnote.context}}
-      - Instruction: {{cnote.instruction}}
-      - Task: {{cnote.task}}
-    vars:
-      - name: cnote
-        type: form
-        params:
-          layout: |-
-            Context: [[context]]
-            Instruction: [[instruction]]
-            Task: [[task]]
-          fields:
-            context:
-              multiline: true
-            instruction:
-              multiline: true
-            task:
-              multiline: true
+          # Windows PowerShell via CMD; resolves repo path via env or WSL and runs repo script.
+          cmd: >-
+            cmd /C powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "$ErrorActionPreference='Stop';
+            $repo=$env:PROMPT_AUTOMATION_REPO;
+            if (-not $repo) {
+              $linux=(wsl.exe bash -lc 'printf %s \"${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}\"');
+              if ($linux) { $repo=(wsl.exe wslpath -w $linux).Trim() }
+            };
+            if (-not $repo) { Write-Error 'Repo path not found. Set PROMPT_AUTOMATION_REPO or ensure repo at $HOME/github-cf/prompt-automation'; exit 1 };
+            $script=Join-Path $repo 'scripts\todoist_add.ps1';
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $script
+            \"{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}\"
+            \"NRA: {{ntsk.nra}}\""
 
   # --- Communication coach prompt (asks for 3 inputs, prints two options only) ---
   - trigger: ":comms"
