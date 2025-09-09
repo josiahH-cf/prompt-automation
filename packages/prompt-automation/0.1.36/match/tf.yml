@@ -1,0 +1,4 @@
+matches:
+  - trigger: ":tf"
+    replace: "Think deeply, Don't hallucinate. If you don't know, say so. Ask follow up questions if anything is still confusing."
+
