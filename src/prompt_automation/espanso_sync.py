@@ -112,7 +112,7 @@ def _read_manifest(repo: Path) -> tuple[str, str]:
         _j("error", "deps", missing="PyYAML", hint="Install via pipx inject prompt-automation pyyaml or pip install pyyaml")
         raise SystemExit("PyYAML is required: install with 'pipx inject prompt-automation pyyaml' or 'pip install pyyaml'") from e
     mf = repo / "espanso-package" / "_manifest.yml"
-    data = yaml.safe_load(mf.read_text()) or {}
+    data = yaml.safe_load(mf.read_text(encoding="utf-8")) or {}
     name = str(data.get("name") or "prompt-automation")
     version = str(data.get("version") or "0.1.0")
     return name, version
@@ -131,13 +131,13 @@ def _validate_yaml(repo: Path) -> None:
     problems: List[str] = []
 
     # Manifest required keys
-    data = yaml.safe_load(manifest.read_text())
+    data = yaml.safe_load(manifest.read_text(encoding="utf-8"))
     for field in ("name", "title", "version", "description", "author"):
         if not (field in data and str(data[field]).strip()):
             problems.append(f"manifest_missing:{field}")
 
     # Package.yml present and basic structure
-    pdata = yaml.safe_load(package_yml.read_text())
+    pdata = yaml.safe_load(package_yml.read_text(encoding="utf-8"))
     if not isinstance(pdata, dict) or not pdata.get("name"):
         problems.append("package_yaml_invalid")
 
@@ -150,7 +150,7 @@ def _validate_yaml(repo: Path) -> None:
     triggers: Dict[str, List[str]] = {}
     style_violations: List[Tuple[str, str]] = []
     for f in match_files:
-        content = yaml.safe_load(f.read_text())
+        content = yaml.safe_load(f.read_text(encoding="utf-8"))
         if not isinstance(content, dict):
             problems.append(f"file_not_mapping:{f.name}")
             continue
@@ -257,7 +257,7 @@ def _render_templates(repo: Path, templates: Iterable[Path]) -> int:
             target = tpl.parent / name
 
         try:
-            doc = yaml.safe_load(tpl.read_text()) or {}
+            doc = yaml.safe_load(tpl.read_text(encoding="utf-8")) or {}
         except Exception as e:
             _j("error", "generate", template=str(tpl), error=str(e)[:200])
             raise SystemExit(f"Template parse failed: {tpl}")
@@ -299,14 +299,14 @@ def _maybe_bump_patch(repo: Path, enable: bool) -> str:
     # very small YAML patcher to bump Z in X.Y.Z
     import re
     path = repo / "espanso-package" / "_manifest.yml"
-    txt = path.read_text()
+    txt = path.read_text(encoding="utf-8")
     m = re.search(r"^version:\s*(\d+)\.(\d+)\.(\d+)", txt, flags=re.M)
     if not m:
         return _read_manifest(repo)[1]
     x, y, z = map(int, m.groups())
     new = f"version: {x}.{y}.{z+1}"
     txt = re.sub(r"^version:.*$", new, txt, count=1, flags=re.M)
-    path.write_text(txt)
+    path.write_text(txt, encoding="utf-8")
     _j("ok", "bump_version", version=f"{x}.{y}.{z+1}")
     return f"{x}.{y}.{z+1}"
 
@@ -509,7 +509,7 @@ def _manifest_homepage(repo: Path) -> str | None:
         import yaml
         mf = repo / "espanso-package" / "_manifest.yml"
         if mf.exists():
-            data = yaml.safe_load(mf.read_text()) or {}
+            data = yaml.safe_load(mf.read_text(encoding="utf-8")) or {}
             url = data.get("homepage")
             if isinstance(url, str) and url.strip():
                 return url.strip()
