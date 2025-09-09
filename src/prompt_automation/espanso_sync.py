@@ -504,6 +504,143 @@ def _prune_local_defaults() -> None:
         _j("warn", "prune_defaults", errors=errors)
 
 
+def _ensure_undo_backspace_disabled() -> None:
+    """Ensure Espanso's backspace-undo is disabled by setting undo_backspace: false.
+
+    Targets config/default.yml under discovered Espanso config directories:
+    - Linux/macOS: ~/.config/espanso/config/
+    - Windows: %APPDATA%/espanso/config/
+    - Any path discovered from `espanso path` that includes a config directory.
+
+    Best-effort and idempotent. Preserves other keys when PyYAML is available;
+    otherwise performs a minimal line-level update/append.
+    """
+    cfg_dirs: List[Path] = []
+    # Discover via `espanso path` first (most accurate)
+    try:
+        bin_ = _espanso_bin()
+        code_p, out_p, err_p = (1, "", "")
+        if bin_:
+            code_p, out_p, err_p = _run(bin_ + ["path"], timeout=6)
+        if (not bin_) or (code_p != 0 or not out_p):
+            if platform.system() == "Windows" and shutil.which("powershell.exe"):
+                code_p, out_p, err_p = _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "espanso path"], timeout=10)
+        if code_p == 0 and out_p:
+            for ln in out_p.splitlines():
+                if "config" in ln.lower():
+                    try:
+                        import re as _re
+                        m = _re.search(r"([A-Za-z]:\\[^\r\n]+|/[^\r\n]+)$", ln.strip())
+                        if m:
+                            p = Path(m.group(1).strip())
+                            if p.exists():
+                                cfg_dirs.append(p)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    # Add conventional locations
+    try:
+        cfg_dirs.append(Path.home() / ".config" / "espanso" / "config")
+    except Exception:
+        pass
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        cfg_dirs.append(Path(appdata) / "espanso" / "config")
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    uniq_dirs: List[Path] = []
+    for d in cfg_dirs:
+        key = str(d.resolve()) if d else ""
+        if key and key not in seen:
+            seen.add(key)
+            uniq_dirs.append(d)
+
+    updated: List[str] = []
+    created: List[str] = []
+    errors: List[str] = []
+
+    def _write_yaml_setting(path: Path) -> bool:
+        try:
+            import yaml  # type: ignore
+            data: dict = {}
+            if path.exists():
+                try:
+                    data_l = yaml.safe_load(path.read_text(encoding="utf-8"))
+                    if isinstance(data_l, dict):
+                        data = data_l
+                except Exception:
+                    # Fall through to overwrite minimally
+                    data = {}
+            # Set and write
+            if data.get("undo_backspace") is False and path.exists():
+                return False  # already correct
+            data["undo_backspace"] = False
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            return True
+        except ModuleNotFoundError:
+            # Minimal text update without PyYAML
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if path.exists():
+                    txt = path.read_text(encoding="utf-8")
+                    import re as _re
+                    if _re.search(r"^\s*undo_backspace\s*:\s*false\s*$", txt, flags=_re.M):
+                        return False
+                    if _re.search(r"^\s*undo_backspace\s*:\s*true\s*$", txt, flags=_re.M):
+                        txt = _re.sub(r"^\s*undo_backspace\s*:\s*true\s*$", "undo_backspace: false", txt, count=1, flags=_re.M)
+                        path.write_text(txt, encoding="utf-8")
+                        return True
+                    # Append setting
+                    if not txt.endswith("\n"):
+                        txt += "\n"
+                    txt += "undo_backspace: false\n"
+                    path.write_text(txt, encoding="utf-8")
+                    return True
+                else:
+                    path.write_text("undo_backspace: false\n", encoding="utf-8")
+                    return True
+            except Exception:
+                return False
+        except Exception:
+            return False
+
+    for cfg in uniq_dirs:
+        try:
+            dfl = cfg / "default.yml"
+            changed = _write_yaml_setting(dfl)
+            if changed:
+                (updated if dfl.exists() else created).append(str(dfl))
+            # Also handle alternative extension if present
+            dfl_yaml = cfg / "default.yaml"
+            if dfl_yaml.exists():
+                changed2 = _write_yaml_setting(dfl_yaml)
+                if changed2:
+                    updated.append(str(dfl_yaml))
+        except Exception as e:  # pragma: no cover - best effort
+            errors.append(f"{cfg}: {str(e)[:160]}")
+
+    if updated:
+        _j("ok", "undo_backspace", updated=updated)
+    if created:
+        _j("ok", "undo_backspace", created=created)
+    if errors:
+        _j("warn", "undo_backspace", errors=errors)
+
+    # Best-effort restart so the setting takes effect immediately
+    try:
+        bin_ = _espanso_bin()
+        if platform.system() == "Windows" and shutil.which("powershell.exe"):
+            _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "espanso restart"], timeout=8)
+        elif bin_:
+            _run(bin_ + ["restart"], timeout=6)
+    except Exception:
+        pass
+
+
 def _manifest_homepage(repo: Path) -> str | None:
     try:
         import yaml
@@ -1132,6 +1269,12 @@ def main(argv: list[str] | None = None) -> None:
 
     repo = _find_repo_root(args.repo)
     _j("ok", "discover_repo", repo=str(repo))
+
+    # Enforce safer defaults early so they apply even on dry-run/skip-install flows
+    try:
+        _ensure_undo_backspace_disabled()
+    except Exception:
+        _j("warn", "undo_backspace_apply_failed", note="continuing")
 
     # Prepare branch & pull latest safely (no-op if not a git repo)
     git_branch = _active_branch(repo, args.git_branch)
