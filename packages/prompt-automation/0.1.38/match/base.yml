@@ -1,0 +1,5 @@
+matches:
+  # --- keep tddh ---
+  - trigger: ":th"
+    replace: >-
+      Think Deeply. Don't Hallucinate.
