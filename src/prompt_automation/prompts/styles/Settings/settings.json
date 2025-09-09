@@ -30,5 +30,6 @@
     "share_this_file_openly": true
   },
   "theme": "dark",
-  "hierarchical_templates": true
+  "hierarchical_templates": true,
+  "espanso_repo_url": "https://github.com/josiahH-cf/prompt-automation.git"
 }

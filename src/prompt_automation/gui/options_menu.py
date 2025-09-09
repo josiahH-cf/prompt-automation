@@ -186,6 +186,26 @@ def configure_options_menu(
             _log.error("Espanso sync action failed: %s", e)
     # Group all Espanso actions into a submenu to declutter the main menu
     esp_menu = tk.Menu(opt, tearoff=0)
+    # Allow configuring a default HTTPS repo URL used by installers
+    def _set_default_repo_url():  # pragma: no cover - GUI
+        from tkinter import simpledialog, messagebox
+        try:
+            from ..variables import storage as _stg
+            cur = _stg.get_setting_espanso_repo_url() or "https://github.com/<owner>/<repo>.git"
+            url = simpledialog.askstring("Espanso Repo URL", "Default HTTPS Git URL for installs:", initialvalue=cur, parent=root)
+            if url is None:
+                return
+            url = url.strip()
+            if not url:
+                _stg.set_setting_espanso_repo_url(None)
+                messagebox.showinfo("Espanso", "Cleared default repo URL.")
+                return
+            _stg.set_setting_espanso_repo_url(url)
+            messagebox.showinfo("Espanso", f"Saved default repo URL:\n{url}")
+        except Exception as e:
+            _log.error("set default repo url failed: %s", e)
+    esp_menu.add_command(label="Set Default Repo URL...", command=_set_default_repo_url)
+    esp_menu.add_separator()
     esp_menu.add_command(label="Sync Espanso?", command=_sync_espanso)
 
     # Deep Clean + Sync (Windows-friendly): backs up and removes all local user matches then syncs
@@ -274,7 +294,9 @@ def configure_options_menu(
                         repo = _esp._find_repo_root(None)
                     except SystemExit:
                         repo = None
-                    repo_url = _esp._git_remote(repo) if repo else None
+                    # Prefer explicit URL from settings, then derive from git
+                    from ..variables import storage as _stg
+                    repo_url = _stg.get_setting_espanso_repo_url() or (_esp._git_remote(repo) if repo else None)
                     branch = _esp._active_branch(repo or _P.cwd(), None)
                     if not branch:
                         branch = "main"
@@ -311,13 +333,15 @@ def configure_options_menu(
                             "espanso package list | Out-String | % { W($_) }; "
                             "W('END')"
                         )
-                        # Elevate and wait
-                        cmd = [
-                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
-                        ]
+                        # Try non-admin first; fallback to elevation only if needed
                         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-                            _esp._run(cmd, timeout=120)
+                            code_na, out_na, err_na = _esp._run(["powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command", ps], timeout=120)
+                            if code_na != 0:
+                                cmd = [
+                                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                                    f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                                ]
+                                _esp._run(cmd, timeout=150)
                         # Read back log
                         try:
                             log_text = log_path.read_text(encoding='utf-8', errors='ignore')
@@ -381,7 +405,8 @@ def configure_options_menu(
                         repo = _esp._find_repo_root(None)
                     except SystemExit:
                         repo = None
-                    repo_url = _esp._git_remote(repo) if repo else None
+                    from ..variables import storage as _stg
+                    repo_url = _stg.get_setting_espanso_repo_url() or (_esp._git_remote(repo) if repo else None)
                     # Prefer HTTPS on Windows
                     if repo_url and repo_url.startswith("git@github.com:"):
                         owner_repo = repo_url.split(":", 1)[1]
@@ -411,12 +436,14 @@ def configure_options_menu(
                             "espanso package list | Out-String | % { W($_) }; "
                             "W('DONE')"
                         )
-                        cmd = [
-                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
-                        ]
                         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-                            _esp._run(cmd, timeout=120)
+                            code_na, out_na, err_na = _esp._run(["powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command", ps], timeout=120)
+                            if code_na != 0:
+                                cmd = [
+                                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                                    f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                                ]
+                                _esp._run(cmd, timeout=150)
                         try:
                             log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
                         except Exception:
@@ -476,7 +503,8 @@ def configure_options_menu(
                         repo = _esp._find_repo_root(None)
                     except SystemExit:
                         repo = None
-                    repo_url = _esp._git_remote(repo) if repo else None
+                    from ..variables import storage as _stg
+                    repo_url = _stg.get_setting_espanso_repo_url() or (_esp._git_remote(repo) if repo else None)
                     if repo_url and repo_url.startswith("git@github.com:"):
                         owner_repo = repo_url.split(":", 1)[1]
                         if owner_repo.endswith(".git"):
@@ -505,12 +533,14 @@ def configure_options_menu(
                             "espanso package list | Out-String | % { W($_) }; "
                             "W('DONE')"
                         )
-                        cmd = [
-                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
-                        ]
                         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-                            _esp._run(cmd, timeout=120)
+                            code_na, out_na, err_na = _esp._run(["powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command", ps], timeout=120)
+                            if code_na != 0:
+                                cmd = [
+                                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                                    f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                                ]
+                                _esp._run(cmd, timeout=150)
                         try:
                             log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
                         except Exception:
@@ -593,10 +623,12 @@ def configure_options_menu(
                             "W('DONE')"
                         )
                         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-                            _esp._run([
-                                "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
-                                f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
-                            ], timeout=120)
+                            code_na, out_na, err_na = _esp._run(["powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command", ps], timeout=120)
+                            if code_na != 0:
+                                _esp._run([
+                                    "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+                                    f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                                ], timeout=150)
                         try:
                             log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
                         except Exception:
@@ -649,9 +681,11 @@ def configure_options_menu(
                 try:
                     import platform, shutil as _sh, tempfile, webbrowser
                     from pathlib import Path as _P
+                    # Prefer URL from settings; fall back to git remote
+                    from ..variables import storage as _stg
+                    set_url = _stg.get_setting_espanso_repo_url()
+                    web = set_url or (_esp._git_remote(repo) or "")
                     # Normalize web URL for release page
-                    url = _esp._git_remote(repo) or ""
-                    web = url
                     if web.startswith("git@github.com:"):
                         owner_repo = web.split(":", 1)[1]
                         if owner_repo.endswith(".git"):
@@ -679,10 +713,14 @@ def configure_options_menu(
                             "W('DONE')"
                         )
                         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-                            _esp._run([
-                                "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
-                                f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                            code_na, out_na, err_na = _esp._run([
+                                "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command", ps
                             ], timeout=120)
+                            if code_na != 0:
+                                _esp._run([
+                                    "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+                                    f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                                ], timeout=150)
                         try:
                             log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
                         except Exception:

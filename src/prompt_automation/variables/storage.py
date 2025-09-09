@@ -105,6 +105,36 @@ def get_setting_espanso_repo_root() -> str | None:
         pass
     return None
 
+# --- Espanso default repo URL (HTTPS) ---------------------------------------
+def get_setting_espanso_repo_url() -> str | None:
+    """Return preferred HTTPS Git URL for installing the Espanso package.
+
+    Reads ``espanso_repo_url`` from Settings/settings.json if set. This helps
+    GUI installers avoid guessing the remote when elevation or UNC paths make
+    discovery unreliable.
+    """
+    try:
+        payload = _load_settings_payload()
+        val = payload.get("espanso_repo_url")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    except Exception:
+        pass
+    return None
+
+
+def set_setting_espanso_repo_url(url: str | None) -> None:
+    """Persist or clear the preferred HTTPS Git URL for Espanso installs."""
+    try:
+        payload = _load_settings_payload()
+        if url and url.strip():
+            payload["espanso_repo_url"] = url.strip()
+        else:
+            payload.pop("espanso_repo_url", None)
+        _write_settings_payload(payload)
+    except Exception as e:  # pragma: no cover - I/O errors
+        _log.error("failed to persist espanso_repo_url: %s", e)
+
 def _sync_settings_from_overrides(overrides: Dict[str, Any]) -> None:
     """Persist selected override data into settings file.
 
