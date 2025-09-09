@@ -1,3 +1,0 @@
-matches:
-  - trigger: ":falsify"
-    replace: "Not the template, but the idea behind it - I want an agnostic, elegant, and comprehensive way to falsify my own bad ideas when using LLMs. Could you make it so that if I'm in a prompt sequence with an LLM it gives an automated command that seeks to disprove my ideas, try and understand the other side, or get rid of things that we don't know for certain?"
