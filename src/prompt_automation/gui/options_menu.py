@@ -44,6 +44,70 @@ def configure_options_menu(
     opt = tk.Menu(new_menubar, tearoff=0)
     accelerators: Dict[str, Callable[[], None]] = {}
 
+    # Helper to present a log window with filter and copy controls
+    def _present_log_window(log_text: str, ok: bool):  # pragma: no cover - GUI
+        try:
+            import tkinter as tk
+            from tkinter import scrolledtext
+            import json as _json2
+            # Prepare filtered view (warn/error only) by parsing JSON lines
+            lines = log_text.splitlines()
+            header = lines[0] if lines else ""
+            json_lines = lines[1:]
+            filtered = []
+            for ln in json_lines:
+                try:
+                    o = _json2.loads(ln)
+                    s = str(o.get('status', '')).lower()
+                    if s in ('warn', 'error'):
+                        filtered.append(ln)
+                except Exception:
+                    # Non-JSON lines are omitted in filtered view
+                    pass
+            full_text = log_text
+            filtered_text = (header + "\n\n" + "\n".join(filtered)) if filtered else full_text
+            win = tk.Toplevel(root)
+            win.title("Espanso Sync Log" + (" — OK" if ok else " — Issues"))
+            win.geometry("720x480")
+            # Controls frame
+            top = tk.Frame(win)
+            top.pack(fill='x')
+            show_all_var = tk.BooleanVar(value=False)
+            def _toggle():
+                try:
+                    txt.configure(state='normal')
+                    txt.delete('1.0', 'end')
+                    txt.insert('1.0', full_text if show_all_var.get() else filtered_text)
+                    txt.mark_set("insert", "1.0")
+                    txt.configure(state='disabled')
+                except Exception:
+                    pass
+            cb = tk.Checkbutton(top, text='Show all logs', variable=show_all_var, command=_toggle)
+            cb.pack(side='left', padx=6, pady=4)
+            def _copy():
+                try:
+                    win.clipboard_clear()
+                    win.clipboard_append(full_text if show_all_var.get() else filtered_text)
+                except Exception:
+                    pass
+            copy_btn = tk.Button(top, text='Copy', command=_copy)
+            copy_btn.pack(side='left', padx=6)
+            # Log area
+            txt = scrolledtext.ScrolledText(win, wrap='none')
+            txt.pack(fill='both', expand=True)
+            try:
+                txt.insert('1.0', filtered_text)
+                txt.mark_set("insert", "1.0")
+                txt.configure(state='disabled')
+            except Exception:
+                pass
+            # Close button
+            btn = tk.Button(win, text=INFO_CLOSE_SAVE, command=win.destroy)
+            btn.pack(side='bottom')
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Espanso", f"Sync finished, but log window failed: {e}")
+
     # Manual Espanso sync button (calls same orchestrator as CLI/colon command)
     def _sync_espanso():  # pragma: no cover - GUI side effects
         import threading
@@ -52,67 +116,6 @@ def configure_options_menu(
         from contextlib import redirect_stdout, redirect_stderr
         from tkinter import messagebox
         try:
-            def _present_log(log_text: str, ok: bool) -> None:
-                try:
-                    import tkinter as tk
-                    from tkinter import scrolledtext
-                    import json as _json2
-                    # Prepare filtered view (warn/error only) by parsing JSON lines
-                    lines = log_text.splitlines()
-                    header = lines[0] if lines else ""
-                    json_lines = lines[1:]
-                    filtered = []
-                    for ln in json_lines:
-                        try:
-                            o = _json2.loads(ln)
-                            s = str(o.get('status', '')).lower()
-                            if s in ('warn', 'error'):
-                                filtered.append(ln)
-                        except Exception:
-                            # Non-JSON lines are omitted in filtered view
-                            pass
-                    full_text = log_text
-                    filtered_text = (header + "\n\n" + "\n".join(filtered)) if filtered else full_text
-                    win = tk.Toplevel(root)
-                    win.title("Espanso Sync Log" + (" — OK" if ok else " — Issues"))
-                    win.geometry("720x480")
-                    # Controls frame
-                    top = tk.Frame(win)
-                    top.pack(fill='x')
-                    show_all_var = tk.BooleanVar(value=False)
-                    def _toggle():
-                        try:
-                            txt.configure(state='normal')
-                            txt.delete('1.0', 'end')
-                            txt.insert('1.0', full_text if show_all_var.get() else filtered_text)
-                            txt.mark_set("insert", "1.0")
-                            txt.configure(state='disabled')
-                        except Exception:
-                            pass
-                    cb = tk.Checkbutton(top, text='Show all logs', variable=show_all_var, command=_toggle)
-                    cb.pack(side='left', padx=6, pady=4)
-                    def _copy():
-                        try:
-                            win.clipboard_clear()
-                            win.clipboard_append(full_text if show_all_var.get() else filtered_text)
-                        except Exception:
-                            pass
-                    copy_btn = tk.Button(top, text='Copy', command=_copy)
-                    copy_btn.pack(side='left', padx=6)
-                    # Log area
-                    txt = scrolledtext.ScrolledText(win, wrap='none')
-                    txt.pack(fill='both', expand=True)
-                    try:
-                        txt.insert('1.0', filtered_text)
-                        txt.mark_set("insert", "1.0")
-                        txt.configure(state='disabled')
-                    except Exception:
-                        pass
-                    # Close button
-                    btn = tk.Button(win, text=INFO_CLOSE_SAVE, command=win.destroy)
-                    btn.pack(side='bottom')
-                except Exception as e:
-                    messagebox.showerror("Espanso", f"Sync finished, but log window failed: {e}")
 
             def _run_sync():
                 buf_out, buf_err = io.StringIO(), io.StringIO()
@@ -161,7 +164,7 @@ def configure_options_menu(
                 finally:
                     # Present log in UI thread
                     try:
-                        root.after(0, _present_log, log_text, ok)
+                        root.after(0, _present_log_window, log_text, ok)
                     except Exception:
                         # Fallback to messagebox if scheduling fails
                         messagebox.showinfo("Espanso", log_text[:2000])
@@ -182,6 +185,71 @@ def configure_options_menu(
         except Exception as e:
             _log.error("Espanso sync action failed: %s", e)
     opt.add_command(label="Sync Espanso?", command=_sync_espanso)
+
+    # Deep Clean + Sync (Windows-friendly): backs up and removes all local user matches then syncs
+    def _deep_clean_and_sync():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        import json as _json
+        from tkinter import messagebox
+        try:
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                try:
+                    # Deep clean
+                    with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                        from ..cli.espanso_cmds import clean_env
+                        clean_env(deep=True, list_only=False)
+                    # Sync (reuse repo detection as in _sync_espanso)
+                    from ..espanso_sync import main as _sync_main
+                    # Optional repo root override
+                    try:
+                        repo_root = _storage.get_setting_espanso_repo_root()
+                    except Exception:
+                        repo_root = None
+                    if not repo_root:
+                        try:
+                            env_file = Path.home() / ".prompt-automation" / "environment"
+                            if env_file.exists():
+                                for line in env_file.read_text(encoding="utf-8").splitlines():
+                                    if line.startswith("PROMPT_AUTOMATION_REPO="):
+                                        repo_root = line.split("=", 1)[1].strip()
+                                        break
+                        except Exception:
+                            pass
+                    argv = ["--repo", repo_root] if repo_root else []
+                    with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                        _sync_main(argv)
+                    # Evaluate summary from sync portion
+                    warn_cnt = 0; err_cnt = 0; last_step = ""
+                    for ln in buf_out.getvalue().splitlines():
+                        try:
+                            o = _json.loads(ln)
+                            s = str(o.get('status', '')).lower()
+                            if s == 'warn': warn_cnt += 1
+                            if s == 'error': err_cnt += 1
+                            if 'step' in o: last_step = str(o['step'])
+                        except Exception:
+                            continue
+                    ok = (err_cnt == 0)
+                    header = f"Deep Clean + Sync Summary: {'OK' if ok else 'Issues'} | warnings={warn_cnt} errors={err_cnt} last_step={last_step}\n\n"
+                    log_text = header + buf_out.getvalue()
+                except SystemExit as e:
+                    code = getattr(e, 'code', 1)
+                    log_text = f"Deep Clean + Sync Summary: Exit {code} (SystemExit)\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                except Exception as e:
+                    log_text = f"Deep Clean + Sync Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Deep clean + sync failed: %s", e)
+    opt.add_command(label="Deep Clean + Sync (Windows)", command=_deep_clean_and_sync)
 
     # Reset reference files (with confirmation + undo support)
     def _reset_refs():

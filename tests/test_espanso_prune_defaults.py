@@ -43,6 +43,10 @@ def test_prune_local_defaults_attempts_deletion(monkeypatch, tmp_path: Path):
     assert not (lin_match / "base.yaml").exists()
     assert not (win_match / "base.yml").exists()
     assert not (win_match / "base.yaml").exists()
-    # Should log at least one prune event
+    # Should log at least one prune event and create a disabled sentinel
     assert any(step == "prune_defaults" for _, step, _ in events)
-
+    created = []
+    for _, step, extra in events:
+        if step == "prune_defaults" and "created" in extra:
+            created.extend(extra["created"])  # type: ignore[index]
+    assert any("disabled.yml" in p for p in created)

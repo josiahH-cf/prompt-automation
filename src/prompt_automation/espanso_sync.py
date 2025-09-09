@@ -396,6 +396,34 @@ def _prune_local_defaults() -> None:
     """
     removed: List[str] = []
     errors: List[str] = []
+    created: List[str] = []
+    # Try discovering config via espanso path for precise targeting
+    cfg_paths: List[Path] = []
+    try:
+        bin_ = _espanso_bin()
+        code_p, out_p, err_p = (1, "", "")
+        if bin_:
+            code_p, out_p, err_p = _run(bin_ + ["path"], timeout=6)
+        if (not bin_) or (code_p != 0 or not out_p):
+            if platform.system() == "Windows" and shutil.which("powershell.exe"):
+                code_p, out_p, err_p = _run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "espanso path"], timeout=10)
+        if code_p == 0 and out_p:
+            # Look for a line containing a path to config (case-insensitive search for 'config')
+            for ln in out_p.splitlines():
+                if "config" in ln.lower():
+                    # extract last path-like token
+                    try:
+                        import re as _re
+                        m = _re.search(r"([A-Za-z]:\\[^\r\n]+|/[^\r\n]+)$", ln.strip())
+                        if m:
+                            p = Path(m.group(1).strip())
+                            if p.exists():
+                                cfg_paths.append(p)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
     # Linux/macOS style
     try:
         match_dir = Path.home() / ".config" / "espanso" / "match"
@@ -406,6 +434,14 @@ def _prune_local_defaults() -> None:
                     removed.append(str(p))
                 except Exception as e:  # pragma: no cover - best effort
                     errors.append(f"{p}: {str(e)[:120]}")
+            # Write disabled sentinel to avoid default regeneration in some builds
+            try:
+                sentinel = match_dir / "disabled.yml"
+                if not sentinel.exists():
+                    sentinel.write_text("matches: []\n", encoding="utf-8")
+                    created.append(str(sentinel))
+            except Exception as e:  # pragma: no cover - best effort
+                errors.append(f"sentinel:{match_dir}: {str(e)[:120]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"home_lookup: {str(e)[:120]}")
     # Windows style (try Python path removal and PowerShell removal for robustness from WSL)
@@ -420,6 +456,14 @@ def _prune_local_defaults() -> None:
                         removed.append(str(p))
                     except Exception as e:  # pragma: no cover - best effort
                         errors.append(f"{p}: {str(e)[:120]}")
+                # Disabled sentinel
+                try:
+                    sentinel = match_dir / "disabled.yml"
+                    if not sentinel.exists():
+                        sentinel.write_text("matches: []\n", encoding="utf-8")
+                        created.append(str(sentinel))
+                except Exception as e:  # pragma: no cover - best effort
+                    errors.append(f"sentinel:{match_dir}: {str(e)[:120]}")
         # Also attempt deletion via PowerShell so WSL can remove Windows-host files
         if shutil.which("powershell.exe"):
             ps = (
@@ -432,8 +476,30 @@ def _prune_local_defaults() -> None:
                 errors.append(f"powershell: {(err_ps or out_ps).strip()[:180]}")
     except Exception as e:  # pragma: no cover - best effort
         errors.append(f"appdata_lookup: {str(e)[:120]}")
+    # Also handle paths discovered from 'espanso path'
+    for cfg in cfg_paths:
+        try:
+            md = cfg / "match"
+            if md.exists():
+                for p in list(md.glob("*.yml")) + list(md.glob("*.yaml")):
+                    try:
+                        p.unlink()
+                        removed.append(str(p))
+                    except Exception as e:
+                        errors.append(f"{p}: {str(e)[:120]}")
+                try:
+                    sentinel = md / "disabled.yml"
+                    if not sentinel.exists():
+                        sentinel.write_text("matches: []\n", encoding="utf-8")
+                        created.append(str(sentinel))
+                except Exception as e:
+                    errors.append(f"sentinel:{md}: {str(e)[:120]}")
+        except Exception as e:
+            errors.append(f"cfg_scan:{cfg}: {str(e)[:120]}")
     if removed:
         _j("ok", "prune_defaults", removed=removed)
+    if created:
+        _j("ok", "prune_defaults", created=created)
     if errors:
         _j("warn", "prune_defaults", errors=errors)
 
