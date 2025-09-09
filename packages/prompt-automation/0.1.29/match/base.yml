@@ -44,28 +44,6 @@ matches:
             \"{{ntsk.type}} - {{ntsk.action}} — DoD: {{ntsk.dod}}\"
             \"NRA: {{ntsk.nra}}\""
 
-  # --- Crit: prompts, then prints bullets ---
-  - trigger: ":cnote"
-    replace: |-
-      - Context: {{cnote.context}}
-      - Instruction: {{cnote.instruction}}
-      - Task: {{cnote.task}}
-    vars:
-      - name: cnote
-        type: form
-        params:
-          layout: |-
-            Context: [[context]]
-            Instruction: [[instruction]]
-            Task: [[task]]
-          fields:
-            context:
-              multiline: true
-            instruction:
-              multiline: true
-            task:
-              multiline: true
-
   # --- Communication coach prompt (asks for 3 inputs, prints two options only) ---
   - trigger: ":comms"
     replace: |-
