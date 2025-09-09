@@ -1,0 +1,3 @@
+matches:
+  - trigger: ":falsify"
+    replace: "testing to see if the sync button workedv2"

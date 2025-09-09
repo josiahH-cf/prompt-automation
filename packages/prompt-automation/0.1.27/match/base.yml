@@ -4,15 +4,6 @@ matches:
     replace: >-
       Think Deeply. Don't Hallucinate.
 
-  # --- open espanso config in Notepad (prints nothing) ---
-  - trigger: ":espanso"
-    replace: "{{open_cfg}}"
-    vars:
-      - name: open_cfg
-        type: shell
-        params:
-          cmd: 'cmd /C start "" notepad "%CONFIG%\match\base.yml"'
-
   # --- New Task (API): create Todoist task via external script ---
   - trigger: ":ntsk"
     replace: "{{create_todoist_task_ntsk}}"
