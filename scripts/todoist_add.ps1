@@ -28,7 +28,8 @@ function Load-TodoistToken {
     [Parameter(Mandatory=$true)][string] $RepoRoot
   )
   # 1) Env var takes precedence. Allow override of var name via TODOIST_TOKEN_ENV, default to TODOIST_API_TOKEN
-  $varName = ($env:TODOIST_TOKEN_ENV ? $env:TODOIST_TOKEN_ENV : 'TODOIST_API_TOKEN')
+  $varName = 'TODOIST_API_TOKEN'
+  if ($env:TODOIST_TOKEN_ENV) { $varName = $env:TODOIST_TOKEN_ENV }
   $tok = [Environment]::GetEnvironmentVariable($varName, 'Process')
   if (-not $tok) { $tok = [Environment]::GetEnvironmentVariable($varName, 'User') }
   if (-not $tok) { $tok = [Environment]::GetEnvironmentVariable($varName, 'Machine') }
@@ -78,8 +79,8 @@ function Parse-Inputs {
   try {
     # Split on em dash or hyphen patterns to find a segment that looks like the action
     $candidate = $summary
-    if ($summary -match '\s—\s') { $candidate = $summary.Split("—")[0] }
-    if ($candidate -match '\s-\s') { $candidate = $candidate.Split("-")[-1] }
+  if ($summary -match '\s—\s') { $candidate = $summary.Split('—')[0] }
+  if ($candidate -match '\s-\s') { $candidate = ($candidate.Split('-') | Select-Object -Last 1) }
     $candidate = $candidate.Trim()
     if ($candidate) { $content = $candidate }
   } catch { }
