@@ -1,6 +1,6 @@
 [project]
 name = "prompt-automation"
-version = "0.6.3"
+version = "0.6.4"
 description = "Keyboard-only smart prompt launcher"
 requires-python = ">=3.11"
 authors = [{name="prompt-automation"}]
