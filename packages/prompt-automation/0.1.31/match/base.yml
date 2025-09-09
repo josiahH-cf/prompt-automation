@@ -35,8 +35,13 @@ matches:
             "$ErrorActionPreference='Stop';
             $repo=$env:PROMPT_AUTOMATION_REPO;
             if (-not $repo) {
-              $linux=(wsl.exe bash -lc 'printf %s "${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}"');
-              if ($linux) { $repo=(wsl.exe wslpath -w $linux).Trim() }
+              $wsl=(Get-Command wsl.exe -ErrorAction SilentlyContinue);
+              if ($wsl) {
+                try {
+                  $linux=(wsl.exe bash -lc 'printf %s "${PROMPT_AUTOMATION_REPO:-$HOME/github-cf/prompt-automation}"');
+                  if ($linux) { $repo=(wsl.exe wslpath -w $linux).Trim() }
+                } catch { }
+              }
             };
             if (-not $repo) { Write-Error 'Repo path not found. Set PROMPT_AUTOMATION_REPO or ensure repo at $HOME/github-cf/prompt-automation'; exit 1 };
             $script=Join-Path $repo 'scripts\todoist_add.ps1';
