@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": 4,
+  "id": 75,
   "title": "Daily Review",
   "style": "Reviews",
   "reminders": [
@@ -26,14 +26,14 @@
       "default": ""
     },
     {
-     "Name": "reminders",
-     "label": [
-       "Attention is all you have",
-       "Make Context Switching Easier and a part of a defined process of: Prepare the session (set time and tabs) --> Start --> if new things are found put them in Obsidian as a take in Permanent notes section.",
-       "Use your bookmarks in Obsidian and Views in Todoist - this can get you into context faster",
-       "Use prompt-automation everywhere I can and consistent jot down lessons learned via tasks",
-       "Try to think ahead in prompts and tasks - when taking notes, format it in such a way that it can be listed as how you want the model to understand it in context"
-     ],
+      "Name": "reminders",
+      "label": [
+        "Attention is all you have",
+        "Make Context Switching Easier and a part of a defined process of: Prepare the session (set time and tabs) --> Start --> if new things are found put them in Obsidian as a take in Permanent notes section.",
+        "Use your bookmarks in Obsidian and Views in Todoist - this can get you into context faster",
+        "Use prompt-automation everywhere I can and consistent jot down lessons learned via tasks",
+        "Try to think ahead in prompts and tasks - when taking notes, format it in such a way that it can be listed as how you want the model to understand it in context"
+      ],
       "multiline": true,
       "default": ""
     }
