@@ -251,6 +251,97 @@ def configure_options_menu(
             _log.error("Deep clean + sync failed: %s", e)
     opt.add_command(label="Deep Clean + Sync (Windows)", command=_deep_clean_and_sync)
 
+    # Install from current git branch with elevation on Windows (admin)
+    def _install_from_current_branch_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        import json as _json
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox
+        from pathlib import Path as _P
+        import tempfile
+        try:
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                try:
+                    # Discover repo, remote, branch
+                    from .. import espanso_sync as _esp
+                    repo = None
+                    try:
+                        repo = _esp._find_repo_root(None)
+                    except SystemExit:
+                        repo = None
+                    repo_url = _esp._git_remote(repo) if repo else None
+                    branch = _esp._active_branch(repo or _P.cwd(), None)
+                    if not branch:
+                        branch = "main"
+                    # Prefer HTTPS on Windows
+                    if repo_url and repo_url.startswith("git@github.com:"):
+                        owner_repo = repo_url.split(":", 1)[1]
+                        if owner_repo.endswith(".git"):
+                            owner_repo = owner_repo[:-4]
+                        repo_url = f"https://github.com/{owner_repo}.git"
+                    elif repo_url and repo_url.startswith("ssh://") and "github.com" in repo_url:
+                        tail = repo_url.split("github.com", 1)[1].lstrip(":/")
+                        if tail.endswith(".git"):
+                            tail = tail[:-4]
+                        repo_url = f"https://github.com/{tail}.git"
+
+                    # Windows elevated path
+                    import platform
+                    import shutil as _sh
+                    if platform.system() == "Windows" and _sh.which("powershell.exe") and repo_url:
+                        # Write a log to a temp file so we can present output
+                        log_path = _P(tempfile.gettempdir()) / "espanso_install_branch.log"
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; "
+                            f"$log=\"{str(log_path)}\"; "
+                            "function W([string]$t){ Add-Content -Path $log -Encoding UTF8 $t }; "
+                            "W('BEGIN'); "
+                            "try { W((espanso path | Out-String)) } catch {}; "
+                            "try { espanso package uninstall prompt-automation | Out-String | %% { W($_) } } catch {}; "
+                            f"espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external | Out-String | %% {{ W($_) }}; "
+                            "espanso restart | Out-String | % { W($_) }; "
+                            "espanso package list | Out-String | % { W($_) }; "
+                            "W('END')"
+                        )
+                        # Elevate and wait
+                        cmd = [
+                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                        ]
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run(cmd, timeout=120)
+                        # Read back log
+                        try:
+                            log_text = log_path.read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        # Basic summary
+                        ok = ("package installed" in log_text.lower() or "already installed" in log_text.lower())
+                        header = f"Install from Branch Summary: {'OK' if ok else 'Issues'} | branch={branch}\n\n"
+                        log_text = header + log_text
+                        root.after(0, _present_log_window, log_text, ok)
+                        return
+
+                    # Non-Windows or fallback: try internal installer directly
+                    with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                        _esp._install_or_update("prompt-automation", repo_url, None, branch)
+                    ok = True
+                    log_text = "Install from Branch Summary: OK\n\n" + buf_out.getvalue()
+                except Exception as e:
+                    log_text = f"Install from Branch Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Install from branch (admin) failed: %s", e)
+    opt.add_command(label="Install from Current Branch (Admin)", command=_install_from_current_branch_admin)
+
     # Reset reference files (with confirmation + undo support)
     def _reset_refs():
         try:
