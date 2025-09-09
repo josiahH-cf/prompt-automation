@@ -921,6 +921,7 @@ def configure_options_menu(
             "Quick Sync Workflow\n\n"
             "1) Options → Espanso → Set Default Repo URL… (HTTPS)\n"
             "2) Options → Espanso → Deep Clean + Sync (Windows)\n"
+            "3) (if you get errors) Options → Espanso → Publish and Install (should make remote version available)\n"
             "3) Verify:\n"
             "   - espanso package list\n"
             "   - Should show 'prompt-automation' with your GitHub https URL\n"
