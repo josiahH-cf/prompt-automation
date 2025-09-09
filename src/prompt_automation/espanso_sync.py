@@ -751,6 +751,16 @@ def _resolve_conflicts(pkg_name: str, repo_url: str | None, local_path: Path | N
                 continue
         except Exception:
             pass
+        # If the same-named package is installed from a different git repo, prefer our remote
+        try:
+            if name == pkg_name and "git:" in (src or "").lower() and repo_norm:
+                src_url = (src_l.split("git:", 1)[1].strip() if 'src_l' in locals() else (src or '').split(':',1)[-1].strip())
+                src_norm = _normalize_git_url(src_url)
+                if src_norm and repo_norm and not (src_norm == repo_norm or repo_norm in src_norm or src_norm in repo_norm):
+                    to_uninstall.append(name)
+                    continue
+        except Exception:
+            pass
         # Same repository under a different package name (normalize URL to compare).
         # Do not target the canonical package name in this alias logic.
         if name == pkg_name:

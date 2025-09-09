@@ -47,15 +47,80 @@ def configure_options_menu(
     # Manual Espanso sync button (calls same orchestrator as CLI/colon command)
     def _sync_espanso():  # pragma: no cover - GUI side effects
         import threading
+        import io
+        import json as _json
+        from contextlib import redirect_stdout, redirect_stderr
         from tkinter import messagebox
         try:
-            def _run_sync():
+            def _present_log(log_text: str, ok: bool) -> None:
                 try:
-                    # Use CLI module to reuse argument parsing and env
+                    import tkinter as tk
+                    from tkinter import scrolledtext
+                    import json as _json2
+                    # Prepare filtered view (warn/error only) by parsing JSON lines
+                    lines = log_text.splitlines()
+                    header = lines[0] if lines else ""
+                    json_lines = lines[1:]
+                    filtered = []
+                    for ln in json_lines:
+                        try:
+                            o = _json2.loads(ln)
+                            s = str(o.get('status', '')).lower()
+                            if s in ('warn', 'error'):
+                                filtered.append(ln)
+                        except Exception:
+                            # Non-JSON lines are omitted in filtered view
+                            pass
+                    full_text = log_text
+                    filtered_text = (header + "\n\n" + "\n".join(filtered)) if filtered else full_text
+                    win = tk.Toplevel(root)
+                    win.title("Espanso Sync Log" + (" — OK" if ok else " — Issues"))
+                    win.geometry("720x480")
+                    # Controls frame
+                    top = tk.Frame(win)
+                    top.pack(fill='x')
+                    show_all_var = tk.BooleanVar(value=False)
+                    def _toggle():
+                        try:
+                            txt.configure(state='normal')
+                            txt.delete('1.0', 'end')
+                            txt.insert('1.0', full_text if show_all_var.get() else filtered_text)
+                            txt.mark_set("insert", "1.0")
+                            txt.configure(state='disabled')
+                        except Exception:
+                            pass
+                    cb = tk.Checkbutton(top, text='Show all logs', variable=show_all_var, command=_toggle)
+                    cb.pack(side='left', padx=6, pady=4)
+                    def _copy():
+                        try:
+                            win.clipboard_clear()
+                            win.clipboard_append(full_text if show_all_var.get() else filtered_text)
+                        except Exception:
+                            pass
+                    copy_btn = tk.Button(top, text='Copy', command=_copy)
+                    copy_btn.pack(side='left', padx=6)
+                    # Log area
+                    txt = scrolledtext.ScrolledText(win, wrap='none')
+                    txt.pack(fill='both', expand=True)
+                    try:
+                        txt.insert('1.0', filtered_text)
+                        txt.mark_set("insert", "1.0")
+                        txt.configure(state='disabled')
+                    except Exception:
+                        pass
+                    # Close button
+                    btn = tk.Button(win, text=INFO_CLOSE_SAVE, command=win.destroy)
+                    btn.pack(side='bottom')
+                except Exception as e:
+                    messagebox.showerror("Espanso", f"Sync finished, but log window failed: {e}")
+
+            def _run_sync():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                try:
                     from ..espanso_sync import main as _sync_main
                     from .. import espanso_sync as _esp
-                    # If user configured a repo root in Settings, pass it explicitly
-                    # Prefer Settings override; fall back to environment file
+                    # Resolve repo root if configured
                     try:
                         repo_root = _storage.get_setting_espanso_repo_root()
                     except Exception:
@@ -71,42 +136,48 @@ def configure_options_menu(
                         except Exception:
                             pass
                     argv = ["--repo", repo_root] if repo_root else []
-                    # Respect env flags; do not hardcode branch or skip-install here
-                    _sync_main(argv)
-                    # After successful sync, show installed version if available
-                    try:
-                        pkgs = _esp._list_installed_packages()
-                        ver = None; src = None
-                        for p in pkgs:
-                            if p.get("name") == "prompt-automation":
-                                ver = p.get("version"); src = p.get("source"); break
-                        if ver:
-                            messagebox.showinfo("Espanso", f"Sync complete. Installed prompt-automation v{ver}.\n\n{('('+src+')' if src else '')}")
-                        else:
-                            messagebox.showinfo("Espanso", "Sync complete. Espanso restarted.")
-                    except Exception:
-                        messagebox.showinfo("Espanso", "Sync complete. Espanso restarted (remote-first).")
-                    # Windows-only advisory if local base.yml exists (can cause duplicates)
-                    try:
-                        import platform, os
-                        from pathlib import Path as _P
-                        if platform.system() == "Windows":
-                            appdata = os.environ.get("APPDATA")
-                            if appdata:
-                                by = _P(appdata) / "espanso" / "match" / "base.yml"
-                                if by.exists():
-                                    messagebox.showwarning("Espanso",
-                                        f"Local base.yml detected at:\n{by}\n\nIt may cause duplicate triggers.\nUse: scripts/espanso-windows.ps1 -DisableLocalBase")
-                    except Exception:
-                        pass
+                    with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                        _sync_main(argv)
+                    # Parse JSON lines to compute summary
+                    warn_cnt = 0; err_cnt = 0
+                    last_step = ""
+                    for line in buf_out.getvalue().splitlines():
+                        try:
+                            o = _json.loads(line)
+                            s = str(o.get('status', '')).lower()
+                            if s == 'warn': warn_cnt += 1
+                            if s == 'error': err_cnt += 1
+                            if 'step' in o: last_step = str(o['step'])
+                        except Exception:
+                            continue
+                    ok = (err_cnt == 0)
+                    header = f"Summary: {'OK' if ok else 'Issues'} | warnings={warn_cnt} errors={err_cnt} last_step={last_step}\n\n"
+                    log_text = header + buf_out.getvalue()
                 except SystemExit as e:
                     code = getattr(e, 'code', 1)
-                    if code:
-                        messagebox.showerror("Espanso", f"Sync failed (exit {code}). See logs.")
-                    else:
-                        messagebox.showinfo("Espanso", "Sync complete.")
+                    log_text = f"Summary: Exit {code} (SystemExit)\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
                 except Exception as e:
-                    messagebox.showerror("Espanso", f"Sync failed: {e}")
+                    log_text = f"Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    # Present log in UI thread
+                    try:
+                        root.after(0, _present_log, log_text, ok)
+                    except Exception:
+                        # Fallback to messagebox if scheduling fails
+                        messagebox.showinfo("Espanso", log_text[:2000])
+                # Windows-only advisory if local base.yml exists (can cause duplicates)
+                try:
+                    import platform, os
+                    from pathlib import Path as _P
+                    if platform.system() == "Windows":
+                        appdata = os.environ.get("APPDATA")
+                        if appdata:
+                            by = _P(appdata) / "espanso" / "match" / "base.yml"
+                            if by.exists():
+                                messagebox.showwarning("Espanso",
+                                    f"Local base.yml detected at:\n{by}\n\nIt may cause duplicate triggers.\nUse: scripts/espanso-windows.ps1 -DisableLocalBase")
+                except Exception:
+                    pass
             threading.Thread(target=_run_sync, daemon=True).start()
         except Exception as e:
             _log.error("Espanso sync action failed: %s", e)
