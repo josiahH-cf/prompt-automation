@@ -3,6 +3,10 @@
   "id": 72,
   "title": "Espanso Snippet – Meta-Prompt (Single-Paragraph Command Generator)",
   "style": "Espanso-Edit",
+  "reminders": [
+    "Need inputs, files, preview, or multi-template composition? → Prompt-Automation.",
+    "Need blazing-fast, cursor-stays-put expansions? → espanso."
+  ],
   "role": "assistant",
   "placeholders": [
   { "name": "name", "label": "Trigger + filename base (typed as you'll use it; ':' optional; becomes <name>.yml)", "default": ":example", "multiline": false },
@@ -37,13 +41,14 @@
     "- Ambiguity: when minor, choose the safest common interpretation and proceed; avoid speculative features.",
     "",
     "Execution Flow",
-  "1) Restate the intent internally; 2) Design trigger and derive a new target_file name; 3) Draft replacement and optional vars (style from heuristics); 4) Render single-paragraph YAML snippet; 5) Assemble single-paragraph JSON payload with fixed keys.",
+  "1) Restate the intent internally; 2) Design trigger and derive a new target_file name; 3) Draft replacement and optional vars (style from heuristics); 4) Render single-paragraph YAML snippet; 5) Output exactly that one line and nothing else.",
     "",
   "Output Format (MANDATORY — one physical line)",
-  "Return ONLY a minified single-paragraph JSON object with exactly these keys and order, no extras: {\"name\":<string>,\"trigger\":<string>,\"target_file\":<string>,\"snippet_yaml\":<string>} — where target_file is a new filename like '<normalized-name>.yml' and snippet_yaml is the one-line YAML from the previous step.",
+  "Return ONLY the one-paragraph flow-style YAML snippet (string) like: matches:[{trigger:\":example\",replace:\"...\"}] optionally with vars:[...]. No JSON wrapper, no code fences, no labels, no commentary.",
     "",
     "Quality Checks (run silently, do not emit)",
-  "- JSON parseable; keys present and ordered; snippet YAML is one paragraph; trigger conforms; target_file is new (would not append to an existing file); no unsafe commands; placeholders used.",
+  "- Snippet YAML is valid and one paragraph; trigger conforms; target_file is new (would not append to an existing file); no unsafe commands; placeholders used.",
+  "- Absolutely no extra output before or after the one-line snippet: no JSON, no fences, no acknowledgements.",
     "",
     "Self-Check (silent)",
     "- Did I avoid verbatim copying? Is the output exactly one physical line? Are repo conventions followed?"
