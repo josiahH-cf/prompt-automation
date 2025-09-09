@@ -184,7 +184,9 @@ def configure_options_menu(
             threading.Thread(target=_run_sync, daemon=True).start()
         except Exception as e:
             _log.error("Espanso sync action failed: %s", e)
-    opt.add_command(label="Sync Espanso?", command=_sync_espanso)
+    # Group all Espanso actions into a submenu to declutter the main menu
+    esp_menu = tk.Menu(opt, tearoff=0)
+    esp_menu.add_command(label="Sync Espanso?", command=_sync_espanso)
 
     # Deep Clean + Sync (Windows-friendly): backs up and removes all local user matches then syncs
     def _deep_clean_and_sync():  # pragma: no cover - GUI side effects
@@ -249,7 +251,7 @@ def configure_options_menu(
             threading.Thread(target=_run, daemon=True).start()
         except Exception as e:
             _log.error("Deep clean + sync failed: %s", e)
-    opt.add_command(label="Deep Clean + Sync (Windows)", command=_deep_clean_and_sync)
+    esp_menu.add_command(label="Deep Clean + Sync (Windows)", command=_deep_clean_and_sync)
 
     # Install from current git branch with elevation on Windows (admin)
     def _install_from_current_branch_admin():  # pragma: no cover - GUI side effects
@@ -295,13 +297,16 @@ def configure_options_menu(
                         # Write a log to a temp file so we can present output
                         log_path = _P(tempfile.gettempdir()) / "espanso_install_branch.log"
                         ps = (
-                            "$ErrorActionPreference='SilentlyContinue'; "
+                            "$ErrorActionPreference='SilentlyContinue'; Set-Location $env:USERPROFILE; "
                             f"$log=\"{str(log_path)}\"; "
                             "function W([string]$t){ Add-Content -Path $log -Encoding UTF8 $t }; "
-                            "W('BEGIN'); "
-                            "try { W((espanso path | Out-String)) } catch {}; "
-                            "try { espanso package uninstall prompt-automation | Out-String | %% { W($_) } } catch {}; "
-                            f"espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external | Out-String | %% {{ W($_) }}; "
+                            "W('BEGIN'); try { W((espanso path | Out-String)) } catch {}; "
+                            f"$o=(espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external) 2>&1 | Out-String; W($o); "
+                            "if (($LASTEXITCODE -ne 0) -or ($o -match 'already installed' -or $o -match 'unable to install')) { "
+                            "  try { espanso package update prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  try { espanso package uninstall prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            f"  $o2=(espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external) 2>&1 | Out-String; W($o2); "
+                            "} "
                             "espanso restart | Out-String | % { W($_) }; "
                             "espanso package list | Out-String | % { W($_) }; "
                             "W('END')"
@@ -340,7 +345,488 @@ def configure_options_menu(
             threading.Thread(target=_run, daemon=True).start()
         except Exception as e:
             _log.error("Install from branch (admin) failed: %s", e)
-    opt.add_command(label="Install from Current Branch (Admin)", command=_install_from_current_branch_admin)
+    esp_menu.add_command(label="Install from Current Branch (Admin)", command=_install_from_current_branch_admin)
+
+    # Install from specific tag (Admin prompt), useful when the GitHub provider expects a versioned tag
+    def _install_from_tag_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        import json as _json
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox, simpledialog
+        from pathlib import Path as _P
+        import tempfile
+        try:
+            # Ask for tag name
+            default_tag = None
+            try:
+                from .. import espanso_sync as _esp
+                repo = _esp._find_repo_root(None)
+                _, ver = _esp._read_manifest(repo)
+                default_tag = f"espanso-v{ver}"
+            except Exception:
+                default_tag = "espanso-v0.1.0"
+            tag = simpledialog.askstring("Install from Tag", "Enter tag to install (e.g., espanso-v0.1.23):", initialvalue=default_tag, parent=root)
+            if not tag:
+                return
+
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                log_text = ""
+                try:
+                    from .. import espanso_sync as _esp
+                    repo = None
+                    try:
+                        repo = _esp._find_repo_root(None)
+                    except SystemExit:
+                        repo = None
+                    repo_url = _esp._git_remote(repo) if repo else None
+                    # Prefer HTTPS on Windows
+                    if repo_url and repo_url.startswith("git@github.com:"):
+                        owner_repo = repo_url.split(":", 1)[1]
+                        if owner_repo.endswith(".git"):
+                            owner_repo = owner_repo[:-4]
+                        repo_url = f"https://github.com/{owner_repo}.git"
+                    elif repo_url and repo_url.startswith("ssh://") and "github.com" in repo_url:
+                        tail = repo_url.split("github.com", 1)[1].lstrip(":/")
+                        if tail.endswith(".git"):
+                            tail = tail[:-4]
+                        repo_url = f"https://github.com/{tail}.git"
+
+                    import platform, shutil as _sh
+                    if platform.system() == "Windows" and _sh.which("powershell.exe") and repo_url:
+                        log_path = _P(tempfile.gettempdir()) / "espanso_install_tag.log"
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; Set-Location $env:USERPROFILE; "
+                            f"$log=\"{str(log_path)}\"; "
+                            "function W([string]$t){ Add-Content -Path $log -Encoding UTF8 $t }; "
+                            f"$o=(espanso package install prompt-automation --git {repo_url} --git-branch {tag} --external) 2>&1 | Out-String; W($o); "
+                            "if (($LASTEXITCODE -ne 0) -or ($o -match 'already installed' -or $o -match 'unable to install')) { "
+                            "  try { espanso package update prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  try { espanso package uninstall prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            f"  $o2=(espanso package install prompt-automation --git {repo_url} --git-branch {tag} --external) 2>&1 | Out-String; W($o2); "
+                            "} "
+                            "espanso restart | Out-String | % { W($_) }; "
+                            "espanso package list | Out-String | % { W($_) }; "
+                            "W('DONE')"
+                        )
+                        cmd = [
+                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                        ]
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run(cmd, timeout=120)
+                        try:
+                            log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        ok = ("package installed" in log_text.lower() or "already installed" in log_text.lower())
+                        header = f"Install from Tag Summary: {'OK' if ok else 'Issues'} | tag={tag}\n\n"
+                        log_text = header + log_text
+                    else:
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._install_or_update("prompt-automation", repo_url, None, tag)
+                        ok = True
+                        log_text = "Install from Tag Summary: OK\n\n" + buf_out.getvalue()
+                except Exception as e:
+                    log_text = f"Install from Tag Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Install from tag (admin) failed: %s", e)
+    esp_menu.add_command(label="Install from Tag (Admin)...", command=_install_from_tag_admin)
+
+    # Install from a custom branch name (Admin prompt)
+    def _install_from_branch_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        import json as _json
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox, simpledialog
+        from pathlib import Path as _P
+        import tempfile
+        try:
+            # Default to current active branch if available
+            default_branch = "main"
+            try:
+                from .. import espanso_sync as _esp
+                repo = _esp._find_repo_root(None)
+                b = _esp._active_branch(repo, None)
+                if b:
+                    default_branch = b
+            except Exception:
+                pass
+            branch = simpledialog.askstring("Install from Branch", "Enter branch to install:", initialvalue=default_branch, parent=root)
+            if not branch:
+                return
+
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                log_text = ""
+                try:
+                    from .. import espanso_sync as _esp
+                    repo = None
+                    try:
+                        repo = _esp._find_repo_root(None)
+                    except SystemExit:
+                        repo = None
+                    repo_url = _esp._git_remote(repo) if repo else None
+                    if repo_url and repo_url.startswith("git@github.com:"):
+                        owner_repo = repo_url.split(":", 1)[1]
+                        if owner_repo.endswith(".git"):
+                            owner_repo = owner_repo[:-4]
+                        repo_url = f"https://github.com/{owner_repo}.git"
+                    elif repo_url and repo_url.startswith("ssh://") and "github.com" in repo_url:
+                        tail = repo_url.split("github.com", 1)[1].lstrip(":/")
+                        if tail.endswith(".git"):
+                            tail = tail[:-4]
+                        repo_url = f"https://github.com/{tail}.git"
+
+                    import platform, shutil as _sh
+                    if platform.system() == "Windows" and _sh.which("powershell.exe") and repo_url:
+                        log_path = _P(tempfile.gettempdir()) / "espanso_install_branch_input.log"
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; Set-Location $env:USERPROFILE; "
+                            f"$log=\"{str(log_path)}\"; "
+                            "function W([string]$t){ Add-Content -Path $log -Encoding UTF8 $t }; "
+                            f"$o=(espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external) 2>&1 | Out-String; W($o); "
+                            "if (($LASTEXITCODE -ne 0) -or ($o -match 'already installed' -or $o -match 'unable to install')) { "
+                            "  try { espanso package update prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  try { espanso package uninstall prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            f"  $o2=(espanso package install prompt-automation --git {repo_url} --git-branch {branch} --external) 2>&1 | Out-String; W($o2); "
+                            "} "
+                            "espanso restart | Out-String | % { W($_) }; "
+                            "espanso package list | Out-String | % { W($_) }; "
+                            "W('DONE')"
+                        )
+                        cmd = [
+                            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                        ]
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run(cmd, timeout=120)
+                        try:
+                            log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        ok = ("package installed" in log_text.lower() or "already installed" in log_text.lower())
+                        header = f"Install from Branch Summary: {'OK' if ok else 'Issues'} | branch={branch}\n\n"
+                        log_text = header + log_text
+                    else:
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._install_or_update("prompt-automation", repo_url, None, branch)
+                        ok = True
+                        log_text = "Install from Branch Summary: OK\n\n" + buf_out.getvalue()
+                except Exception as e:
+                    log_text = f"Install from Branch Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Install from branch (custom, admin) failed: %s", e)
+    esp_menu.add_command(label="Install from Branch (Admin)...", command=_install_from_branch_admin)
+
+    # Install from custom Git URL + branch (Admin)
+    def _install_from_url_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox, simpledialog
+        try:
+            from .. import espanso_sync as _esp
+            # Suggest current repo remote (HTTPS normalized) and branch
+            repo = None
+            try:
+                repo = _esp._find_repo_root(None)
+            except SystemExit:
+                repo = None
+            url = _esp._git_remote(repo) if repo else "https://github.com/<owner>/<repo>.git"
+            if url and url.startswith("git@github.com:"):
+                owner_repo = url.split(":", 1)[1]
+                if owner_repo.endswith(".git"):
+                    owner_repo = owner_repo[:-4]
+                url = f"https://github.com/{owner_repo}.git"
+            elif url and url.startswith("ssh://") and "github.com" in url:
+                tail = url.split("github.com", 1)[1].lstrip(":/")
+                if tail.endswith(".git"):
+                    tail = tail[:-4]
+                url = f"https://github.com/{tail}.git"
+            branch = _esp._active_branch(repo, None) or "main"
+
+            chosen_url = simpledialog.askstring("Install from URL", "Git URL (HTTPS):", initialvalue=url, parent=root)
+            if not chosen_url:
+                return
+            chosen_branch = simpledialog.askstring("Install from URL", "Branch or tag:", initialvalue=branch, parent=root)
+            if not chosen_branch:
+                return
+
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                log_text = ""
+                try:
+                    import platform, shutil as _sh, tempfile
+                    from pathlib import Path as _P
+                    if platform.system() == "Windows" and _sh.which("powershell.exe"):
+                        log_path = _P(tempfile.gettempdir()) / "espanso_install_url.log"
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; Set-Location $env:USERPROFILE; "
+                            f"$log=\"{str(log_path)}\"; "
+                            "function W([string]$t){ Add-Content -Path $log -Encoding UTF8 $t }; "
+                            f"$o=(espanso package install prompt-automation --git {chosen_url} --git-branch {chosen_branch} --external) 2>&1 | Out-String; W($o); "
+                            "if (($LASTEXITCODE -ne 0) -or ($o -match 'already installed' -or $o -match 'unable to install')) { "
+                            "  try { espanso package update prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  try { espanso package uninstall prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            f"  $o2=(espanso package install prompt-automation --git {chosen_url} --git-branch {chosen_branch} --external) 2>&1 | Out-String; W($o2); "
+                            "} "
+                            "espanso restart | Out-String | % { W($_) }; "
+                            "espanso package list | Out-String | % { W($_) }; "
+                            "W('DONE')"
+                        )
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run([
+                                "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+                                f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                            ], timeout=120)
+                        try:
+                            log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        ok = ("package installed" in log_text.lower() or "already installed" in log_text.lower())
+                        header = f"Install from URL Summary: {'OK' if ok else 'Issues'} | branch_or_tag={chosen_branch}\n\n"
+                        log_text = header + log_text
+                    else:
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._install_or_update("prompt-automation", chosen_url, None, chosen_branch)
+                        ok = True
+                        log_text = "Install from URL Summary: OK\n\n" + buf_out.getvalue()
+                except Exception as e:
+                    log_text = f"Install from URL Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Install from URL (admin) failed: %s", e)
+    esp_menu.add_command(label="Install from URL (Admin)...", command=_install_from_url_admin)
+
+    # Publish release tag (Admin) and open GitHub releases page
+    def _publish_release_tag_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox, simpledialog
+        try:
+            from .. import espanso_sync as _esp
+            repo = None
+            try:
+                repo = _esp._find_repo_root(None)
+            except SystemExit:
+                messagebox.showerror("Publish", "Repo not found; open the app from the repo")
+                return
+            # Default tag based on manifest
+            _, ver = _esp._read_manifest(repo)
+            default_tag = f"espanso-v{ver}"
+            tag = simpledialog.askstring("Publish Tag", "Tag to create/push (e.g., espanso-v0.1.23):", initialvalue=default_tag, parent=root)
+            if not tag:
+                return
+
+            def _run():
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                log_text = ""
+                try:
+                    import platform, shutil as _sh, tempfile, webbrowser
+                    from pathlib import Path as _P
+                    # Normalize web URL for release page
+                    url = _esp._git_remote(repo) or ""
+                    web = url
+                    if web.startswith("git@github.com:"):
+                        owner_repo = web.split(":", 1)[1]
+                        if owner_repo.endswith(".git"):
+                            owner_repo = owner_repo[:-4]
+                        web = f"https://github.com/{owner_repo}"
+                    elif web.startswith("ssh://") and "github.com" in web:
+                        tail = web.split("github.com", 1)[1].lstrip(":/")
+                        if tail.endswith(".git"):
+                            tail = tail[:-4]
+                        web = f"https://github.com/{tail}"
+                    if web.endswith(".git"):
+                        web = web[:-4]
+
+                    if platform.system() == "Windows" and _sh.which("powershell.exe"):
+                        log_path = _P(tempfile.gettempdir()) / "espanso_publish_tag.log"
+                        # Build PS with safe.directory retry
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; "
+                            f"$log=\"{str(log_path)}\"; function W([string]$t){{ Add-Content -Path $log -Encoding UTF8 $t }}; "
+                            f"$repo=\"{str(repo)}\"; $tag=\"{tag}\"; "
+                            "try { W((git -C $repo status --porcelain | Out-String)) } catch {}; "
+                            "try { git -C $repo tag -a $tag -m $tag 2>&1 | Out-String | % { W($_) } } catch {}; "
+                            "try { git -C $repo push origin $tag 2>&1 | Out-String | % { W($_) } } catch {}; "
+                            "if ((Get-Content $log) -match 'dubious ownership') { git config --global --add safe.directory $repo; git -C $repo push origin $tag 2>&1 | Out-String | % { W($_) } }; "
+                            "W('DONE')"
+                        )
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run([
+                                "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+                                f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                            ], timeout=120)
+                        try:
+                            log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        ok = ("[new tag]" in log_text.lower() or "up to date" in log_text.lower() or "done" in log_text.lower())
+                        header = f"Publish Tag Summary: {'OK' if ok else 'Issues'} | tag={tag}\n\n"
+                        log_text = header + log_text
+                        # Open releases page for tag
+                        if web:
+                            try: webbrowser.open(f"{web}/releases/new?tag={tag}")
+                            except Exception: pass
+                    else:
+                        # Non-Windows simple path
+                        out = []
+                        def _W(s: str): out.append(s)
+                        _esp._run(["git","-C",str(repo),"tag","-a",tag,"-m",tag])
+                        _esp._run(["git","-C",str(repo),"push","origin",tag])
+                        for l in out: pass
+                        ok = True
+                        log_text = f"Publish Tag Summary: OK | tag={tag}\n"
+                        if web:
+                            try: webbrowser.open(f"{web}/releases/new?tag={tag}")
+                            except Exception: pass
+                except Exception as e:
+                    log_text = f"Publish Tag Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Publish release tag (admin) failed: %s", e)
+    esp_menu.add_command(label="Publish Release + Tag (Admin)", command=_publish_release_tag_admin)
+
+    # Publish current manifest version tag and install it (Admin, one-click)
+    def _publish_and_install_admin():  # pragma: no cover - GUI side effects
+        import threading
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        from tkinter import messagebox
+        try:
+            from .. import espanso_sync as _esp
+            repo = None
+            try:
+                repo = _esp._find_repo_root(None)
+            except SystemExit:
+                messagebox.showerror("Publish + Install", "Repo not found; open the app from the repo")
+                return
+            # Determine version and tag
+            _, ver = _esp._read_manifest(repo)
+            tag = f"espanso-v{ver}"
+            # Normalize remote to HTTPS for Windows
+            remote = _esp._git_remote(repo) or ""
+            if remote.startswith("git@github.com:"):
+                owner_repo = remote.split(":", 1)[1]
+                if owner_repo.endswith(".git"):
+                    owner_repo = owner_repo[:-4]
+                remote_https = f"https://github.com/{owner_repo}.git"
+            elif remote.startswith("ssh://") and "github.com" in remote:
+                tail = remote.split("github.com", 1)[1].lstrip(":/")
+                if tail.endswith(".git"):
+                    tail = tail[:-4]
+                remote_https = f"https://github.com/{tail}.git"
+            else:
+                remote_https = remote or ""
+            # If remote URL is still unknown, prompt the user
+            if not remote_https or "github.com/" not in remote_https:
+                from tkinter import simpledialog
+                entered = simpledialog.askstring(
+                    "Publish + Install",
+                    "Enter HTTPS Git URL (e.g., https://github.com/<owner>/<repo>.git):",
+                    parent=root,
+                )
+                if not entered:
+                    messagebox.showerror("Publish + Install", "Aborted: missing repository URL")
+                    return
+                remote_https = entered.strip()
+
+            def _run():
+                import platform, shutil as _sh, tempfile
+                from pathlib import Path as _P
+                buf_out, buf_err = io.StringIO(), io.StringIO()
+                ok = False
+                log_text = ""
+                try:
+                    if platform.system() == "Windows" and _sh.which("powershell.exe"):
+                        log_path = _P(tempfile.gettempdir()) / "espanso_publish_install.log"
+                        # PowerShell script to set location, tag, push (with safe.directory retry), install, restart, list
+                        ps = (
+                            "$ErrorActionPreference='SilentlyContinue'; Set-Location $env:USERPROFILE; "
+                            f"$log=\"{str(log_path)}\"; function W([string]$t){{ Add-Content -Path $log -Encoding UTF8 $t }}; "
+                            f"$repo=\"{str(repo)}\"; $tag=\"{tag}\"; $url=\"{remote_https}\"; "
+                            # Git tag and push
+                            "try { git -C $repo tag -a $tag -m $tag 2>&1 | Out-String | % { W($_) } } catch {}; "
+                            "try { git -C $repo push origin $tag 2>&1 | Out-String | % { W($_) } } catch {}; "
+                            # Dubious ownership recovery
+                            "if ((Get-Content $log) -match 'dubious ownership') { git config --global --add safe.directory $repo; git -C $repo push origin $tag 2>&1 | Out-String | % { W($_) } }; "
+                            # Install that tag with retry logic
+                            "$o=(espanso package install prompt-automation --git $url --git-branch $tag --external) 2>&1 | Out-String; W($o); "
+                            "if (($LASTEXITCODE -ne 0) -or ($o -match 'already installed' -or $o -match 'unable to install')) { "
+                            "  try { espanso package update prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  try { espanso package uninstall prompt-automation | Out-String | % { W($_) } } catch {}; "
+                            "  $o2=(espanso package install prompt-automation --git $url --git-branch $tag --external) 2>&1 | Out-String; W($o2); "
+                            "} "
+                            "espanso restart | Out-String | % { W($_) }; "
+                            "espanso package list | Out-String | % { W($_) }; "
+                            "W('DONE')"
+                        )
+                        cmd = [
+                            "powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+                            f"Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','{ps.replace("'","''")}' -Verb RunAs -Wait"
+                        ]
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run(cmd, timeout=150)
+                        try:
+                            log_text = _P(log_path).read_text(encoding='utf-8', errors='ignore')
+                        except Exception:
+                            log_text = buf_out.getvalue()
+                        low = log_text.lower()
+                        ok = ("package installed" in low or "already installed" in low) and (tag.lower() in low)
+                        header = f"Publish + Install Summary: {'OK' if ok else 'Issues'} | tag={tag}\n\n"
+                        log_text = header + log_text
+                    else:
+                        # Non-Windows fallback: do best-effort tagging + install via internal functions
+                        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+                            _esp._run(["git","-C",str(repo),"tag","-a",tag,"-m",tag])
+                            _esp._run(["git","-C",str(repo),"push","origin",tag])
+                            _esp._uninstall_package("prompt-automation")
+                            _esp._install_or_update("prompt-automation", remote_https, None, tag)
+                        ok = True
+                        log_text = f"Publish + Install Summary: OK | tag={tag}\n\n" + buf_out.getvalue()
+                except Exception as e:
+                    log_text = f"Publish + Install Summary: Exception: {e}\n\n" + buf_out.getvalue() + ("\n[stderr]\n" + buf_err.getvalue() if buf_err.getvalue() else "")
+                finally:
+                    try:
+                        root.after(0, _present_log_window, log_text, ok)
+                    except Exception:
+                        messagebox.showinfo("Espanso", log_text[:2000])
+            threading.Thread(target=_run, daemon=True).start()
+        except Exception as e:
+            _log.error("Publish + Install (admin) failed: %s", e)
+    esp_menu.add_command(label="Publish + Install (Admin)", command=_publish_and_install_admin)
+    opt.add_cascade(label="Espanso", menu=esp_menu)
 
     # Reset reference files (with confirmation + undo support)
     def _reset_refs():
