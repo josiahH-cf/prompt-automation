@@ -866,6 +866,95 @@ def configure_options_menu(
     esp_menu.add_command(label="Publish + Install (Admin)", command=_publish_and_install_admin)
     opt.add_cascade(label="Espanso", menu=esp_menu)
 
+    # Help menu with concise workflow and guide
+    help_menu = tk.Menu(new_menubar, tearoff=0)
+
+    def _open_remote_first_guide():  # pragma: no cover - GUI heavy
+        import tkinter as tk
+        from tkinter import scrolledtext, messagebox
+        try:
+            # Try to locate the local docs file from repo
+            from .. import espanso_sync as _esp
+            guide = None
+            try:
+                repo = _esp._find_repo_root(None)
+                p = repo / 'docs' / 'ESPANSO_REMOTE_FIRST.md'
+                if p.exists():
+                    guide = p
+            except Exception:
+                guide = None
+            content = None
+            if guide is not None:
+                try:
+                    content = guide.read_text(encoding='utf-8', errors='ignore')
+                except Exception:
+                    content = None
+            if content is None:
+                content = (
+                    "Remote-first guide not found locally.\n\n"
+                    "Summary:\n"
+                    "1) Options → Espanso → Set Default Repo URL… (HTTPS)\n"
+                    "2) Options → Espanso → Deep Clean + Sync (Windows)\n"
+                    "3) Verify via 'espanso package list'\n"
+                )
+            win = tk.Toplevel(root)
+            win.title("Remote-First Guide")
+            win.geometry("780x560")
+            txt = scrolledtext.ScrolledText(win, wrap='word')
+            txt.pack(fill='both', expand=True)
+            try:
+                txt.insert('1.0', content)
+                txt.configure(state='disabled')
+            except Exception:
+                pass
+            tk.Button(win, text=INFO_CLOSE_SAVE, command=win.destroy).pack(side='bottom')
+        except Exception as e:
+            try:
+                messagebox.showerror('Help', f'Unable to open guide: {e}')
+            except Exception:
+                pass
+
+    def _quick_sync_steps():  # pragma: no cover - GUI heavy
+        import tkinter as tk
+        from tkinter import messagebox
+        steps = (
+            "Quick Sync Workflow\n\n"
+            "1) Options → Espanso → Set Default Repo URL… (HTTPS)\n"
+            "2) Options → Espanso → Deep Clean + Sync (Windows)\n"
+            "3) Verify:\n"
+            "   - espanso package list\n"
+            "   - Should show 'prompt-automation' with your GitHub https URL\n"
+            "   - No user match files except disabled.yml under %APPDATA%\\espanso\\match\n\n"
+            "Tip: Use Install from Tag/Branch/URL to bypass Releases when needed."
+        )
+        try:
+            win = tk.Toplevel(root)
+            win.title('Quick Sync')
+            win.geometry('560x360')
+            txt = tk.Text(win, wrap='word')
+            txt.pack(fill='both', expand=True)
+            try:
+                txt.insert('1.0', steps)
+                txt.configure(state='disabled')
+            except Exception:
+                pass
+            def _copy():
+                try:
+                    root.clipboard_clear(); root.clipboard_append(steps)
+                except Exception: pass
+            bar = tk.Frame(win); bar.pack(fill='x')
+            tk.Button(bar, text='Copy', command=_copy).pack(side='left')
+            tk.Button(bar, text=INFO_CLOSE_SAVE, command=win.destroy).pack(side='right')
+        except Exception:
+            try:
+                messagebox.showinfo('Quick Sync', steps)
+            except Exception:
+                pass
+
+    help_menu.add_command(label='Quick Sync Steps', command=_quick_sync_steps)
+    help_menu.add_command(label='Open Remote-First Guide', command=_open_remote_first_guide)
+    new_menubar.add_cascade(label='Help', menu=help_menu)
+
     # Reset reference files (with confirmation + undo support)
     def _reset_refs():
         try:

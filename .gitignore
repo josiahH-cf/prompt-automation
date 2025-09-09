@@ -37,3 +37,6 @@ desktop.ini
 
 # Remove accidentally added binary assets
 espanso.deb
+
+# Local troubleshooting notes (do not commit)
+troubleshooting/
