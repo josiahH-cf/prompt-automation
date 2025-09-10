@@ -123,16 +123,27 @@ info "Project root directory: $PROJECT_ROOT"
 # record default hotkey mapping and enable GUI + auto updates
 HOTKEY_CFG_DIR="$HOME/.prompt-automation"
 mkdir -p "$HOTKEY_CFG_DIR"
-echo '{"hotkey": "ctrl+shift+j"}' > "$HOTKEY_CFG_DIR/hotkey.json"
+
+HOTKEY_FILE="$HOTKEY_CFG_DIR/hotkey.json"
+if [ -f "$HOTKEY_FILE" ]; then
+    info "Preserving existing hotkey config at $HOTKEY_FILE"
+else
+    echo '{"hotkey": "ctrl+shift+j"}' > "$HOTKEY_FILE"
+fi
+
 ENV_FILE="$HOTKEY_CFG_DIR/environment"
-{
-    echo 'PROMPT_AUTOMATION_GUI=1'
-    echo 'PROMPT_AUTOMATION_AUTO_UPDATE=1'
-    echo 'PROMPT_AUTOMATION_MANIFEST_AUTO=1'
-    # Enable espanso sync orchestration to find this repo root
-    echo "PROMPT_AUTOMATION_REPO=$PROJECT_ROOT"
-} > "$ENV_FILE"
-info "Wrote environment defaults to $ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
+    info "Preserving existing environment config at $ENV_FILE"
+else
+    {
+        echo 'PROMPT_AUTOMATION_GUI=1'
+        echo 'PROMPT_AUTOMATION_AUTO_UPDATE=1'
+        echo 'PROMPT_AUTOMATION_MANIFEST_AUTO=1'
+        # Enable espanso sync orchestration to find this repo root
+        echo "PROMPT_AUTOMATION_REPO=$PROJECT_ROOT"
+    } > "$ENV_FILE"
+    info "Wrote environment defaults to $ENV_FILE"
+fi
 
 # Install prompt-automation via pipx
 info "Installing prompt-automation..."
