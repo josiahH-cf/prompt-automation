@@ -10,9 +10,13 @@ if TYPE_CHECKING:  # pragma: no cover - import for type checking only
     from ..cli.controller import UninstallOptions
 
 
-def run_uninstall(options: "UninstallOptions") -> None:
-    """Entry point for the uninstall routine."""
-    run(options)
+def run_uninstall(options: "UninstallOptions") -> int:
+    """Entry point for the uninstall routine.
+
+    Returns the exit code from :func:`executor.run`.
+    """
+    code, _ = run(options)
+    return code
 
 
 __all__ = ["run_uninstall"]

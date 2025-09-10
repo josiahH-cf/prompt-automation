@@ -254,8 +254,7 @@ class PromptCLI:
                 json=args.json,
                 platform=args.platform,
             )
-            run_uninstall(options)
-            return
+            return run_uninstall(options)
 
         if args.version:
             try:
