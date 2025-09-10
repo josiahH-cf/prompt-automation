@@ -111,6 +111,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
         "skipped": [],
         "errors": [],
         "partial": False,
+        "pending": [],
     }
     privileged = True
     if os.name != "nt":
@@ -120,6 +121,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
             privileged = False
 
     removal_failed = False
+    pending_paths: list[Path] = []
     backup_root: Path | None = None
     repo_backup_root: Path | None = None
 
@@ -133,6 +135,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                 if art.requires_privilege and not privileged:
                     status = "needs-privilege"
                     removal_failed = True
+                    pending_paths.append(art.path)
                     msg = f"{art.id} requires elevated privileges"
                     _log.warning(msg)
                     print(f"[prompt-automation] Warning: {msg}")
@@ -228,6 +231,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
             elif status in ("failed", "needs-privilege", "permission-denied"):
                 results["errors"].append(entry)
 
+    results["pending"] = [str(p) for p in pending_paths]
     results["partial"] = removal_failed
 
     removed_count = len(results["removed"])
@@ -258,6 +262,8 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
         )
         if options.dry_run:
             print("DRY RUN: no changes made.")
+        if pending_paths and not privileged and options.print_elevated_script:
+            _print_elevated_script(pending_paths, platform)
 
     _log.info(
         "summary removed=%d skipped=%d errors=%d",
@@ -306,3 +312,14 @@ def _remove(artifact: Artifact) -> bool:
         raise
     except Exception:
         return False
+
+
+def _print_elevated_script(paths: list[Path], platform: str) -> None:
+    """Emit a script that removes the provided paths with elevated privileges."""
+    if platform.startswith("win"):
+        for p in paths:
+            print(f'Remove-Item -Recurse -Force "{p}"')
+    else:
+        print("#!/bin/sh")
+        for p in paths:
+            print(f"rm -rf '{p}'")

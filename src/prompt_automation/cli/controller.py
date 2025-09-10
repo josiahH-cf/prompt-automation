@@ -51,6 +51,7 @@ class UninstallOptions:
     platform: str | None = None
     remove_orphans: bool = False
     confirm_orphans: bool = False
+    print_elevated_script: bool = False
 
 
 class PromptCLI:
@@ -250,6 +251,11 @@ class PromptCLI:
         uninstall.add_argument("--json", action="store_true", help="Emit JSON output")
         uninstall.add_argument("--platform", help="Target platform override")
         uninstall.add_argument(
+            "--print-elevated-script",
+            action="store_true",
+            help="Emit a script to remove artifacts requiring elevated privileges",
+        )
+        uninstall.add_argument(
             "--remove-orphans",
             action="store_true",
             help="Remove orphan prompt-automation executables",
@@ -280,6 +286,7 @@ class PromptCLI:
                 platform=args.platform,
                 remove_orphans=args.remove_orphans,
                 confirm_orphans=args.confirm_orphans,
+                print_elevated_script=args.print_elevated_script,
             )
             return run_uninstall(options)
 

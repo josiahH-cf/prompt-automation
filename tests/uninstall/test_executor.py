@@ -115,7 +115,7 @@ def test_idempotent_runs(monkeypatch, tmp_path):
 
     code2, results2 = executor.run(options)
     assert code2 == 0
-    assert results2 == {"removed": [], "skipped": [], "errors": [], "partial": False}
+    assert results2 == {"removed": [], "skipped": [], "errors": [], "partial": False, "pending": []}
 
 
 def test_json_output(monkeypatch, tmp_path, capsys):
