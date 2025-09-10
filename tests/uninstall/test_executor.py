@@ -128,3 +128,48 @@ def test_json_output(monkeypatch, tmp_path, capsys):
     assert data == results
     assert data["removed"][0]["path"] == str(art.path)
     assert data["removed"][0]["status"] == "planned"
+
+
+def test_backup_created(monkeypatch, tmp_path):
+    art = Artifact("dummy", "file", tmp_path / "dummy.txt", purge_candidate=True)
+    art.path.write_text("payload")
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    options = UninstallOptions(force=True, purge_data=True)
+    code, results = executor.run(options)
+    assert code == 0
+    backup = results["removed"][0]["backup"]
+    assert backup is not None
+    bak_path = Path(backup)
+    assert "prompt-automation.backup" in bak_path.parent.name
+    assert bak_path.read_text() == "payload"
+
+
+def test_no_backup_flag(monkeypatch, tmp_path):
+    art = Artifact("dummy", "file", tmp_path / "dummy.txt", purge_candidate=True)
+    art.path.write_text("payload")
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    options = UninstallOptions(force=True, purge_data=True, no_backup=True)
+    code, results = executor.run(options)
+    assert code == 0
+    assert results["removed"][0]["backup"] is None
+
+
+def test_permission_denied(monkeypatch, tmp_path, capsys):
+    art = Artifact("dummy", "file", tmp_path / "dummy.txt", purge_candidate=True)
+    art.path.write_text("payload")
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    def deny_remove(_artifact):
+        raise PermissionError
+
+    monkeypatch.setattr(executor, "_remove", deny_remove)
+    options = UninstallOptions(force=True, purge_data=True)
+    code, results = executor.run(options)
+    captured = capsys.readouterr().out
+    assert "insufficient permissions" in captured
+    assert results["errors"][0]["status"] == "permission-denied"
+    assert art.path.exists()
+    assert code == 2
