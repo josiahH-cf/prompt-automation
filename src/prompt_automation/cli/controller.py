@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 from dataclasses import dataclass
 
-from ..uninstall import run_uninstall
 
 from .. import logger, paste, update as manifest_update, updater
 from ..menus import (
@@ -251,9 +250,11 @@ class PromptCLI:
         args = parser.parse_args(argv)
 
         if args.command == "uninstall":
-            if os.environ.get("UNINSTALL_FEATURE_FLAG") != "1":
+            if os.environ.get("UNINSTALL_FEATURE_FLAG", "1") == "0":
                 print("[prompt-automation] Uninstall feature disabled. Set UNINSTALL_FEATURE_FLAG=1 to enable.")
-                return
+                return 1
+            from ..uninstall import run_uninstall
+
             options = UninstallOptions(
                 all=args.all,
                 dry_run=args.dry_run,
