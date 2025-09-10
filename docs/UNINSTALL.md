@@ -1,15 +1,19 @@
 # Uninstall
 
 The uninstaller removes Prompt Automation and related artifacts. It is
-currently gated behind the `UNINSTALL_FEATURE_FLAG` environment variable.
+enabled by default but can be disabled by setting the
+`UNINSTALL_FEATURE_FLAG` environment variable to ``0``. When disabled, any
+import of the uninstall module or CLI invocation of ``uninstall`` prints a
+message and exits with code ``1``.
 
 ## Usage
 
 ```bash
-UNINSTALL_FEATURE_FLAG=1 prompt-automation uninstall [options]
+prompt-automation uninstall [options]
 ```
 
-The command also accepts the alias `remove`.
+The command also accepts the alias `remove`. To explicitly disable the
+command, run with ``UNINSTALL_FEATURE_FLAG=0``.
 
 ## Options
 

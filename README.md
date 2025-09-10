@@ -134,11 +134,11 @@ Run tests as a baseline: `pytest -q`.
 
 ### Uninstall
 
-The CLI provides an experimental uninstaller. Enable it with
-`UNINSTALL_FEATURE_FLAG=1` and run:
+The CLI provides an uninstaller that is enabled by default. To disable it,
+set `UNINSTALL_FEATURE_FLAG=0` before invoking the command:
 
 ```bash
-UNINSTALL_FEATURE_FLAG=1 prompt-automation uninstall --dry-run
+UNINSTALL_FEATURE_FLAG=0 prompt-automation uninstall
 ```
 
 Add flags like `--all` to remove every detected component or `--purge-data`
