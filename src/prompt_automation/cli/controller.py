@@ -228,7 +228,16 @@ class PromptCLI:
             help="Print reminders for a selected template and exit (no prompting)",
         )
         sub = parser.add_subparsers(dest="command")
-        uninstall = sub.add_parser("uninstall", aliases=["remove"], help="Uninstall Prompt Automation")
+        uninstall = sub.add_parser(
+            "uninstall",
+            aliases=["remove"],
+            help="Uninstall Prompt Automation",
+            description=(
+                "Remove the application and optional user data. "
+                "Requires UNINSTALL_FEATURE_FLAG=1. "
+                "Exit codes: 0 success, 1 invalid options, 2 removal failure."
+            ),
+        )
         uninstall.add_argument("--all", action="store_true", help="Remove all components")
         uninstall.add_argument("--dry-run", action="store_true", help="Preview actions without executing")
         uninstall.add_argument("--force", action="store_true", help="Force removal even if in use")

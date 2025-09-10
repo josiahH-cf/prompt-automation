@@ -132,6 +132,19 @@ Hotkey repair/verification: `prompt-automation --hotkey-repair` (re-writes AHK/E
 
 Run tests as a baseline: `pytest -q`.
 
+### Uninstall
+
+The CLI provides an experimental uninstaller. Enable it with
+`UNINSTALL_FEATURE_FLAG=1` and run:
+
+```bash
+UNINSTALL_FEATURE_FLAG=1 prompt-automation uninstall --dry-run
+```
+
+Add flags like `--all` to remove every detected component or `--purge-data`
+to delete configuration and cache files. See `docs/UNINSTALL.md` for the full
+flag list, behavior notes, and exit codes.
+
 ### Espanso Package (Snippets)
 
 Install the versioned Espanso package from this repo to get team-wide text expansions:
