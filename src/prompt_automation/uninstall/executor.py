@@ -24,13 +24,15 @@ _DEF_DETECTORS: Iterable = (
 )
 
 
-def run(options: "UninstallOptions") -> tuple[int, list[dict[str, object]]]:
+def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     """Run the uninstall routine using provided options.
 
-    Returns a tuple ``(exit_code, results)`` where ``results`` is a list of
-    dictionaries describing each processed artifact.  ``exit_code`` follows the
-    convention used by the CLI: ``0`` for success, ``1`` for invalid options and
-    ``2`` when a removal operation failed.
+    Returns a tuple ``(exit_code, results)`` where ``results`` is a dictionary
+    grouping processed artifacts into ``removed``, ``skipped`` and ``errors``.
+    ``exit_code`` follows the convention used by the CLI: ``0`` for success,
+    ``1`` for invalid options and ``2`` when a removal operation failed.
+    ``results`` also contains a ``partial`` flag indicating whether any
+    artifacts were skipped or failed.
     """
 
     if options.purge_data and options.keep_user_data:
@@ -49,7 +51,12 @@ def run(options: "UninstallOptions") -> tuple[int, list[dict[str, object]]]:
     if options.keep_user_data or not options.purge_data:
         artifacts = [a for a in artifacts if not a.purge_candidate]
 
-    results: list[dict[str, object]] = []
+    results: dict[str, object] = {
+        "removed": [],
+        "skipped": [],
+        "errors": [],
+        "partial": False,
+    }
     privileged = True
     if os.name != "nt":
         try:
@@ -87,21 +94,46 @@ def run(options: "UninstallOptions") -> tuple[int, list[dict[str, object]]]:
                 else:
                     status = "skipped"
                     removal_failed = True
-        results.append(
-            {
-                "id": art.id,
-                "kind": art.kind,
-                "path": str(art.path),
-                "status": status,
-                "backup": str(backup_path) if backup_path else None,
-            }
-        )
+        entry = {
+            "id": art.id,
+            "kind": art.kind,
+            "path": str(art.path),
+            "status": status,
+            "backup": str(backup_path) if backup_path else None,
+        }
+        if status in ("removed", "planned"):
+            results["removed"].append(entry)
+        elif status == "skipped":
+            results["skipped"].append(entry)
+        elif status in ("failed", "needs-privilege"):
+            results["errors"].append(entry)
+
+    results["partial"] = removal_failed
 
     if options.json:
         print(json.dumps(results, indent=2))
     else:
-        for r in results:
-            print(f"{r['kind']:20} {r['path']} -> {r['status']}")
+        rows: list[tuple[str, str]] = []
+        for r in results["removed"]:
+            label = "would remove" if r["status"] == "planned" else "removed"
+            rows.append((label, r["path"]))
+        for r in results["skipped"]:
+            rows.append(("skipped", r["path"]))
+        for r in results["errors"]:
+            rows.append((r["status"], r["path"]))
+        if rows:
+            width = max(len(a) for a, _ in rows) + 2
+            print(f"{'Action':{width}}Path")
+            for act, path in rows:
+                print(f"{act:{width}}{path}")
+        else:
+            print("No artifacts to process.")
+        print(
+            f"\nSummary: removed={len(results['removed'])} "
+            f"skipped={len(results['skipped'])} errors={len(results['errors'])}"
+        )
+        if options.dry_run:
+            print("DRY RUN: no changes made.")
 
     return (2 if removal_failed else 0), results
 
