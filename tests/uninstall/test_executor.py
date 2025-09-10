@@ -173,3 +173,34 @@ def test_permission_denied(monkeypatch, tmp_path, capsys):
     assert results["errors"][0]["status"] == "permission-denied"
     assert art.path.exists()
     assert code == 2
+
+
+def test_exit_code_success(monkeypatch, tmp_path):
+    art = _make_artifact(tmp_path)
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+    options = UninstallOptions(force=True)
+    code = run_uninstall(options)
+    assert code == 0
+
+
+def test_exit_code_partial(monkeypatch, tmp_path):
+    art = _make_artifact(tmp_path)
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+
+    def failing_remove(_artifact: Artifact) -> bool:
+        return False
+
+    monkeypatch.setattr(executor, "_remove", failing_remove)
+    options = UninstallOptions(force=True)
+    code = run_uninstall(options)
+    assert code == 2
+
+
+def test_exit_code_unexpected_exception(monkeypatch):
+    def boom(_options):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("prompt_automation.uninstall.run", boom)
+    options = UninstallOptions()
+    code = run_uninstall(options)
+    assert code > 2

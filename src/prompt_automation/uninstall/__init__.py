@@ -13,10 +13,14 @@ if TYPE_CHECKING:  # pragma: no cover - import for type checking only
 def run_uninstall(options: "UninstallOptions") -> int:
     """Entry point for the uninstall routine.
 
-    Returns the exit code from :func:`executor.run`.
+    Returns the exit code from :func:`executor.run`. Any unexpected
+    exception results in an exit code greater than ``2``.
     """
-    code, _ = run(options)
-    return code
+    try:
+        code, _ = run(options)
+        return code
+    except Exception:
+        return 3
 
 
 __all__ = ["run_uninstall"]
