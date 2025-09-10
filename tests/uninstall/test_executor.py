@@ -26,6 +26,7 @@ import json
 @pytest.fixture(autouse=True)
 def clear_detectors(monkeypatch):
     monkeypatch.setattr(executor, "_DEF_DETECTORS", [])
+    monkeypatch.setattr(executor, "_OPT_DETECTORS", [])
 
 
 def _make_artifact(tmp_path: Path) -> Artifact:

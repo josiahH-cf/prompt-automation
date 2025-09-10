@@ -16,9 +16,15 @@ from . import detectors, multi_python
 from ..errorlog import get_logger
 
 
+# Detectors used for core uninstall operations. Optional detectors that remove
+# ancillary artifacts are enabled when the ``--all`` flag is provided.
 _DEF_DETECTORS: Iterable = (
     detectors.detect_pip_install,
     detectors.detect_editable_repo,
+)
+
+# Extended detector set enabled by ``--all``.
+_OPT_DETECTORS: Iterable = (
     detectors.detect_espanso_package,
     detectors.detect_systemd_units,
     detectors.detect_desktop_entries,
@@ -75,7 +81,10 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     _log.debug("starting uninstall on platform=%s", platform)
     artifacts: list[Artifact] = []
     if not arg_error:
-        for func in _DEF_DETECTORS:
+        detector_funcs = list(_DEF_DETECTORS)
+        if options.all:
+            detector_funcs.extend(_OPT_DETECTORS)
+        for func in detector_funcs:
             try:
                 detected = func(platform)
                 artifacts.extend(detected)
