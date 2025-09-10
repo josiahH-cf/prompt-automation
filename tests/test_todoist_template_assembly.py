@@ -23,7 +23,9 @@ def test_summary_and_note_omissions():
     assert n is None
 
 
-def test_post_action_disabled_by_default(monkeypatch):
+def test_post_action_disabled_by_default(monkeypatch, tmp_path):
+    # Ensure packaged Settings/settings.json doesn't flip the default on
+    monkeypatch.setenv("PROMPT_AUTOMATION_PROMPTS", str(tmp_path))
     monkeypatch.delenv("SEND_TODOIST_AFTER_RENDER", raising=False)
     ok, msg = send_to_todoist("Task", None)
     assert ok and msg == "disabled"

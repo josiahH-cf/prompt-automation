@@ -35,6 +35,14 @@ Behavior:
 - `espanso status` → “espanso is running”.
 - Test any trigger (e.g., `:espanso`, `:ntsk`) once — only one entry should appear.
 
+### Safety default: backspace-undo disabled
+
+Prompt‑Automation automatically sets `undo_backspace: false` so a stray Backspace after an expansion won’t delete a bunch of text.
+
+- To verify: run `espanso path` and open the printed `config/default.yml` path.
+- Ensure it contains: `undo_backspace: false`.
+- To re‑enable: change it to `true` and restart Espanso.
+
 ## Notes
 
 - The GUI “Sync Espanso?” and CLI discover your repo via `Settings/settings.json` key `espanso_repo_root` (seeded by the installers) or `~/.prompt-automation/environment` (`PROMPT_AUTOMATION_REPO`). No manual edits are required after install.

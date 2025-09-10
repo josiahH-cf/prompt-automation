@@ -89,6 +89,9 @@ def send_to_todoist(summary: str, note: Optional[str]) -> Tuple[bool, str]:
       - NTSK_DISABLE: kill-switch honored by the script
       - TODOIST_TOKEN_ENV: optional override of token env var name
     """
+    # In dev/test runs, default to disabled unless explicitly enabled via env
+    if os.environ.get("PROMPT_AUTOMATION_DEV") == "1" and os.environ.get("SEND_TODOIST_AFTER_RENDER") is None:
+        return True, "disabled"
     # Gate by env first; if off, also check user setting key 'send_todoist_after_render'
     if not (_bool_env("SEND_TODOIST_AFTER_RENDER", default=False) or get_boolean_setting("send_todoist_after_render", False)):
         return True, "disabled"
