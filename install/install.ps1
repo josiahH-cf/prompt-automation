@@ -46,18 +46,31 @@ Info "Starting prompt-automation installation..."
 # Record default hotkey mapping and enable GUI mode
 $cfgDir = Join-Path $env:USERPROFILE '.prompt-automation'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
-'{"hotkey": "ctrl+shift+j"}' | Set-Content (Join-Path $cfgDir 'hotkey.json')
+
+$hotkeyFile = Join-Path $cfgDir 'hotkey.json'
+if (-not (Test-Path $hotkeyFile)) {
+    '{"hotkey": "ctrl+shift+j"}' | Set-Content $hotkeyFile
+    Info "Default hotkey config written"
+} else {
+    Info "Preserving existing hotkey config at $hotkeyFile"
+}
+
+$envFile = Join-Path $cfgDir 'environment'
+if (-not (Test-Path $envFile)) {
 @'
 PROMPT_AUTOMATION_GUI=1
 PROMPT_AUTOMATION_AUTO_UPDATE=1
 PROMPT_AUTOMATION_MANIFEST_AUTO=1
-'@ | Set-Content (Join-Path $cfgDir 'environment')
-Info 'Environment defaults written (GUI + auto-update enabled)'
+'@ | Set-Content $envFile
+    Info 'Environment defaults written (GUI + auto-update enabled)'
+} else {
+    Info "Preserving existing environment config at $envFile"
+}
 
 # Add repo root hint for espanso sync orchestrator
 try {
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-    Add-Content -Path (Join-Path $cfgDir 'environment') -Value "PROMPT_AUTOMATION_REPO=$projectRoot"
+    Add-Content -Path $envFile -Value "PROMPT_AUTOMATION_REPO=$projectRoot"
     Info "Recorded PROMPT_AUTOMATION_REPO in environment file"
 } catch {
     Write-Warning "Could not record PROMPT_AUTOMATION_REPO: $($_.Exception.Message)"
