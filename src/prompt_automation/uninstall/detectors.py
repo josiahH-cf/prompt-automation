@@ -5,10 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import os
+import subprocess
 import importlib.metadata
 import site
+import json
 
 from .artifacts import Artifact
+from . import multi_python
 
 
 def _platform_value(platform: str | None) -> str:
@@ -16,19 +19,47 @@ def _platform_value(platform: str | None) -> str:
 
 
 def detect_pip_install(platform: str | None = None) -> list[Artifact]:
-    """Detect package installation location via ``pip``."""
+    """Detect package installation location via ``pip`` across interpreters."""
+
     _platform_value(platform)  # placeholder to satisfy signature
     artifacts: list[Artifact] = []
-    try:
-        dist = importlib.metadata.distribution("prompt-automation")
-        location = Path(dist.locate_file(""))
+
+    for interpreter in multi_python.enumerate_pythons():
+        script = (
+            "import importlib.metadata, json, sys, site, pathlib;"
+            "dist=importlib.metadata.distribution('prompt-automation');"
+            "p=pathlib.Path(dist.locate_file(''));"
+            "try:\n"
+            "    requires_priv=p.is_relative_to(pathlib.Path(sys.prefix)) and not p.is_relative_to(pathlib.Path(site.USER_SITE))\n"
+            "except Exception:\n"
+            "    requires_priv=str(p).startswith(sys.prefix) and not str(p).startswith(site.USER_SITE)\n"
+            "print(json.dumps({'location': str(p), 'requires_priv': requires_priv}))"
+        )
         try:
-            requires_priv = location.is_relative_to(Path(sys.prefix)) and not location.is_relative_to(Path(site.USER_SITE))
+            proc = subprocess.run(
+                [str(interpreter), "-c", script],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode != 0:
+                continue
+            data = proc.stdout.strip()
+            if not data:
+                continue
+            info = json.loads(data)
+            location = Path(info["location"])
+            requires_priv = bool(info.get("requires_priv"))
+            artifacts.append(
+                Artifact(
+                    "pip-install",
+                    "pip",
+                    location,
+                    requires_privilege=requires_priv,
+                    interpreter=Path(interpreter),
+                )
+            )
         except Exception:
-            requires_priv = str(location).startswith(sys.prefix) and not str(location).startswith(site.USER_SITE)
-        artifacts.append(Artifact("pip-install", "pip", location, requires_privilege=requires_priv))
-    except importlib.metadata.PackageNotFoundError:
-        pass
+            continue
     return [a for a in artifacts if a.present()]
 
 
