@@ -12,7 +12,7 @@ from typing import Iterable
 from datetime import datetime
 
 from .artifacts import Artifact
-from . import detectors, multi_python
+from . import detectors, multi_python, orphan
 from ..errorlog import get_logger
 
 
@@ -98,6 +98,14 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
         if options.keep_user_data or not options.purge_data:
             artifacts = [a for a in artifacts if not a.purge_candidate]
 
+        if options.confirm_orphans or options.remove_orphans:
+            try:
+                orphan_arts = orphan.detect_orphans(platform)
+                artifacts.extend(orphan_arts)
+                _log.debug("orphan detector found %d artifacts", len(orphan_arts))
+            except Exception:
+                _log.debug("orphan detector failed")
+
     results: dict[str, object] = {
         "removed": [],
         "skipped": [],
@@ -133,7 +141,20 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                     _log.debug("would remove %s", art.id)
                 else:
                     proceed = True
-                    if not options.force and not options.non_interactive:
+                    if art.kind == "orphan":
+                        if not (
+                            options.force
+                            or options.non_interactive
+                            or options.remove_orphans
+                        ):
+                            try:
+                                resp = input(
+                                    f"Remove orphan {safe}? [y/N]: "
+                                ).strip().lower()
+                            except EOFError:
+                                resp = "n"
+                            proceed = resp in ("y", "yes")
+                    elif not options.force and not options.non_interactive:
                         try:
                             resp = input(f"Remove {safe}? [y/N]: ").strip().lower()
                         except EOFError:
