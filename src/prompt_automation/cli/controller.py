@@ -49,6 +49,8 @@ class UninstallOptions:
     verbose: bool = False
     json: bool = False
     platform: str | None = None
+    remove_orphans: bool = False
+    confirm_orphans: bool = False
 
 
 class PromptCLI:
@@ -247,6 +249,16 @@ class PromptCLI:
         uninstall.add_argument("--verbose", action="store_true", help="Increase output verbosity")
         uninstall.add_argument("--json", action="store_true", help="Emit JSON output")
         uninstall.add_argument("--platform", help="Target platform override")
+        uninstall.add_argument(
+            "--remove-orphans",
+            action="store_true",
+            help="Remove orphan prompt-automation executables",
+        )
+        uninstall.add_argument(
+            "--confirm-orphans",
+            action="store_true",
+            help="Prompt before removing orphan executables",
+        )
         args = parser.parse_args(argv)
 
         if args.command == "uninstall":
@@ -266,6 +278,8 @@ class PromptCLI:
                 verbose=args.verbose,
                 json=args.json,
                 platform=args.platform,
+                remove_orphans=args.remove_orphans,
+                confirm_orphans=args.confirm_orphans,
             )
             return run_uninstall(options)
 
