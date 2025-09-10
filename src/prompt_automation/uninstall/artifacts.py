@@ -16,6 +16,7 @@ class Artifact:
     requires_privilege: bool = False
     purge_candidate: bool = False
     repo_protected: bool = False
+    interpreter: Path | None = None
 
     def present(self) -> bool:
         """Return ``True`` if the artifact exists on disk."""

@@ -12,7 +12,7 @@ from typing import Iterable
 from datetime import datetime
 
 from .artifacts import Artifact
-from . import detectors
+from . import detectors, multi_python
 from ..errorlog import get_logger
 
 
@@ -189,6 +189,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                 "path": str(art.path),
                 "status": status,
                 "backup": str(backup_path) if backup_path else None,
+                "interpreter": str(art.interpreter) if getattr(art, "interpreter", None) else None,
             }
             if status in ("removed", "planned"):
                 results["removed"].append(entry)
@@ -256,12 +257,12 @@ def _backup(artifact: Artifact, root: Path) -> Path | None:
 
 
 def _remove(artifact: Artifact) -> bool:
-    """Remove the artifact from the filesystem.
+    """Remove the artifact from the filesystem or via interpreter pip."""
 
-    Returns ``True`` if the artifact was removed successfully or already
-    absent.  ``False`` is returned when a failure occurred.
-    """
     try:
+        if artifact.kind == "pip" and artifact.interpreter is not None:
+            success, _output = multi_python.uninstall(artifact.interpreter)
+            return success
         if artifact.path.is_dir():
             if getattr(artifact, "repo_protected", False):
                 return True
