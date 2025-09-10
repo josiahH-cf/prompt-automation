@@ -11,6 +11,9 @@ import os
 import platform
 from pathlib import Path
 from typing import Any
+from dataclasses import dataclass
+
+from ..uninstall import run_uninstall
 
 from .. import logger, paste, update as manifest_update, updater
 from ..menus import (
@@ -31,6 +34,21 @@ from .template_select import select_template_cli, pick_prompt_cli
 from .render import render_template_cli
 from ..gui.file_append import _append_to_files
 from .update import perform_update
+
+
+@dataclass
+class UninstallOptions:
+    """Options controlling the uninstall routine."""
+
+    all: bool = False
+    dry_run: bool = False
+    force: bool = False
+    purge_data: bool = False
+    keep_user_data: bool = False
+    non_interactive: bool = False
+    verbose: bool = False
+    json: bool = False
+    platform: str | None = None
 
 
 class PromptCLI:
@@ -208,7 +226,36 @@ class PromptCLI:
             action="store_true",
             help="Print reminders for a selected template and exit (no prompting)",
         )
+        sub = parser.add_subparsers(dest="command")
+        uninstall = sub.add_parser("uninstall", aliases=["remove"], help="Uninstall Prompt Automation")
+        uninstall.add_argument("--all", action="store_true", help="Remove all components")
+        uninstall.add_argument("--dry-run", action="store_true", help="Preview actions without executing")
+        uninstall.add_argument("--force", action="store_true", help="Force removal even if in use")
+        uninstall.add_argument("--purge-data", action="store_true", help="Delete all associated data")
+        uninstall.add_argument("--keep-user-data", action="store_true", help="Preserve user data only")
+        uninstall.add_argument("--non-interactive", action="store_true", help="Run without prompts")
+        uninstall.add_argument("--verbose", action="store_true", help="Increase output verbosity")
+        uninstall.add_argument("--json", action="store_true", help="Emit JSON output")
+        uninstall.add_argument("--platform", help="Target platform override")
         args = parser.parse_args(argv)
+
+        if args.command == "uninstall":
+            if os.environ.get("UNINSTALL_FEATURE_FLAG") != "1":
+                print("[prompt-automation] Uninstall feature disabled. Set UNINSTALL_FEATURE_FLAG=1 to enable.")
+                return
+            options = UninstallOptions(
+                all=args.all,
+                dry_run=args.dry_run,
+                force=args.force,
+                purge_data=args.purge_data,
+                keep_user_data=args.keep_user_data,
+                non_interactive=args.non_interactive,
+                verbose=args.verbose,
+                json=args.json,
+                platform=args.platform,
+            )
+            run_uninstall(options)
+            return
 
         if args.version:
             try:
