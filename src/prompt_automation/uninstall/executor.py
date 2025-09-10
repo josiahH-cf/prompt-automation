@@ -104,6 +104,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
 
     removal_failed = False
     backup_root: Path | None = None
+    repo_backup_root: Path | None = None
 
     if not arg_error:
         for art in artifacts:
@@ -130,20 +131,35 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                             resp = "n"
                         proceed = resp in ("y", "yes")
                     if proceed:
-                        if options.purge_data and art.purge_candidate and not options.no_backup:
-                            if backup_root is None:
-                                ts = datetime.now().strftime("%Y%m%d%H%M%S")
-                                backup_root = Path.home() / ".config" / f"prompt-automation.backup.{ts}"
-                            try:
-                                backup_root.mkdir(parents=True, exist_ok=True)
-                                backup_path = _backup(art, backup_root)
-                            except PermissionError:
-                                msg = "insufficient permissions to back up artifact"
-                                _log.warning("%s: %s", msg, art.id)
-                                print(f"[prompt-automation] Warning: {msg}")
-                                status = "permission-denied"
-                                removal_failed = True
-                                proceed = False
+                        if not options.no_backup:
+                            if art.repo_protected:
+                                if repo_backup_root is None:
+                                    ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                                    repo_backup_root = Path.home() / ".config" / f"prompt-automation.repo-backup.{ts}"
+                                try:
+                                    repo_backup_root.mkdir(parents=True, exist_ok=True)
+                                    backup_path = _backup(art, repo_backup_root)
+                                except PermissionError:
+                                    msg = "insufficient permissions to back up artifact"
+                                    _log.warning("%s: %s", msg, art.id)
+                                    print(f"[prompt-automation] Warning: {msg}")
+                                    status = "permission-denied"
+                                    removal_failed = True
+                                    proceed = False
+                            elif options.purge_data and art.purge_candidate:
+                                if backup_root is None:
+                                    ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                                    backup_root = Path.home() / ".config" / f"prompt-automation.backup.{ts}"
+                                try:
+                                    backup_root.mkdir(parents=True, exist_ok=True)
+                                    backup_path = _backup(art, backup_root)
+                                except PermissionError:
+                                    msg = "insufficient permissions to back up artifact"
+                                    _log.warning("%s: %s", msg, art.id)
+                                    print(f"[prompt-automation] Warning: {msg}")
+                                    status = "permission-denied"
+                                    removal_failed = True
+                                    proceed = False
                         if proceed:
                             try:
                                 success = _remove(art)
@@ -247,6 +263,8 @@ def _remove(artifact: Artifact) -> bool:
     """
     try:
         if artifact.path.is_dir():
+            if getattr(artifact, "repo_protected", False):
+                return True
             shutil.rmtree(artifact.path)
         else:
             artifact.path.unlink()

@@ -33,11 +33,34 @@ def detect_pip_install(platform: str | None = None) -> list[Artifact]:
 
 
 def detect_editable_repo(platform: str | None = None) -> list[Artifact]:
-    """Detect if running from an editable repository checkout."""
-    repo_root = Path(__file__).resolve().parents[2]
-    if (repo_root / ".git").exists():
-        return [Artifact("editable-repo", "repo", repo_root)]
-    return []
+    """Detect editable install metadata without targeting the repo itself."""
+
+    arts: list[Artifact] = []
+    repo_root = Path(__file__).resolve().parents[3]
+    if not (repo_root / ".git").exists():
+        return arts
+
+    candidates: list[Path] = []
+    for p_str in sys.path:
+        base = Path(p_str)
+        # Pip may use either hyphen or underscore naming conventions
+        candidates.append(base / "prompt_automation.egg-link")
+        candidates.append(base / "prompt-automation.egg-link")
+        for info_dir in ["prompt_automation.egg-info", "prompt_automation.dist-info"]:
+            candidates.append(base / info_dir / "entry_points.txt")
+
+    for path in candidates:
+        if path.exists():
+            arts.append(
+                Artifact(
+                    "editable-metadata",
+                    "repo",
+                    path,
+                    repo_protected=True,
+                )
+            )
+
+    return arts
 
 
 def detect_espanso_package(platform: str | None = None) -> list[Artifact]:
