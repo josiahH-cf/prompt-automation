@@ -20,6 +20,7 @@ if str(_src) not in sys.path:
 from prompt_automation.cli.controller import UninstallOptions
 from prompt_automation.uninstall import executor, run_uninstall
 from prompt_automation.uninstall.artifacts import Artifact
+import json
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +56,8 @@ def test_confirmation_prompt_interactive(monkeypatch, tmp_path):
     assert called is True
     assert art.path.exists()
     assert code == 2
-    assert results[0]["status"] == "skipped"
+    assert results["skipped"][0]["status"] == "skipped"
+    assert results["partial"] is True
 
 
 @pytest.mark.parametrize("flag", ["force", "non_interactive"])
@@ -76,7 +78,8 @@ def test_force_or_non_interactive_skips_prompt(monkeypatch, tmp_path, flag):
     assert called is False
     assert code == 0
     assert not art.path.exists()
-    assert results[0]["status"] == "removed"
+    assert results["removed"][0]["status"] == "removed"
+    assert results["partial"] is False
 
 
 def test_failure_sets_exit_code(monkeypatch, tmp_path):
@@ -90,7 +93,8 @@ def test_failure_sets_exit_code(monkeypatch, tmp_path):
     options = UninstallOptions(force=True)
     code, results = executor.run(options)
     assert code == 2
-    assert results[0]["status"] == "failed"
+    assert results["errors"][0]["status"] == "failed"
+    assert results["partial"] is True
     assert art.path.exists()
 
 
@@ -104,9 +108,23 @@ def test_idempotent_runs(monkeypatch, tmp_path):
     options = UninstallOptions(force=True)
     code1, results1 = executor.run(options)
     assert code1 == 0
-    assert results1[0]["status"] == "removed"
+    assert results1["removed"][0]["status"] == "removed"
+    assert results1["partial"] is False
     assert not art.path.exists()
 
     code2, results2 = executor.run(options)
     assert code2 == 0
-    assert results2 == []
+    assert results2 == {"removed": [], "skipped": [], "errors": [], "partial": False}
+
+
+def test_json_output(monkeypatch, tmp_path, capsys):
+    art = _make_artifact(tmp_path)
+    monkeypatch.setattr(executor, "_DEF_DETECTORS", [lambda _platform: [art]])
+    options = UninstallOptions(force=True, json=True, dry_run=True)
+    code, results = executor.run(options)
+    captured = capsys.readouterr().out
+    data = json.loads(captured)
+    assert code == 0
+    assert data == results
+    assert data["removed"][0]["path"] == str(art.path)
+    assert data["removed"][0]["status"] == "planned"
