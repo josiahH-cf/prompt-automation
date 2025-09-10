@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 from typing import Iterable
+from datetime import datetime
 
 from .artifacts import Artifact
 from . import detectors
@@ -65,6 +66,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
             privileged = False
 
     removal_failed = False
+    backup_root: Path | None = None
 
     for art in artifacts:
         status = "absent"
@@ -84,14 +86,34 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                         resp = "n"
                     proceed = resp in ("y", "yes")
                 if proceed:
-                    backup_path = _backup(art)
-                    success = _remove(art)
-                    if not success or art.present():
-                        status = "failed"
-                        removal_failed = True
+                    if options.purge_data and art.purge_candidate and not options.no_backup:
+                        if backup_root is None:
+                            ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                            backup_root = Path.home() / ".config" / f"prompt-automation.backup.{ts}"
+                        try:
+                            backup_root.mkdir(parents=True, exist_ok=True)
+                            backup_path = _backup(art, backup_root)
+                        except PermissionError:
+                            print(f"[prompt-automation] Warning: insufficient permissions to back up {art.path}")
+                            status = "permission-denied"
+                            removal_failed = True
+                            proceed = False
+                    if proceed:
+                        try:
+                            success = _remove(art)
+                        except PermissionError:
+                            print(f"[prompt-automation] Warning: insufficient permissions to remove {art.path}")
+                            status = "permission-denied"
+                            removal_failed = True
+                        else:
+                            if not success or art.present():
+                                status = "failed"
+                                removal_failed = True
+                            else:
+                                status = "removed"
                     else:
-                        status = "removed"
-                else:
+                        removal_failed = True
+                if not proceed and status == "absent":
                     status = "skipped"
                     removal_failed = True
         entry = {
@@ -105,7 +127,7 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
             results["removed"].append(entry)
         elif status == "skipped":
             results["skipped"].append(entry)
-        elif status in ("failed", "needs-privilege"):
+        elif status in ("failed", "needs-privilege", "permission-denied"):
             results["errors"].append(entry)
 
     results["partial"] = removal_failed
@@ -138,17 +160,17 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     return (2 if removal_failed else 0), results
 
 
-def _backup(artifact: Artifact) -> Path | None:
+def _backup(artifact: Artifact, root: Path) -> Path | None:
     """Create a backup copy of the artifact before removal."""
-    backup_root = Path.home() / ".prompt-automation" / "backups"
     try:
-        backup_root.mkdir(parents=True, exist_ok=True)
-        target = backup_root / artifact.path.name
+        target = root / artifact.path.name
         if artifact.path.is_dir():
             shutil.copytree(artifact.path, target, dirs_exist_ok=True)
         else:
             shutil.copy2(artifact.path, target)
         return target
+    except PermissionError:
+        raise
     except Exception:
         return None
 
@@ -167,5 +189,7 @@ def _remove(artifact: Artifact) -> bool:
         return True
     except FileNotFoundError:
         return True
+    except PermissionError:
+        raise
     except Exception:
         return False

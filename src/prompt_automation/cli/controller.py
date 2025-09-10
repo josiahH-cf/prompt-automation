@@ -45,6 +45,7 @@ class UninstallOptions:
     force: bool = False
     purge_data: bool = False
     keep_user_data: bool = False
+    no_backup: bool = False
     non_interactive: bool = False
     verbose: bool = False
     json: bool = False
@@ -233,6 +234,7 @@ class PromptCLI:
         uninstall.add_argument("--force", action="store_true", help="Force removal even if in use")
         uninstall.add_argument("--purge-data", action="store_true", help="Delete all associated data")
         uninstall.add_argument("--keep-user-data", action="store_true", help="Preserve user data only")
+        uninstall.add_argument("--no-backup", action="store_true", help="Do not create data backups")
         uninstall.add_argument("--non-interactive", action="store_true", help="Run without prompts")
         uninstall.add_argument("--verbose", action="store_true", help="Increase output verbosity")
         uninstall.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -249,6 +251,7 @@ class PromptCLI:
                 force=args.force,
                 purge_data=args.purge_data,
                 keep_user_data=args.keep_user_data,
+                no_backup=args.no_backup,
                 non_interactive=args.non_interactive,
                 verbose=args.verbose,
                 json=args.json,

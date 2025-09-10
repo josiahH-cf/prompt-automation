@@ -94,7 +94,8 @@ def detect_data_dirs(platform: str | None = None) -> list[Artifact]:
     """Detect configuration and cache directories."""
     _platform_value(platform)
     home = Path.home()
-    config_dir = home / ".prompt-automation"
+    # Follow the XDG base directory specification for config and cache data
+    config_dir = home / ".config" / "prompt-automation"
     cache_dir = home / ".cache" / "prompt-automation"
     log_dir = config_dir / "logs"
     arts = [
