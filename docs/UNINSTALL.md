@@ -27,6 +27,7 @@ command, run with ``UNINSTALL_FEATURE_FLAG=0``.
 - `--verbose` – increase output verbosity
 - `--json` – emit a JSON summary of results
 - `--platform PLATFORM` – override the target platform for testing
+- `--print-elevated-script` – print a script to remove privileged artifacts
 
 ## Behavior
 
@@ -37,6 +38,11 @@ a confirmation is requested before removing each artifact. When purging data,
 files are backed up to `~/.config/prompt-automation.backup.<timestamp>` unless
 `--no-backup` is provided. The `--dry-run` flag prints the planned actions
 without making changes.
+
+When run without elevated privileges, any artifact that requires
+administrative access is skipped and recorded. Use `--print-elevated-script` to
+generate a shell (or PowerShell on Windows) script that removes those paths
+with the necessary permissions.
 
 ## Exit Codes
 
