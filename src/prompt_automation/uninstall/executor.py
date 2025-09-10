@@ -24,8 +24,19 @@ _DEF_DETECTORS: Iterable = (
 )
 
 
-def run(options: "UninstallOptions") -> list[dict[str, object]]:
-    """Run the uninstall routine using provided options."""
+def run(options: "UninstallOptions") -> tuple[int, list[dict[str, object]]]:
+    """Run the uninstall routine using provided options.
+
+    Returns a tuple ``(exit_code, results)`` where ``results`` is a list of
+    dictionaries describing each processed artifact.  ``exit_code`` follows the
+    convention used by the CLI: ``0`` for success, ``1`` for invalid options and
+    ``2`` when a removal operation failed.
+    """
+
+    if options.purge_data and options.keep_user_data:
+        print("Cannot use --purge-data with --keep-user-data", file=sys.stderr)
+        return 1, []
+
     platform = options.platform or sys.platform
     artifacts: list[Artifact] = []
     for func in _DEF_DETECTORS:
@@ -38,7 +49,7 @@ def run(options: "UninstallOptions") -> list[dict[str, object]]:
     if options.keep_user_data or not options.purge_data:
         artifacts = [a for a in artifacts if not a.purge_candidate]
 
-    results = []
+    results: list[dict[str, object]] = []
     privileged = True
     if os.name != "nt":
         try:
@@ -46,18 +57,36 @@ def run(options: "UninstallOptions") -> list[dict[str, object]]:
         except AttributeError:
             privileged = False
 
+    removal_failed = False
+
     for art in artifacts:
         status = "absent"
         backup_path: Path | None = None
         if art.present():
             if art.requires_privilege and not privileged:
                 status = "needs-privilege"
+                removal_failed = True
             elif options.dry_run:
                 status = "planned"
             else:
-                backup_path = _backup(art)
-                _remove(art)
-                status = "removed"
+                proceed = True
+                if not options.force and not options.non_interactive:
+                    try:
+                        resp = input(f"Remove {art.path}? [y/N]: ").strip().lower()
+                    except EOFError:
+                        resp = "n"
+                    proceed = resp in ("y", "yes")
+                if proceed:
+                    backup_path = _backup(art)
+                    success = _remove(art)
+                    if not success or art.present():
+                        status = "failed"
+                        removal_failed = True
+                    else:
+                        status = "removed"
+                else:
+                    status = "skipped"
+                    removal_failed = True
         results.append(
             {
                 "id": art.id,
@@ -73,7 +102,8 @@ def run(options: "UninstallOptions") -> list[dict[str, object]]:
     else:
         for r in results:
             print(f"{r['kind']:20} {r['path']} -> {r['status']}")
-    return results
+
+    return (2 if removal_failed else 0), results
 
 
 def _backup(artifact: Artifact) -> Path | None:
@@ -91,12 +121,19 @@ def _backup(artifact: Artifact) -> Path | None:
         return None
 
 
-def _remove(artifact: Artifact) -> None:
-    """Remove the artifact from the filesystem."""
+def _remove(artifact: Artifact) -> bool:
+    """Remove the artifact from the filesystem.
+
+    Returns ``True`` if the artifact was removed successfully or already
+    absent.  ``False`` is returned when a failure occurred.
+    """
     try:
         if artifact.path.is_dir():
             shutil.rmtree(artifact.path)
         else:
             artifact.path.unlink()
+        return True
     except FileNotFoundError:
-        pass
+        return True
+    except Exception:
+        return False
