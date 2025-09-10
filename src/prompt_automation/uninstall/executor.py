@@ -29,6 +29,17 @@ _DEF_DETECTORS: Iterable = (
 _log = get_logger(__name__)
 
 
+def _determine_exit_code(removal_failed: bool, arg_error: bool) -> int:
+    """Compute the final exit code.
+
+    ``1`` is returned when the user supplied invalid arguments, ``2`` when
+    removal failed for one or more artifacts and ``0`` on success.
+    """
+    if arg_error:
+        return 1
+    return 2 if removal_failed else 0
+
+
 def _safe_path(p: Path) -> str:
     """Return path with home directory masked."""
     try:
@@ -53,26 +64,30 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     artifacts were skipped or failed.
     """
 
+    arg_error = False
     if options.purge_data and options.keep_user_data:
         print("Cannot use --purge-data with --keep-user-data", file=sys.stderr)
-        return 1, []
+        arg_error = True
 
     platform = options.platform or sys.platform
     if options.verbose:
         _log.setLevel(logging.DEBUG)
     _log.debug("starting uninstall on platform=%s", platform)
     artifacts: list[Artifact] = []
-    for func in _DEF_DETECTORS:
-        try:
-            detected = func(platform)
-            artifacts.extend(detected)
-            _log.debug("detector %s found %d artifacts", func.__name__, len(detected))
-        except Exception:
-            _log.debug("detector %s failed", func.__name__)
-            continue
+    if not arg_error:
+        for func in _DEF_DETECTORS:
+            try:
+                detected = func(platform)
+                artifacts.extend(detected)
+                _log.debug(
+                    "detector %s found %d artifacts", func.__name__, len(detected)
+                )
+            except Exception:
+                _log.debug("detector %s failed", func.__name__)
+                continue
 
-    if options.keep_user_data or not options.purge_data:
-        artifacts = [a for a in artifacts if not a.purge_candidate]
+        if options.keep_user_data or not options.purge_data:
+            artifacts = [a for a in artifacts if not a.purge_candidate]
 
     results: dict[str, object] = {
         "removed": [],
@@ -90,80 +105,81 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     removal_failed = False
     backup_root: Path | None = None
 
-    for art in artifacts:
-        status = "absent"
-        backup_path: Path | None = None
-        safe = _safe_path(art.path)
-        _log.debug("processing %s (%s)", art.id, safe)
-        if art.present():
-            if art.requires_privilege and not privileged:
-                status = "needs-privilege"
-                removal_failed = True
-                msg = f"{art.id} requires elevated privileges"
-                _log.warning(msg)
-                print(f"[prompt-automation] Warning: {msg}")
-            elif options.dry_run:
-                status = "planned"
-                _log.debug("would remove %s", art.id)
-            else:
-                proceed = True
-                if not options.force and not options.non_interactive:
-                    try:
-                        resp = input(f"Remove {safe}? [y/N]: ").strip().lower()
-                    except EOFError:
-                        resp = "n"
-                    proceed = resp in ("y", "yes")
-                if proceed:
-                    if options.purge_data and art.purge_candidate and not options.no_backup:
-                        if backup_root is None:
-                            ts = datetime.now().strftime("%Y%m%d%H%M%S")
-                            backup_root = Path.home() / ".config" / f"prompt-automation.backup.{ts}"
-                        try:
-                            backup_root.mkdir(parents=True, exist_ok=True)
-                            backup_path = _backup(art, backup_root)
-                        except PermissionError:
-                            msg = "insufficient permissions to back up artifact"
-                            _log.warning("%s: %s", msg, art.id)
-                            print(f"[prompt-automation] Warning: {msg}")
-                            status = "permission-denied"
-                            removal_failed = True
-                            proceed = False
-                    if proceed:
-                        try:
-                            success = _remove(art)
-                        except PermissionError:
-                            msg = "insufficient permissions to remove artifact"
-                            _log.warning("%s: %s", msg, art.id)
-                            print(f"[prompt-automation] Warning: {msg}")
-                            status = "permission-denied"
-                            removal_failed = True
-                        else:
-                            if not success or art.present():
-                                status = "failed"
-                                removal_failed = True
-                                _log.warning("failed to remove %s", art.id)
-                            else:
-                                status = "removed"
-                                _log.debug("removed %s", art.id)
-                    else:
-                        removal_failed = True
-                if not proceed and status == "absent":
-                    status = "skipped"
+    if not arg_error:
+        for art in artifacts:
+            status = "absent"
+            backup_path: Path | None = None
+            safe = _safe_path(art.path)
+            _log.debug("processing %s (%s)", art.id, safe)
+            if art.present():
+                if art.requires_privilege and not privileged:
+                    status = "needs-privilege"
                     removal_failed = True
-                    _log.warning("user skipped %s", art.id)
-        entry = {
-            "id": art.id,
-            "kind": art.kind,
-            "path": str(art.path),
-            "status": status,
-            "backup": str(backup_path) if backup_path else None,
-        }
-        if status in ("removed", "planned"):
-            results["removed"].append(entry)
-        elif status == "skipped":
-            results["skipped"].append(entry)
-        elif status in ("failed", "needs-privilege", "permission-denied"):
-            results["errors"].append(entry)
+                    msg = f"{art.id} requires elevated privileges"
+                    _log.warning(msg)
+                    print(f"[prompt-automation] Warning: {msg}")
+                elif options.dry_run:
+                    status = "planned"
+                    _log.debug("would remove %s", art.id)
+                else:
+                    proceed = True
+                    if not options.force and not options.non_interactive:
+                        try:
+                            resp = input(f"Remove {safe}? [y/N]: ").strip().lower()
+                        except EOFError:
+                            resp = "n"
+                        proceed = resp in ("y", "yes")
+                    if proceed:
+                        if options.purge_data and art.purge_candidate and not options.no_backup:
+                            if backup_root is None:
+                                ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                                backup_root = Path.home() / ".config" / f"prompt-automation.backup.{ts}"
+                            try:
+                                backup_root.mkdir(parents=True, exist_ok=True)
+                                backup_path = _backup(art, backup_root)
+                            except PermissionError:
+                                msg = "insufficient permissions to back up artifact"
+                                _log.warning("%s: %s", msg, art.id)
+                                print(f"[prompt-automation] Warning: {msg}")
+                                status = "permission-denied"
+                                removal_failed = True
+                                proceed = False
+                        if proceed:
+                            try:
+                                success = _remove(art)
+                            except PermissionError:
+                                msg = "insufficient permissions to remove artifact"
+                                _log.warning("%s: %s", msg, art.id)
+                                print(f"[prompt-automation] Warning: {msg}")
+                                status = "permission-denied"
+                                removal_failed = True
+                            else:
+                                if not success or art.present():
+                                    status = "failed"
+                                    removal_failed = True
+                                    _log.warning("failed to remove %s", art.id)
+                                else:
+                                    status = "removed"
+                                    _log.debug("removed %s", art.id)
+                        else:
+                            removal_failed = True
+                    if not proceed and status == "absent":
+                        status = "skipped"
+                        removal_failed = True
+                        _log.warning("user skipped %s", art.id)
+            entry = {
+                "id": art.id,
+                "kind": art.kind,
+                "path": str(art.path),
+                "status": status,
+                "backup": str(backup_path) if backup_path else None,
+            }
+            if status in ("removed", "planned"):
+                results["removed"].append(entry)
+            elif status == "skipped":
+                results["skipped"].append(entry)
+            elif status in ("failed", "needs-privilege", "permission-denied"):
+                results["errors"].append(entry)
 
     results["partial"] = removal_failed
 
@@ -204,8 +220,8 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     )
     if options.dry_run:
         _log.info("dry run: no changes made")
-
-    return (2 if removal_failed else 0), results
+    exit_code = _determine_exit_code(removal_failed, arg_error)
+    return exit_code, results
 
 
 def _backup(artifact: Artifact, root: Path) -> Path | None:
