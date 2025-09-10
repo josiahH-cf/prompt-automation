@@ -26,8 +26,9 @@ def test_artifact_detection_and_platforms(tmp_path, monkeypatch):
     (tmp_path / ".config/prompt-automation").mkdir(parents=True)
     (tmp_path / ".cache/prompt-automation").mkdir(parents=True)
     (tmp_path / ".config/prompt-automation/logs").mkdir(parents=True)
+    (tmp_path / ".local/state/prompt-automation").mkdir(parents=True)
     data_arts = detectors.detect_data_dirs(platform="linux")
-    assert {a.id for a in data_arts} == {"config-dir", "cache-dir", "log-dir"}
+    assert {a.id for a in data_arts} == {"config-dir", "cache-dir", "state-dir", "log-dir"}
     assert all(a.purge_candidate for a in data_arts)
 
     scripts = tmp_path / "Scripts"
