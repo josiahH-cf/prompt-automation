@@ -145,16 +145,38 @@ def detect_symlink_wrappers(platform: str | None = None) -> list[Artifact]:
 
 
 def detect_data_dirs(platform: str | None = None) -> list[Artifact]:
-    """Detect configuration and cache directories."""
-    _platform_value(platform)
+    """Detect configuration, cache, state, and log directories."""
+
+    platform = _platform_value(platform)
     home = Path.home()
-    # Follow the XDG base directory specification for config and cache data
-    config_dir = home / ".config" / "prompt-automation"
-    cache_dir = home / ".cache" / "prompt-automation"
-    log_dir = config_dir / "logs"
+
+    if platform.startswith("linux"):
+        config_dir = home / ".config" / "prompt-automation"
+        cache_dir = home / ".cache" / "prompt-automation"
+        state_dir = home / ".local" / "state" / "prompt-automation"
+        log_dir = config_dir / "logs"
+    elif platform.startswith("darwin"):
+        config_dir = home / "Library" / "Application Support" / "prompt-automation"
+        cache_dir = home / "Library" / "Caches" / "prompt-automation"
+        state_dir = config_dir / "state"
+        log_dir = home / "Library" / "Logs" / "prompt-automation"
+    elif platform.startswith("win"):
+        appdata = Path(os.environ.get("APPDATA", home))
+        local = Path(os.environ.get("LOCALAPPDATA", home))
+        config_dir = appdata / "prompt-automation"
+        cache_dir = local / "prompt-automation" / "cache"
+        state_dir = local / "prompt-automation" / "state"
+        log_dir = local / "prompt-automation" / "logs"
+    else:
+        config_dir = home / ".config" / "prompt-automation"
+        cache_dir = home / ".cache" / "prompt-automation"
+        state_dir = home / ".local" / "state" / "prompt-automation"
+        log_dir = config_dir / "logs"
+
     arts = [
         Artifact("config-dir", "data", config_dir, purge_candidate=True),
         Artifact("cache-dir", "data", cache_dir, purge_candidate=True),
+        Artifact("state-dir", "data", state_dir, purge_candidate=True),
         Artifact("log-dir", "data", log_dir, purge_candidate=True),
     ]
     return [a for a in arts if a.present()]
