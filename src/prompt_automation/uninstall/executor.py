@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import logging
 import os
 import shutil
 import sys
@@ -12,6 +13,7 @@ from datetime import datetime
 
 from .artifacts import Artifact
 from . import detectors
+from ..errorlog import get_logger
 
 
 _DEF_DETECTORS: Iterable = (
@@ -23,6 +25,21 @@ _DEF_DETECTORS: Iterable = (
     detectors.detect_symlink_wrappers,
     detectors.detect_data_dirs,
 )
+
+_log = get_logger(__name__)
+
+
+def _safe_path(p: Path) -> str:
+    """Return path with home directory masked."""
+    try:
+        home = Path.home().resolve()
+        p_resolved = p.resolve()
+        if str(p_resolved).startswith(str(home)):
+            rel = p_resolved.relative_to(home)
+            return f"~/{rel}" if rel.parts else "~"
+        return p_resolved.name
+    except Exception:
+        return p.name
 
 
 def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
@@ -41,12 +58,17 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
         return 1, []
 
     platform = options.platform or sys.platform
+    if options.verbose:
+        _log.setLevel(logging.DEBUG)
+    _log.debug("starting uninstall on platform=%s", platform)
     artifacts: list[Artifact] = []
     for func in _DEF_DETECTORS:
         try:
-            artifacts.extend(func(platform))
+            detected = func(platform)
+            artifacts.extend(detected)
+            _log.debug("detector %s found %d artifacts", func.__name__, len(detected))
         except Exception:
-            # ignore detector failures, continue
+            _log.debug("detector %s failed", func.__name__)
             continue
 
     if options.keep_user_data or not options.purge_data:
@@ -71,17 +93,23 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
     for art in artifacts:
         status = "absent"
         backup_path: Path | None = None
+        safe = _safe_path(art.path)
+        _log.debug("processing %s (%s)", art.id, safe)
         if art.present():
             if art.requires_privilege and not privileged:
                 status = "needs-privilege"
                 removal_failed = True
+                msg = f"{art.id} requires elevated privileges"
+                _log.warning(msg)
+                print(f"[prompt-automation] Warning: {msg}")
             elif options.dry_run:
                 status = "planned"
+                _log.debug("would remove %s", art.id)
             else:
                 proceed = True
                 if not options.force and not options.non_interactive:
                     try:
-                        resp = input(f"Remove {art.path}? [y/N]: ").strip().lower()
+                        resp = input(f"Remove {safe}? [y/N]: ").strip().lower()
                     except EOFError:
                         resp = "n"
                     proceed = resp in ("y", "yes")
@@ -94,7 +122,9 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                             backup_root.mkdir(parents=True, exist_ok=True)
                             backup_path = _backup(art, backup_root)
                         except PermissionError:
-                            print(f"[prompt-automation] Warning: insufficient permissions to back up {art.path}")
+                            msg = "insufficient permissions to back up artifact"
+                            _log.warning("%s: %s", msg, art.id)
+                            print(f"[prompt-automation] Warning: {msg}")
                             status = "permission-denied"
                             removal_failed = True
                             proceed = False
@@ -102,20 +132,25 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
                         try:
                             success = _remove(art)
                         except PermissionError:
-                            print(f"[prompt-automation] Warning: insufficient permissions to remove {art.path}")
+                            msg = "insufficient permissions to remove artifact"
+                            _log.warning("%s: %s", msg, art.id)
+                            print(f"[prompt-automation] Warning: {msg}")
                             status = "permission-denied"
                             removal_failed = True
                         else:
                             if not success or art.present():
                                 status = "failed"
                                 removal_failed = True
+                                _log.warning("failed to remove %s", art.id)
                             else:
                                 status = "removed"
+                                _log.debug("removed %s", art.id)
                     else:
                         removal_failed = True
                 if not proceed and status == "absent":
                     status = "skipped"
                     removal_failed = True
+                    _log.warning("user skipped %s", art.id)
         entry = {
             "id": art.id,
             "kind": art.kind,
@@ -132,17 +167,21 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
 
     results["partial"] = removal_failed
 
+    removed_count = len(results["removed"])
+    skipped_count = len(results["skipped"])
+    error_count = len(results["errors"])
+
     if options.json:
         print(json.dumps(results, indent=2))
     else:
         rows: list[tuple[str, str]] = []
         for r in results["removed"]:
             label = "would remove" if r["status"] == "planned" else "removed"
-            rows.append((label, r["path"]))
+            rows.append((label, _safe_path(Path(r["path"]))))
         for r in results["skipped"]:
-            rows.append(("skipped", r["path"]))
+            rows.append(("skipped", _safe_path(Path(r["path"]))))
         for r in results["errors"]:
-            rows.append((r["status"], r["path"]))
+            rows.append((r["status"], _safe_path(Path(r["path"]))))
         if rows:
             width = max(len(a) for a, _ in rows) + 2
             print(f"{'Action':{width}}Path")
@@ -151,11 +190,20 @@ def run(options: "UninstallOptions") -> tuple[int, dict[str, object]]:
         else:
             print("No artifacts to process.")
         print(
-            f"\nSummary: removed={len(results['removed'])} "
-            f"skipped={len(results['skipped'])} errors={len(results['errors'])}"
+            f"\nSummary: removed={removed_count} "
+            f"skipped={skipped_count} errors={error_count}"
         )
         if options.dry_run:
             print("DRY RUN: no changes made.")
+
+    _log.info(
+        "summary removed=%d skipped=%d errors=%d",
+        removed_count,
+        skipped_count,
+        error_count,
+    )
+    if options.dry_run:
+        _log.info("dry run: no changes made")
 
     return (2 if removal_failed else 0), results
 
