@@ -268,6 +268,26 @@ class PromptCLI:
             help="Re-write hotkey integration files and verify (safe)",
         )
         parser.add_argument(
+            "--enable-background-hotkey",
+            action="store_true",
+            help="Enable background hotkey integration and persist",
+        )
+        parser.add_argument(
+            "--disable-background-hotkey",
+            action="store_true",
+            help="Disable background hotkey integration and persist",
+        )
+        parser.add_argument(
+            "--enable-espanso",
+            action="store_true",
+            help="Enable espanso integration for background hotkey and persist",
+        )
+        parser.add_argument(
+            "--disable-espanso",
+            action="store_true",
+            help="Disable espanso integration for background hotkey and persist",
+        )
+        parser.add_argument(
             "--theme",
             choices=["light", "dark", "system"],
             help="Override theme for this run (does not persist)",
@@ -331,6 +351,15 @@ class PromptCLI:
         args = parser.parse_args(argv)
         # Register background hotkey if configured
         self._maybe_register_background_hotkey()
+
+        if args.enable_background_hotkey:
+            storage.set_background_hotkey_enabled(True)
+        if args.disable_background_hotkey:
+            storage.set_background_hotkey_enabled(False)
+        if args.enable_espanso:
+            storage.set_espanso_enabled(True)
+        if args.disable_espanso:
+            storage.set_espanso_enabled(False)
 
         if args.command == "uninstall":
             if os.environ.get("UNINSTALL_FEATURE_FLAG", "1") == "0":
