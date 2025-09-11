@@ -1,7 +1,5 @@
 import logging
 
-import logging
-
 from prompt_automation.cli import controller
 from prompt_automation import background_hotkey
 
@@ -62,6 +60,25 @@ def test_background_hotkey_errors_logged(monkeypatch, tmp_path, caplog):
     controller.PromptCLI()._maybe_register_background_hotkey()
 
     assert "background_hotkey_init_failed" in caplog.text
+
+
+def test_env_disables_background_hotkey(monkeypatch, tmp_path, caplog):
+    _prep_home(monkeypatch, tmp_path)
+
+    stub_service = object()
+    monkeypatch.setattr(controller, "global_shortcut_service", stub_service, raising=False)
+    monkeypatch.setattr(controller.storage, "get_background_hotkey_enabled", lambda: True)
+    monkeypatch.setattr(controller, "is_background_hotkey_enabled", lambda: False)
+    monkeypatch.setattr(controller.storage, "_load_settings_payload", lambda: {"background_hotkey": {}})
+
+    called: dict[str, bool] = {}
+    monkeypatch.setattr(controller.background_hotkey, "ensure_registered", lambda s, svc: called.__setitem__("called", True))
+
+    caplog.set_level(logging.WARNING, logger="prompt_automation.cli")
+    controller.PromptCLI()._maybe_register_background_hotkey()
+
+    assert "background_hotkey_env_disabled" in caplog.text
+    assert "called" not in called
 
 
 def test_settings_observer_reacts(monkeypatch, tmp_path):

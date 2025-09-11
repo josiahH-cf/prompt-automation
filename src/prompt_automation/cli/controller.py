@@ -94,7 +94,13 @@ class PromptCLI:
         if not global_shortcut_service:
             return
         try:
-            if not (storage.get_background_hotkey_enabled() and is_background_hotkey_enabled()):
+            if not storage.get_background_hotkey_enabled():
+                return
+            if not is_background_hotkey_enabled():
+                try:
+                    self._log.warning("background_hotkey_env_disabled")
+                except Exception:
+                    pass
                 return
             payload = storage._load_settings_payload()
             settings = payload.get("background_hotkey") or {}
@@ -105,11 +111,18 @@ class PromptCLI:
                 if not global_shortcut_service:
                     return
                 try:
-                    if enabled and is_background_hotkey_enabled():
-                        payload = storage._load_settings_payload()
-                        s = payload.get("background_hotkey") or {}
-                        s["espanso_enabled"] = storage.get_espanso_enabled()
-                        background_hotkey.ensure_registered(s, global_shortcut_service)
+                    if enabled:
+                        if is_background_hotkey_enabled():
+                            payload = storage._load_settings_payload()
+                            s = payload.get("background_hotkey") or {}
+                            s["espanso_enabled"] = storage.get_espanso_enabled()
+                            background_hotkey.ensure_registered(s, global_shortcut_service)
+                        else:
+                            try:
+                                self._log.warning("background_hotkey_env_disabled")
+                            except Exception:
+                                pass
+                            background_hotkey.unregister(global_shortcut_service)
                     else:
                         background_hotkey.unregister(global_shortcut_service)
                 except Exception as exc:
@@ -122,11 +135,18 @@ class PromptCLI:
                 if not global_shortcut_service:
                     return
                 try:
-                    if storage.get_background_hotkey_enabled() and is_background_hotkey_enabled():
-                        payload = storage._load_settings_payload()
-                        s = payload.get("background_hotkey") or {}
-                        s["espanso_enabled"] = enabled
-                        background_hotkey.ensure_registered(s, global_shortcut_service)
+                    if storage.get_background_hotkey_enabled():
+                        if is_background_hotkey_enabled():
+                            payload = storage._load_settings_payload()
+                            s = payload.get("background_hotkey") or {}
+                            s["espanso_enabled"] = enabled
+                            background_hotkey.ensure_registered(s, global_shortcut_service)
+                        else:
+                            try:
+                                self._log.warning("background_hotkey_env_disabled")
+                            except Exception:
+                                pass
+                            background_hotkey.unregister(global_shortcut_service)
                     else:
                         background_hotkey.unregister(global_shortcut_service)
                 except Exception as exc:
