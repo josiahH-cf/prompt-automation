@@ -5,6 +5,7 @@ from __future__ import annotations
 Currently supports:
   - hierarchical_templates: enable hierarchical template browsing in UI/CLI.
   - reminders: enable read-only reminders parsing and rendering.
+  - background_hotkey: enable background hotkey integration.
 
 Resolution order for hierarchical_templates (mimics theme behavior):
   1. Environment variable PROMPT_AUTOMATION_HIERARCHICAL_TEMPLATES
@@ -145,6 +146,38 @@ def is_reminders_timing_enabled() -> bool:
 
 
 __all__.append("is_reminders_timing_enabled")
+
+
+# --- Background hotkey ------------------------------------------------------
+def is_background_hotkey_enabled() -> bool:
+    """Resolve background hotkey feature flag.
+
+    Resolution order:
+      1. Env PA_FEAT_BG_HOTKEY (1/true/on vs 0/false/off)
+      2. Settings Settings/settings.json key "feature_background_hotkey"
+      3. Default: True (enabled)
+    """
+    env = os.environ.get("PA_FEAT_BG_HOTKEY")
+    coerced = _coerce_bool(env) if env is not None else None
+    if coerced is not None:
+        return coerced
+    try:
+        settings = PROMPTS_DIR / "Settings" / "settings.json"
+        if settings.exists():
+            data = json.loads(settings.read_text())
+            v = data.get("feature_background_hotkey")
+            coerced = _coerce_bool(v)
+            if coerced is not None:
+                return coerced
+    except Exception as e:  # pragma: no cover - permissive
+        try:
+            _log.debug("bg_hotkey_flag_read_failed error=%s", e)
+        except Exception:
+            pass
+    return True
+
+
+__all__.append("is_background_hotkey_enabled")
 
 
 # --- Placeholder fast-path (auto-skip collect stage) ------------------------
