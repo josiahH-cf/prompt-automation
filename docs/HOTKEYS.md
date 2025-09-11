@@ -3,6 +3,14 @@
 This project provides platform-specific scripts for launching `prompt-automation` with a keyboard shortcut.
 The default key combination is **Ctrl+Shift+J**. Run `prompt-automation --assign-hotkey` to change it at any time.
 
+## Background Hotkey (Ctrl+Shift+3)
+
+An optional in-app background hotkey can trigger the prompt sequence without relying on platform scripts. It defaults to **Ctrl+Shift+3** and currently works on Windows and Linux (macOS support is planned).
+
+Enable or disable it with `--enable-background-hotkey` / `--disable-background-hotkey` or via the Settings panel (`background_hotkey_enabled`). The combo can be customized in `Settings/settings.json` under `background_hotkey.combo`.
+
+This feature is controlled by the `PA_FEAT_BG_HOTKEY` flag. Set `PA_FEAT_BG_HOTKEY=0` to disable registration regardless of user settings.
+
 The launcher now uses a unified single-window interface for selection, variable
 collection, and review. Set `PROMPT_AUTOMATION_FORCE_LEGACY=1` before launching
 if you prefer the older multi-window dialogs.
