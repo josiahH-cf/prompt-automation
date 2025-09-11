@@ -74,13 +74,19 @@ def on_activate() -> None:
     """
     settings = _settings_ref or {}
     minimal = False
+    espanso_enabled = True
     try:
         if isinstance(settings, dict):
             minimal = bool(settings.get("activateMinimal"))
+            espanso_enabled = bool(settings.get("espanso_enabled", True))
         else:
             minimal = bool(getattr(settings, "activateMinimal", False))
+            espanso_enabled = bool(getattr(settings, "espanso_enabled", True))
     except Exception:
         minimal = False
+        espanso_enabled = True
+    if not espanso_enabled:
+        minimal = True
 
     try:
         if minimal:

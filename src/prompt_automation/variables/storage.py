@@ -5,7 +5,7 @@ import json
 import os
 import platform
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 from ..config import HOME_DIR, PROMPTS_DIR
 from ..errorlog import get_logger
@@ -20,6 +20,9 @@ _PERSIST_FILE = _PERSIST_DIR / "placeholder-overrides.json"
 # Settings file (lives alongside templates so it can be edited via GUI / under VCS if desired)
 _SETTINGS_DIR = PROMPTS_DIR / "Settings"
 _SETTINGS_FILE = _SETTINGS_DIR / "settings.json"
+
+# Registered observers for boolean settings
+_BOOLEAN_OBSERVERS: Dict[str, list[Callable[[bool], None]]] = {}
 
 def _load_settings_payload() -> Dict[str, Any]:
     if not _SETTINGS_FILE.exists():
@@ -38,6 +41,27 @@ def _write_settings_payload(payload: Dict[str, Any]) -> None:
         tmp.replace(_SETTINGS_FILE)
     except Exception as e:  # pragma: no cover - I/O errors
         _log.error("failed to write settings file: %s", e)
+
+
+def add_boolean_setting_observer(key: str, callback: Callable[[bool], None]) -> None:
+    """Register ``callback`` to run when ``key`` is updated via :func:`set_boolean_setting`.
+
+    Observers are lightweight and best-effort; failures are logged but do not
+    propagate. Callbacks receive the new boolean value.
+    """
+
+    _BOOLEAN_OBSERVERS.setdefault(key, []).append(callback)
+
+
+def _notify_boolean_observers(key: str, value: bool) -> None:
+    for cb in _BOOLEAN_OBSERVERS.get(key, []):
+        try:
+            cb(value)
+        except Exception as e:  # pragma: no cover - defensive
+            try:
+                _log.error("settings_observer_failed key=%s error=%s", key, e)
+            except Exception:
+                pass
 
 # --- Theme settings accessors ----------------------------------------------
 def get_setting_theme() -> str | None:
@@ -299,6 +323,7 @@ def set_boolean_setting(key: str, value: bool) -> None:
         payload = _load_settings_payload()
         payload[key] = bool(value)
         _write_settings_payload(payload)
+        _notify_boolean_observers(key, bool(value))
     except Exception as e:  # pragma: no cover
         _log.error("failed to persist boolean setting %s: %s", key, e)
 

@@ -98,7 +98,47 @@ class PromptCLI:
                 return
             payload = storage._load_settings_payload()
             settings = payload.get("background_hotkey") or {}
+            settings["espanso_enabled"] = storage.get_espanso_enabled()
             background_hotkey.ensure_registered(settings, global_shortcut_service)
+
+            def _toggle_bg_hotkey(enabled: bool) -> None:
+                if not global_shortcut_service:
+                    return
+                try:
+                    if enabled and is_background_hotkey_enabled():
+                        payload = storage._load_settings_payload()
+                        s = payload.get("background_hotkey") or {}
+                        s["espanso_enabled"] = storage.get_espanso_enabled()
+                        background_hotkey.ensure_registered(s, global_shortcut_service)
+                    else:
+                        background_hotkey.unregister(global_shortcut_service)
+                except Exception as exc:
+                    try:
+                        self._log.error("background_hotkey_toggle_failed error=%s", exc)
+                    except Exception:
+                        pass
+
+            def _toggle_espanso(enabled: bool) -> None:
+                if not global_shortcut_service:
+                    return
+                try:
+                    if storage.get_background_hotkey_enabled() and is_background_hotkey_enabled():
+                        payload = storage._load_settings_payload()
+                        s = payload.get("background_hotkey") or {}
+                        s["espanso_enabled"] = enabled
+                        background_hotkey.ensure_registered(s, global_shortcut_service)
+                    else:
+                        background_hotkey.unregister(global_shortcut_service)
+                except Exception as exc:
+                    try:
+                        self._log.error("espanso_toggle_failed error=%s", exc)
+                    except Exception:
+                        pass
+
+            storage.add_boolean_setting_observer(
+                "background_hotkey_enabled", _toggle_bg_hotkey
+            )
+            storage.add_boolean_setting_observer("espanso_enabled", _toggle_espanso)
         except Exception as e:
             try:
                 self._log.error("background_hotkey_init_failed error=%s", e)
