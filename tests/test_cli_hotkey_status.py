@@ -14,8 +14,10 @@ def test_hotkey_status_linux(monkeypatch, capsys, tmp_path):
     import prompt_automation.hotkeys.base as base
     monkeypatch.setattr(base.HotkeyManager, 'get_current_hotkey', staticmethod(lambda: 'ctrl+shift+j'))
 
-    # Invoke CLI
+    # Invoke CLI with background hotkey feature disabled to avoid side effects
     import prompt_automation.cli as cli
+    import prompt_automation.cli.controller as controller
+    monkeypatch.setattr(controller, "is_background_hotkey_enabled", lambda: False)
     cli.PromptCLI().main(['--hotkey-status'])
     out = capsys.readouterr().out
     assert 'Current hotkey' in out and 'Espanso YAML: OK' in out
