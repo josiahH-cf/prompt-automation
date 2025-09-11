@@ -4,7 +4,7 @@ This plan follows phased delivery with tests-first, minimal API surface changes,
 
 ## Scope Summary
 - Add a physical on-disk hierarchy scanner with caching and safe CRUD operations.
-- Provide a CLI tree listing behind `--tree` flag; keep existing flat `--list` intact.
+- Provide a CLI tree listing behind `--tree` flag; keep existing flat `--list` intact. Add optional `--filter <pattern>` for name filtering.
 - Expose a feature flag to enable hierarchical behavior in UI without breaking existing flows.
 - Ensure security (no traversal/symlink escape), observability (structured logs, counters), and tests.
 

@@ -180,6 +180,58 @@ class TemplateHierarchyScanner:
             results.append(p)
         return sorted(results)
 
+    # --- Filtering -----------------------------------------------------
+    def scan_filtered(self, pattern: str | None) -> HierarchyNode:
+        """Return a hierarchy optionally filtered by case-insensitive pattern.
 
-__all__ = ["TemplateHierarchyScanner", "HierarchyNode"]
+        Filtering is performed on a cached full scan so repeated calls with
+        different patterns are fast and do not touch the filesystem again
+        within the cache TTL.
+        """
+        tree = self.scan()
+        if not pattern:
+            return tree
+        return filter_tree(tree, pattern)
+
+
+def filter_tree(root: HierarchyNode, pattern: str) -> HierarchyNode:
+    """Return a new tree containing only nodes whose names contain *pattern*.
+
+    Matching is case-insensitive. Folders are included if they or any
+    descendant templates match the pattern.
+    """
+
+    pat = pattern.lower()
+
+    def _filter(node: HierarchyNode) -> Optional[HierarchyNode]:
+        if node.type == "folder":
+            kept: List[HierarchyNode] = []
+            for ch in node.children:
+                res = _filter(ch)
+                if res is not None:
+                    kept.append(res)
+            if pat in node.name.lower():
+                return HierarchyNode(
+                    type=node.type,
+                    name=node.name,
+                    relpath=node.relpath,
+                    children=node.children,
+                )
+            if kept:
+                return HierarchyNode(
+                    type=node.type,
+                    name=node.name,
+                    relpath=node.relpath,
+                    children=kept,
+                )
+            return None
+        if pat in node.name.lower():
+            return node
+        return None
+
+    filtered = _filter(root)
+    return filtered or HierarchyNode(type="folder", name=root.name, relpath=root.relpath, children=[])
+
+
+__all__ = ["TemplateHierarchyScanner", "HierarchyNode", "filter_tree"]
 

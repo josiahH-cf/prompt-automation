@@ -106,11 +106,19 @@ Browse and manage templates using the on‑disk folder structure. This is disabl
 
 - Enable via env: set `PROMPT_AUTOMATION_HIERARCHICAL_TEMPLATES=1` (or add `"hierarchical_templates": true` to `Settings/settings.json`).
 - CLI tree listing: `prompt-automation --list --tree` (use `--flat` to force legacy flat listing).
+- Name filtering: add `--filter <pattern>` to `--list`/`--tree` to restrict output.
 - Safe operations (for GUI adapters / future CLI): create, rename, move, duplicate, and delete templates/folders are sandboxed under `PROMPTS_DIR` with name validation and path traversal protection.
 - Observability: scan and CRUD actions emit structured INFO logs (no template content).
  - GUI toggle: Options → "Toggle Hierarchical Templates" shows current state and persists your choice.
 
 Rollback: unset the env var or set the settings flag to `false` to return to the flat view. No data migration is required—the filesystem is canonical.
+
+Example:
+
+```bash
+prompt-automation --list --filter meeting
+prompt-automation --list --tree --filter docs
+```
 
 ---
 
@@ -614,7 +622,7 @@ Per-template file selections and skip decisions are stored locally in `~/.prompt
 ## Troubleshooting
 
 - Run `prompt-automation --troubleshoot` to print log and database locations.
-- Use `prompt-automation --list` to list available templates.
+- Use `prompt-automation --list` to list available templates. Append `--filter <pattern>` to narrow results.
 - Use `prompt-automation --update` to refresh hotkey configuration and ensure dependencies are properly installed.
 - If the hotkey does not work see [docs/HOTKEYS.md](docs/HOTKEYS.md) for manual setup instructions.
 

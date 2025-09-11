@@ -200,6 +200,12 @@ class PromptCLI:
             help="Force flat listing (overrides feature flag)",
         )
         parser.add_argument(
+            "--filter",
+            type=str,
+            metavar="PATTERN",
+            help="Filter templates/folders by case-insensitive substring",
+        )
+        parser.add_argument(
             "--reset-log", action="store_true", help="Clear usage log database"
         )
         parser.add_argument(
@@ -509,9 +515,11 @@ class PromptCLI:
             except Exception:
                 use_tree = args.tree and not args.flat
             if use_tree:
-                from ..services.hierarchy import TemplateHierarchyScanner, HierarchyNode
+                from ..services.hierarchy import TemplateHierarchyScanner, HierarchyNode, filter_tree
                 scanner = TemplateHierarchyScanner()
                 tree = scanner.scan()
+                if args.filter:
+                    tree = filter_tree(tree, args.filter)
 
                 def _print(node: HierarchyNode, indent: int = 0) -> None:
                     prefix = "  " * indent
@@ -525,10 +533,14 @@ class PromptCLI:
 
                 _print(tree)
             else:
+                pat = args.filter.lower() if args.filter else None
                 for style in list_styles():
+                    items = [p for p in list_prompts(style) if not pat or pat in p.name.lower()]
+                    if not items:
+                        continue
                     print(style)
-                    for tmpl_path in list_prompts(style):
-                        print("  ", tmpl_path.name)
+                    for tmpl_path in items:
+                        print(f"  {tmpl_path.name}")
             return
 
         if args.troubleshoot:
