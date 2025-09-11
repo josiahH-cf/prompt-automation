@@ -26,6 +26,7 @@ Introduce a filesystem-backed hierarchical template browser while preserving the
 - Feature Flag
   - `features.is_hierarchy_enabled()` reads from env `PROMPT_AUTOMATION_HIERARCHICAL_TEMPLATES` or `Settings/settings.json` key `hierarchical_templates` (default false).
   - GUI/CLI can inspect and choose tree vs flat behavior.
+  - CLI supports name filtering via `--filter <pattern>` to trim listings.
 
 ## Public Interfaces (docsignatures)
 
