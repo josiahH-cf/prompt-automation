@@ -3,6 +3,8 @@ def test_cli_hotkey_repair_invokes_update(monkeypatch, tmp_path):
     monkeypatch.setattr('pathlib.Path.home', lambda: tmp_path)
 
     import prompt_automation.cli.__init__ as cli_mod
+    import prompt_automation.cli.controller as controller
+    monkeypatch.setattr(controller, "is_background_hotkey_enabled", lambda: False)
 
     called = {'deps': 0, 'update': 0}
 
