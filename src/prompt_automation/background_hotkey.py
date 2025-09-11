@@ -6,6 +6,7 @@ from typing import Any
 import time
 
 from .errorlog import get_logger
+from .features import is_background_hotkey_enabled
 
 try:  # pragma: no cover - optional dependency
     from . import metrics as _metrics
@@ -35,6 +36,13 @@ def ensure_registered(settings: Any, shortcut_service: Any) -> bool:
     """
     global _settings_ref
     _settings_ref = settings
+
+    if not is_background_hotkey_enabled():
+        try:
+            _log.warning("background_hotkey_env_disabled")
+        except Exception:
+            pass
+        return False
 
     combo = DEFAULT_COMBO
     try:

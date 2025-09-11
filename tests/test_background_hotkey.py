@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 
 import pytest
 
@@ -123,3 +124,20 @@ def test_unregistration_on_toggle(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     controller.storage.set_background_hotkey_enabled(False)
 
     assert stub_service in unreg_calls
+
+
+def test_ensure_registered_respects_env(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
+    calls: list[str] = []
+
+    class StubService:
+        def register_hotkey(self, *_args) -> None:  # pragma: no cover - defensive
+            calls.append("registered")
+
+    monkeypatch.setattr(background_hotkey, "is_background_hotkey_enabled", lambda: False)
+
+    caplog.set_level(logging.WARNING, logger="prompt_automation.background_hotkey")
+    result = background_hotkey.ensure_registered({}, StubService())
+
+    assert result is False
+    assert calls == []
+    assert "background_hotkey_env_disabled" in caplog.text
