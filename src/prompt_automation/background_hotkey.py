@@ -3,8 +3,14 @@ from __future__ import annotations
 """Background hotkey registration helpers."""
 
 from typing import Any
+import time
 
 from .errorlog import get_logger
+
+try:  # pragma: no cover - optional dependency
+    from . import metrics as _metrics
+except Exception:  # pragma: no cover - defensive
+    _metrics = None
 
 HOTKEY_ID = "prompt_automation.activate"
 DEFAULT_COMBO = "Ctrl+Shift+3"
@@ -88,13 +94,36 @@ def on_activate() -> None:
     if not espanso_enabled:
         minimal = True
 
+    start = time.perf_counter()
+    _log.info("background_hotkey_invoked minimal=%s", minimal)
+    if _metrics is not None:
+        try:  # pragma: no cover - optional metrics
+            _metrics.counter("background_hotkey.invocations").inc()
+        except Exception:  # pragma: no cover - defensive
+            pass
+
     try:
         if minimal:
             run_prompt_sequence_minimal()  # type: ignore[name-defined]
         else:
             trigger_prompt_sequence()  # type: ignore[name-defined]
     except Exception as e:  # pragma: no cover - defensive
+        if _metrics is not None:
+            try:  # pragma: no cover - optional metrics
+                _metrics.counter("background_hotkey.failures").inc()
+            except Exception:  # pragma: no cover - defensive
+                pass
         try:
             _log.error("background_hotkey_activation_failed minimal=%s error=%s", minimal, e)
         except Exception:
+            pass
+    finally:
+        try:
+            duration_ms = int((time.perf_counter() - start) * 1000)
+            _log.info(
+                "background_hotkey_completed minimal=%s duration_ms=%s",
+                minimal,
+                duration_ms,
+            )
+        except Exception:  # pragma: no cover - defensive
             pass
