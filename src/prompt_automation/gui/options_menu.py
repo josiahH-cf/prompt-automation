@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict
 
 from ..errorlog import get_logger
 from .constants import INFO_CLOSE_SAVE
+from . import settings_panel as _settings_panel
 from ..variables import storage as _storage
 from ..theme import resolve as _theme_resolve, model as _theme_model, apply as _theme_apply
 from ..features import is_hierarchy_enabled as _hierarchy_enabled, set_user_hierarchy_preference as _set_hierarchy
@@ -866,6 +867,15 @@ def configure_options_menu(
             _log.error("Publish + Install (admin) failed: %s", e)
     esp_menu.add_command(label="Publish + Install (Admin)", command=_publish_and_install_admin)
     opt.add_cascade(label="Espanso", menu=esp_menu)
+
+    # Settings panel entry
+    def _open_settings_panel():  # pragma: no cover - GUI heavy
+        try:
+            _settings_panel.open_settings_panel(root)
+        except Exception as e:
+            _log.error("Settings panel failed: %s", e)
+    opt.add_command(label="Settings...", command=_open_settings_panel)
+    opt.add_separator()
 
     # Help menu with concise workflow and guide
     help_menu = tk.Menu(new_menubar, tearoff=0)
