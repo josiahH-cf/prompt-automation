@@ -459,6 +459,12 @@ To update existing hotkeys after installation or system changes:
 prompt-automation --update
 ```
 
+### Background Hotkey (Ctrl+Shift+3)
+
+`prompt-automation` can also register a lightweight background shortcut that triggers the prompt sequence without relying on the platform hotkey scripts. It defaults to **Ctrl+Shift+3** and is available on Windows and Linux (macOS support is planned).
+
+Toggle it with `--enable-background-hotkey` / `--disable-background-hotkey` or from the Settings panel (`background_hotkey_enabled`). The combo can be changed via `Settings/settings.json` under `background_hotkey.combo`. Set the `PA_FEAT_BG_HOTKEY` environment variable to `0` to disable this feature regardless of settings.
+
 ```
 [Hotkey] -> [Template] -> [Fill] -> [Copy]
 ```
