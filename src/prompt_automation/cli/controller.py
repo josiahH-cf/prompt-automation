@@ -14,7 +14,8 @@ from typing import Any
 from dataclasses import dataclass
 
 
-from .. import logger, paste, update as manifest_update, updater
+from .. import background_hotkey, logger, paste, update as manifest_update, updater
+from ..features import is_background_hotkey_enabled
 from ..menus import (
     ensure_unique_ids,
     list_styles,
@@ -26,7 +27,13 @@ from ..variables import (
     reset_file_overrides,
     reset_single_file_override,
     list_file_overrides,
+    storage,
 )
+
+try:  # Optional background hotkey service
+    from ..services import global_shortcut_service  # type: ignore
+except Exception:  # pragma: no cover - service unavailable
+    global_shortcut_service = None
 
 from .dependencies import check_dependencies, dependency_status
 from .template_select import select_template_cli, pick_prompt_cli
@@ -81,6 +88,22 @@ class PromptCLI:
     pick_prompt_cli = staticmethod(pick_prompt_cli)
     render_template_cli = staticmethod(render_template_cli)
     _append_to_files = staticmethod(_append_to_files)
+
+    def _maybe_register_background_hotkey(self) -> None:
+        """Best-effort background hotkey registration."""
+        if not global_shortcut_service:
+            return
+        try:
+            if not (storage.get_background_hotkey_enabled() and is_background_hotkey_enabled()):
+                return
+            payload = storage._load_settings_payload()
+            settings = payload.get("background_hotkey") or {}
+            background_hotkey.ensure_registered(settings, global_shortcut_service)
+        except Exception as e:
+            try:
+                self._log.error("background_hotkey_init_failed error=%s", e)
+            except Exception:
+                pass
 
     def main(self, argv: list[str] | None = None) -> None:
         """Program entry point."""
@@ -266,6 +289,8 @@ class PromptCLI:
             help="Prompt before removing orphan executables",
         )
         args = parser.parse_args(argv)
+        # Register background hotkey if configured
+        self._maybe_register_background_hotkey()
 
         if args.command == "uninstall":
             if os.environ.get("UNINSTALL_FEATURE_FLAG", "1") == "0":
