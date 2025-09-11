@@ -302,6 +302,28 @@ def set_boolean_setting(key: str, value: bool) -> None:
     except Exception as e:  # pragma: no cover
         _log.error("failed to persist boolean setting %s: %s", key, e)
 
+
+# --- Specific boolean settings --------------------------------------------
+
+def get_background_hotkey_enabled() -> bool:
+    """Return True if background hotkey feature is enabled (default True)."""
+    return get_boolean_setting("background_hotkey_enabled", True)
+
+
+def set_background_hotkey_enabled(enabled: bool) -> None:
+    """Persist background hotkey enabled flag."""
+    set_boolean_setting("background_hotkey_enabled", enabled)
+
+
+def get_espanso_enabled() -> bool:
+    """Return True if Espanso integration is enabled (default True)."""
+    return get_boolean_setting("espanso_enabled", True)
+
+
+def set_espanso_enabled(enabled: bool) -> None:
+    """Persist Espanso integration enabled flag."""
+    set_boolean_setting("espanso_enabled", enabled)
+
 def _normalize_reference_path(path: str) -> str:
     """Normalize reference file path for cross-platform consistency.
 
